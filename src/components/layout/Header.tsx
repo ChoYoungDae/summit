@@ -1,0 +1,44 @@
+"use client";
+
+import Link from "next/link";
+import { Mountain, ChevronLeft } from "lucide-react";
+import { usePathname } from "next/navigation";
+
+export function Header() {
+  const pathname = usePathname();
+  const isRouteContext = pathname.startsWith("/route");
+
+  if (isRouteContext) {
+    return (
+      <header className="fixed top-0 inset-x-0 z-50 h-14 bg-white/80 backdrop-blur-sm flex items-center px-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-0.5 text-[var(--color-primary)] active:opacity-70 transition-opacity"
+        >
+          <ChevronLeft className="w-5 h-5" strokeWidth={2} />
+          <span
+            className="text-[0.9375rem] font-semibold"
+            style={{ fontFamily: "var(--font-en)" }}
+          >
+            Mountains
+          </span>
+        </Link>
+      </header>
+    );
+  }
+
+  return (
+    <header className="fixed top-0 inset-x-0 z-50 h-14 bg-white border-b border-gray-100 flex items-center px-4 shadow-sm">
+      <Mountain
+        className="w-5 h-5 text-[var(--color-primary)] shrink-0"
+        strokeWidth={2}
+      />
+      <span
+        className="ml-2 text-[var(--color-primary)] font-semibold text-[15px] tracking-tight"
+        style={{ fontFamily: "var(--font-en)" }}
+      >
+        Seoul Subway to Summit
+      </span>
+    </header>
+  );
+}

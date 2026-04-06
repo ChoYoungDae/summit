@@ -1,0 +1,19 @@
+{
+  "name": "Seoul Subway to Summit",
+  "short_name": "S3",
+  "description": "Subway-accessible hiking guide for Seoul",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F7FA",
+  "theme_color": "#2E5E4A",
+  "orientation": "portrait-primary",
+  "categories": ["navigation", "sports"],
+  "icons": [
+    {
+      "src": "/globe.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

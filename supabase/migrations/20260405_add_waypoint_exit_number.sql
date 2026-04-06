@@ -1,0 +1,1 @@
+ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS exit_number TEXT;

@@ -1,26 +1,93 @@
+/* ─── All @imports must precede any rules (CSS spec) ────────── */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import "mapbox-gl/dist/mapbox-gl.css";
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ─── Tailwind v4 Custom Theme ──────────────────────────────── */
+@theme {
+  /* Brand Colors */
+  --color-primary:         #2E5E4A; /* Namsan Pine Green    */
+  --color-primary-light:   #3D7A61;
+  --color-primary-dark:    #1E3D30;
+
+  --color-secondary:       #C8362A; /* Dancheong Red        */
+  --color-secondary-light: #D9534F;
+  --color-secondary-dark:  #A02820;
+
+  /* Accents */
+  --color-subway-yellow:   #F5C518; /* Subway highlight / hero accent */
+  --color-warning-soft:    #FFFBEB; /* Sunset bar background          */
+
+  /* Backgrounds */
+  --color-bg-light:        #F7F7FA;
+  --color-bg-dark:         #111116;
+
+  /* Surface / Card */
+  --color-card:            #FFFFFF;
+  --color-card-dark:       #1C1C22;
+
+  /* Text */
+  --color-text-primary:    #111116;
+  --color-text-body:       #6B7280; /* Body / description paragraphs — between primary and muted */
+  --color-text-muted:      #AAABB8;
+  --color-text-on-primary: #FFFFFF;
+
+  /* Fonts */
+  --font-en: "Inter", "Roboto", ui-sans-serif, system-ui, sans-serif;
+  --font-ko: "Pretendard", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-en);
+
+  /* Border */
+  --color-border:          #E8E8EE;
+
+  /* Radius tokens */
+  --radius-card: 0.75rem; /* 12px */
+  --radius-pill: 9999px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Base Styles ───────────────────────────────────────────── */
+:root {
+  --bg: var(--color-bg-light);
+  --fg: var(--color-text-primary);
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: var(--color-bg-dark);
+    --fg: #F0F0F5;
+    color-scheme: dark;
   }
 }
 
+html {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-en);
+  -webkit-font-smoothing: antialiased;
+  height: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Korean font utility ───────────────────────────────────── */
+.font-ko {
+  font-family: var(--font-ko);
+}
+
+/* ─── ETA number update animation ──────────────────────────── */
+@keyframes etaUpdate {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ─── Off-route alert banner pulse ─────────────────────────── */
+@keyframes offRoutePulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(200, 54, 42, 0.55); }
+  50%       { box-shadow: 0 0 0 8px rgba(200, 54, 42, 0);    }
 }
