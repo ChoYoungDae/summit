@@ -106,7 +106,7 @@ const ROUTES: RouteCard[] = [
     active: true,
     href: "/route/1",
     imageUrl:
-      "https://xtuqpqvjgxnclgkkxwgs.supabase.co/storage/v1/object/public/mountains/gwanaksan.webp",
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/mountains/gwanaksan.webp`,
   },
   {
     id: "bukhan-gupabal-baegundae-ui",

@@ -363,7 +363,6 @@ export default function MapView({
   // Map / compass state
   const [isTracking, setIsTracking] = useState(false);
   const [mapBearing, setMapBearing] = useState(0);
-  const [is3D,       setIs3D]       = useState(true);
   const [mapError,   setMapError]   = useState<string | null>(null);
   const [gpsError,   setGpsError]   = useState<string | null>(null);
 
@@ -386,10 +385,9 @@ export default function MapView({
           padding: { top: 100, left: 40, right: 40, bottom: bottomPadding + 40 },
           maxZoom: 15,
           bearing: 0,
-          pitch: 45,
+          pitch: 0,
           duration: 800,
         });
-        setIs3D(true);
       }
       return;
     }
@@ -534,7 +532,6 @@ export default function MapView({
     mapRef.current?.fitBounds(bounds, {
       padding: { top: 100, left: 40, right: 40, bottom: bottomPadding + 40 },
       maxZoom: 15,
-      pitch: 45,
     });
     pollGps();
     gpsIntervalRef.current = setInterval(pollGps, GPS_POLL_MS);
@@ -623,24 +620,9 @@ export default function MapView({
   }, [selectedWaypointIndex, waypoints, isMapLoaded]);
 
   // ── Map interaction handlers ────────────────────────────────────────────────
-  const handleDragStart = useCallback(() => {
-    if ((mapRef.current?.getPitch() ?? 0) > 0) {
-      mapRef.current?.easeTo({ pitch: 0, duration: 600 });
-      setIs3D(false);
-    }
-  }, []);
-
-  const toggle3D = useCallback(() => {
-    const next = !is3D;
-    setIs3D(next);
-    mapRef.current?.easeTo({ pitch: next ? 45 : 0, duration: 600 });
-  }, [is3D]);
+  const handleDragStart = useCallback(() => {}, []);
 
   const handleMapClick = useCallback((e: any) => {
-    if ((mapRef.current?.getPitch() ?? 0) > 0) {
-      mapRef.current?.easeTo({ pitch: 0, duration: 600 });
-      setIs3D(false);
-    }
     if (!onTrailPointClick || track.length === 0) return;
 
     // Find nearest track point by geographic distance — no layer query needed
@@ -928,26 +910,6 @@ export default function MapView({
           </div>
         );
       })()}
-
-      {/* 3D / 2D toggle button — floats just above the bottom sheet */}
-      <button
-        onClick={toggle3D}
-        aria-label={is3D ? "Switch to 2D view" : "Switch to 3D view"}
-        className="absolute right-3 z-10
-                   w-9 h-9 rounded-full
-                   flex items-center justify-center
-                   shadow-lg transition-colors
-                   text-[10px] font-bold"
-        style={{
-          bottom: controlsBottomOffset + 52,
-          transition: controlsTransition,
-          background: is3D ? "#2E5E4A" : "rgba(255,255,255,0.92)",
-          color: is3D ? "#fff" : "#2E5E4A",
-          border: is3D ? "none" : "1px solid rgba(0,0,0,0.1)",
-        }}
-      >
-        {is3D ? "3D" : "2D"}
-      </button>
 
       {/* Compass / auto-rotate button — floats just above the bottom sheet */}
       <button
