@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("waypoints")
-    .select("id, mountain_id, slug, name, type, lat, lon, elevation_m, image_url, description, exit_number")
+    .select("id, mountain_id, slug, name, type, lat, lon, elevation_m, image_url, description, exit_number, subway_line, subway_station, ars_id, bus_numbers")
     .eq("mountain_id", mountainId)
     .order("id");
 
@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
   const descEn     = (form.get("descEn") as string)?.trim() ?? "";
   const descKo     = (form.get("descKo") as string)?.trim() ?? "";
   const exitNumber = (form.get("exit_number") as string)?.trim() ?? "";
+  const subwayLine = (form.get("subway_line") as string)?.trim() ?? "";
+  const subwayStation = (form.get("subway_station") as string)?.trim() ?? "";
+  const arsId      = (form.get("ars_id")      as string)?.trim() ?? "";
+  const busNumbers = (form.get("bus_numbers") as string)?.trim() ?? "";
   const imageFile  = form.get("image");
 
   const missing = [
@@ -96,6 +100,10 @@ export async function POST(req: NextRequest) {
     type,
     slug: waypointSlug,
     exit_number: exitNumber || null,
+    subway_line: subwayLine || null,
+    subway_station: subwayStation || null,
+    ars_id: arsId || null,
+    bus_numbers: busNumbers || null,
     ...(imageUrl  ? { image_url:   imageUrl   } : {}),
     ...(descJsonb ? { description: descJsonb  } : {}),
   }).select("id").single();
@@ -120,6 +128,10 @@ export async function PATCH(req: NextRequest) {
   const descEn       = (form.get("descEn")      as string | null)?.trim() ?? "";
   const descKo       = (form.get("descKo")      as string | null)?.trim() ?? "";
   const exitNumber   = (form.get("exit_number") as string | null)?.trim();
+  const subwayLine   = (form.get("subway_line") as string | null)?.trim();
+  const subwayStation = (form.get("subway_station") as string | null)?.trim();
+  const arsId        = (form.get("ars_id")      as string | null)?.trim();
+  const busNumbers   = (form.get("bus_numbers") as string | null)?.trim();
   const imageFile    = form.get("image");
   const mountainSlug = (form.get("mountainSlug") as string | null)?.trim() ?? "unknown";
 
@@ -135,6 +147,10 @@ export async function PATCH(req: NextRequest) {
     ...(descKo ? { ko: descKo } : {}),
   };
   if (exitNumber !== undefined) updates.exit_number = exitNumber || null;
+  if (subwayLine !== undefined) updates.subway_line = subwayLine || null;
+  if (subwayStation !== undefined) updates.subway_station = subwayStation || null;
+  if (arsId !== undefined) updates.ars_id = arsId || null;
+  if (busNumbers !== undefined) updates.bus_numbers = busNumbers || null;
 
   if (imageFile instanceof File && imageFile.size > 0) {
     updates.image_url = await uploadImage(imageFile, `${mountainSlug}/waypoints`);

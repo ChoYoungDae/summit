@@ -10,17 +10,19 @@ import Map, {
 import type { MapRef } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Waypoint } from "@/types/trail";
-import { Footprints, GitFork, Camera, Flag, TrainFront } from "lucide-react";
-
-type AccessMode = "walk" | "bus";
+import { Footprints, GitFork, Camera, Flag, TrainFront, Bus } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { t } from "@/lib/i18n";
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
-const COLOR_PRIMARY      = "#2E5E4A"; // Namsan Pine Green
-const COLOR_SECONDARY    = "#C8362A"; // Dancheong Red
-const COLOR_DESCEND      = "#6366F1"; // Purple Indigo (Vibrant)
+const COLOR_BUS          = "#FF7A00"; // Bright Orange
+const COLOR_ASCENT       = "#10B981"; // Emerald Green
+const COLOR_DESCENT      = "#8B5CF6"; // Purple Indigo
+const COLOR_PRIMARY      = "#2E5E4A"; // Namsan Pine Green (Marker base)
+const COLOR_SECONDARY    = "#C8362A"; // Dancheong Red (GPS pulse)
 const COLOR_GPS          = "#2E5E4A";
 const COLOR_GPS_OFF      = "#C8362A";
+const COLOR_CASING       = "#FFFFFF";
 
 // ── Waypoint marker config (Lucide icon-based) ────────────────────────────────
 type MarkerStyle = {
@@ -111,6 +113,15 @@ function haversineM(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function getBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toR = (d: number) => (d * Math.PI) / 180;
+  const y = Math.sin(toR(lon2 - lon1)) * Math.cos(toR(lat2));
+  const x = Math.cos(toR(lat1)) * Math.sin(toR(lat2)) -
+            Math.sin(toR(lat1)) * Math.cos(toR(lat2)) * Math.cos(toR(lon2 - lon1));
+  const brng = Math.atan2(y, x);
+  return (brng * 180 / Math.PI + 360) % 360;
+}
+
 function checkOffRoute(
   lat: number,
   lon: number,
@@ -139,7 +150,7 @@ function StationMarker({
   const exitNum = wpt.exitNumber;
   const BG_SOFT_DARK = "#2D2D2D";
   const TEXT_YELLOW = "#FFCE00";
-  const size = isSelected ? 34 : 30;
+  const size = isSelected ? 28 : 24;
 
   return (
     <div
@@ -155,10 +166,10 @@ function StationMarker({
         alignItems: "center",
         justifyContent: "center",
         background: BG_SOFT_DARK,
-        borderRadius: "4px", // Square with slight rounding
+        borderRadius: "4px",
         boxShadow: isSelected
-          ? `0 0 0 2px #fff, 0 4px 12px rgba(0,0,0,0.5)`
-          : "0 2px 8px rgba(0,0,0,0.35)",
+          ? `0 0 0 1.5px #fff, 0 3px 8px rgba(0,0,0,0.5)`
+          : "0 1.5px 5px rgba(0,0,0,0.35)",
         cursor: "pointer",
         userSelect: "none",
         transition: "width 0.2s, height 0.2s, box-shadow 0.2s",
@@ -167,17 +178,21 @@ function StationMarker({
       {exitNum ? (
         <span
           style={{
-            fontWeight: 900,
-            fontSize: isSelected ? 19 : 17,
+            fontWeight: 700,
+            fontSize: isSelected ? 16 : 14,
             color: TEXT_YELLOW,
-            lineHeight: 1,
-            fontFamily: "var(--font-ko)", // Use bold Korean font for numbers if needed
+            lineHeight: isSelected ? "16px" : "14px",
+            fontFamily: "var(--font-ko)",
+            textRendering: "optimizeLegibility",
+            WebkitFontSmoothing: "subpixel-antialiased",
+            MozOsxFontSmoothing: "auto",
+            letterSpacing: "-0.02em",
           }}
         >
           {exitNum}
         </span>
       ) : (
-        <TrainFront size={isSelected ? 19 : 17} color={TEXT_YELLOW} strokeWidth={2.5} />
+        <TrainFront size={isSelected ? 16 : 14} color={TEXT_YELLOW} strokeWidth={2.5} />
       )}
     </div>
   );
@@ -188,11 +203,13 @@ function WaypointDot({
   onClick,
   isSelected = false,
   locale = "en",
+  rotation = 0,
 }: {
   wpt: Waypoint;
   onClick: () => void;
   isSelected?: boolean;
   locale?: string;
+  rotation?: number;
 }) {
   if (wpt.type === "STATION") {
     return <StationMarker wpt={wpt} onClick={onClick} isSelected={isSelected} locale={locale} />;
@@ -224,7 +241,9 @@ function WaypointDot({
         filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
       }}
     >
-      <Icon size={iconSize} color={s.iconColor} strokeWidth={2} />
+      <div style={{ transform: `rotate(${rotation}deg)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon size={iconSize} color={s.iconColor} strokeWidth={2} />
+      </div>
     </div>
   );
 }
@@ -238,6 +257,36 @@ function waypointAlertMessage(wpt: Waypoint, locale: string): string {
     case "TRAILHEAD": return `${ui.alert.TRAILHEAD} — ${wptName}`;
     default:          return wptName;
   }
+}
+
+/** Bus chip marker — shows at the bus stop coordinate on bus segments */
+function BusChip({ busNumbers, color, chipTextColor }: { busNumbers?: string; color?: string; chipTextColor?: string }) {
+  const bg       = color         ?? COLOR_BUS;
+  const textColor = chipTextColor ?? "#FFFFFF";
+  return (
+    <div
+      className="font-num"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "0 8px",
+        borderRadius: 4,
+        background: bg,
+        color: textColor,
+        fontSize: 11,
+        fontWeight: "bold",
+        height: 20,
+        lineHeight: 1,
+        whiteSpace: "nowrap",
+        pointerEvents: "none",
+        marginBottom: 8,
+      }}
+    >
+      <Bus size={13} strokeWidth={2.5} />
+      {busNumbers && <span>{busNumbers}</span>}
+    </div>
+  );
 }
 
 function HoverDot({ ele }: { ele?: number }) {
@@ -305,6 +354,17 @@ function GpsArrow({
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────────
+export interface BusSegmentInfo {
+  /** Coordinate [lon, lat] where the bus is boarded / alighted — shows bus chip */
+  stopCoord?: [number, number];
+  /** Bus route numbers to display in the chip, e.g. "704, 34" */
+  busNumbers?: string;
+  /** Hex color derived from Seoul bus number format (간선/지선/광역/순환) */
+  color?: string;
+  /** Chip text color — white for most types, dark (#212529) for yellow 순환 */
+  chipTextColor?: string;
+}
+
 export interface MapViewProps {
   track: [number, number, number][];
   waypoints: Waypoint[];
@@ -314,12 +374,22 @@ export interface MapViewProps {
   isHiking?: boolean;
   /** Index of the currently selected waypoint — drives flyTo + marker highlight */
   selectedWaypointIndex?: number | null;
-  /** GPS coordinates [lon, lat] of the access route (subway → trailhead) */
-  accessTrack?: [number, number][];
-  /** GPS coordinates [lon, lat] of the return route (trail exit → subway) */
-  returnTrack?: [number, number][];
-  /** walk → dashed green line; bus → solid orange line */
-  accessMode?: AccessMode;
+  /** GPS coordinates [lon, lat] of the bus component of the approach route */
+  approachBusTrack?: [number, number][];
+  /** GPS coordinates [lon, lat] of the walk component of the approach route */
+  approachWalkTrack?: [number, number][];
+  /** GPS coordinates [lon, lat] of the bus component of the return route */
+  returnBusTrack?: [number, number][];
+  /** GPS coordinates [lon, lat] of the walk component of the return route */
+  returnWalkTrack?: [number, number][];
+  /** true → approach track styled as bus (thin, 60 % opacity) */
+  approachIsBus?: boolean;
+  /** true → return track styled as bus (thin, 60 % opacity) */
+  returnIsBus?: boolean;
+  /** Bus chip info for the approach segment */
+  approachBusInfo?: BusSegmentInfo;
+  /** Bus chip info for the return segment */
+  returnBusInfo?: BusSegmentInfo;
   /**
    * Pixels of bottom padding for the Mapbox camera.
    * When the bottom sheet rises, pass its visible height so the trail
@@ -345,9 +415,14 @@ export default function MapView({
   onTrailPointClick,
   isHiking = false,
   selectedWaypointIndex = null,
-  accessTrack,
-  returnTrack,
-  accessMode = "walk",
+  approachBusTrack = [],
+  approachWalkTrack = [],
+  returnBusTrack = [],
+  returnWalkTrack = [],
+  approachIsBus = false,
+  returnIsBus = false,
+  approachBusInfo,
+  returnBusInfo,
   bottomPadding = 0,
   controlsBottomOffset = 88,
   locale = "en",
@@ -409,14 +484,20 @@ export default function MapView({
         bounds: [[126.96, 37.55], [126.99, 37.58]] as [[number, number], [number, number]],
       };
     }
-    // Include access track coords in bounds so the full journey is visible on load
+    // Include all access/return track coords in bounds
     const allLons = [
       ...track.map(([lon]) => lon),
-      ...(accessTrack ?? []).map(([lon]) => lon),
+      ...approachBusTrack.map(([lon]) => lon),
+      ...approachWalkTrack.map(([lon]) => lon),
+      ...returnBusTrack.map(([lon]) => lon),
+      ...returnWalkTrack.map(([lon]) => lon),
     ];
     const allLats = [
       ...track.map(([, lat]) => lat),
-      ...(accessTrack ?? []).map(([, lat]) => lat),
+      ...approachBusTrack.map(([, lat]) => lat),
+      ...approachWalkTrack.map(([, lat]) => lat),
+      ...returnBusTrack.map(([, lat]) => lat),
+      ...returnWalkTrack.map(([, lat]) => lat),
     ];
     return {
       bounds: [
@@ -424,27 +505,27 @@ export default function MapView({
         [Math.max(...allLons), Math.max(...allLats)],
       ] as [[number, number], [number, number]],
     };
-  }, [track, accessTrack]);
+  }, [track, approachBusTrack, approachWalkTrack, returnBusTrack, returnWalkTrack]);
 
-  // Access route GeoJSON
-  const accessGeoJSON = useMemo<GeoJSON.Feature<GeoJSON.LineString> | null>(() => {
-    if (!accessTrack || accessTrack.length < 2) return null;
-    return {
-      type: "Feature",
-      properties: {},
-      geometry: { type: "LineString", coordinates: accessTrack },
-    };
-  }, [accessTrack]);
+  const approachBusGeoJSON = useMemo<GeoJSON.Feature<GeoJSON.LineString> | null>(() => {
+    if (!approachBusTrack || approachBusTrack.length < 2) return null;
+    return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: approachBusTrack } };
+  }, [approachBusTrack]);
 
-  // Return route GeoJSON
-  const returnGeoJSON = useMemo<GeoJSON.Feature<GeoJSON.LineString> | null>(() => {
-    if (!returnTrack || returnTrack.length < 2) return null;
-    return {
-      type: "Feature",
-      properties: {},
-      geometry: { type: "LineString", coordinates: returnTrack },
-    };
-  }, [returnTrack]);
+  const approachWalkGeoJSON = useMemo<GeoJSON.Feature<GeoJSON.LineString> | null>(() => {
+    if (!approachWalkTrack || approachWalkTrack.length < 2) return null;
+    return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: approachWalkTrack } };
+  }, [approachWalkTrack]);
+
+  const returnBusGeoJSON = useMemo<GeoJSON.Feature<GeoJSON.LineString> | null>(() => {
+    if (!returnBusTrack || returnBusTrack.length < 2) return null;
+    return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: returnBusTrack } };
+  }, [returnBusTrack]);
+
+  const returnWalkGeoJSON = useMemo<GeoJSON.Feature<GeoJSON.LineString> | null>(() => {
+    if (!returnWalkTrack || returnWalkTrack.length < 2) return null;
+    return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: returnWalkTrack } };
+  }, [returnWalkTrack]);
 
   /** Nearest waypoint within alert radius while hiking (rest type excluded). */
   const nearAlertWaypoint = useMemo<Waypoint | null>(() => {
@@ -526,9 +607,15 @@ export default function MapView({
     );
   }, []); // stable — only touches refs and state setters
 
-  // Start GPS once the map style is loaded
   const handleMapLoad = useCallback(() => {
     setIsMapLoaded(true);
+    const map = mapRef.current?.getMap();
+    if (map) {
+      map.loadImage("/footprint.svg", (error, image) => {
+        if (!error && image) map.addImage("footprint", image);
+      });
+    }
+
     mapRef.current?.fitBounds(bounds, {
       padding: { top: 100, left: 40, right: 40, bottom: bottomPadding + 40 },
       maxZoom: 15,
@@ -700,108 +787,180 @@ export default function MapView({
       >
         <AttributionControl compact position="bottom-right" />
 
-        {/* Access route — dashed (walk) or solid orange (bus) */}
-        {accessGeoJSON && (
-          <Source id="access-route" type="geojson" data={accessGeoJSON}>
-            {accessMode === "bus" && (
-              <Layer
-                id="access-casing"
-                type="line"
-                layout={{ "line-join": "round", "line-cap": "round" }}
-                paint={{ "line-color": "#ffffff", "line-width": 6, "line-opacity": 0.8 }}
-              />
-            )}
+        {/* ── Approach Segments ── */}
+
+        {/* Approach Walk Part (Emerald Dashed) */}
+        {approachWalkGeoJSON && (
+          <Source id="approach-walk-route" type="geojson" data={approachWalkGeoJSON}>
+            {/* Casing */}
             <Layer
-              id="access-line"
+              id="approach-walk-casing"
               type="line"
-              layout={{
-                "line-join": "round",
-                "line-cap": accessMode === "walk" ? "butt" : "round",
-              }}
-              paint={
-                accessMode === "walk"
-                  ? {
-                      "line-color": "#2E5E4A",
-                      "line-width": 5,
-                      "line-dasharray": [1, 1],
-                      "line-opacity": 0.65,
-                    }
-                  : {
-                      "line-color": "#F97316",
-                      "line-width": 5,
-                      "line-opacity": 0.9,
-                    }
-              }
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 8, "line-opacity": 1.0 }}
+            />
+            {/* Dashed Line */}
+            <Layer
+              id="approach-walk-line"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "butt" }}
+              paint={{ "line-color": COLOR_ASCENT, "line-width": 4.5, "line-dasharray": [1, 1], "line-opacity": 0.8 }}
             />
           </Source>
         )}
 
-        {/* Return route — dashed (walk) or solid orange (bus) */}
-        {returnGeoJSON && (
-          <Source id="return-route" type="geojson" data={returnGeoJSON}>
-            {accessMode === "bus" && (
-              <Layer
-                id="return-casing"
-                type="line"
-                layout={{ "line-join": "round", "line-cap": "round" }}
-                paint={{ "line-color": "#ffffff", "line-width": 6, "line-opacity": 0.8 }}
-              />
-            )}
+        {/* Approach Bus Part (Triple-Layer Road) */}
+        {approachBusGeoJSON && (
+          <Source id="approach-bus-route" type="geojson" data={approachBusGeoJSON}>
+            {/* Casing (Outer) */}
             <Layer
-              id="return-line"
+              id="approach-bus-casing"
               type="line"
-              layout={{
-                "line-join": "round",
-                "line-cap": accessMode === "walk" ? "butt" : "round",
-              }}
-              paint={
-                accessMode === "walk"
-                  ? {
-                      "line-color": COLOR_DESCEND,
-                      "line-width": 5,
-                      "line-dasharray": [1, 1],
-                      "line-opacity": 0.65,
-                    }
-                  : {
-                      "line-color": "#F97316",
-                      "line-width": 5,
-                      "line-opacity": 0.9,
-                    }
-              }
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 13, "line-opacity": 1.0 }}
+            />
+            {/* Glow */}
+            <Layer
+              id="approach-bus-glow"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": approachBusInfo?.color ?? COLOR_BUS, "line-width": 16, "line-opacity": 0.12 }}
+            />
+            {/* Main Road Line */}
+            <Layer
+              id="approach-bus-line"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": approachBusInfo?.color ?? COLOR_BUS, "line-width": 10, "line-opacity": 1.0 }}
+            />
+            {/* Center Stripe */}
+            <Layer
+              id="approach-bus-center"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 1.5, "line-opacity": 0.9 }}
             />
           </Source>
         )}
 
-        {/* Ascending trail — trailhead → summit (Pine Green) */}
+        {/* ── Return Segments ── */}
+
+        {/* Return Walk Part (Purple Dashed) */}
+        {returnWalkGeoJSON && (
+          <Source id="return-walk-route" type="geojson" data={returnWalkGeoJSON}>
+            {/* Casing */}
+            <Layer
+              id="return-walk-casing"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 8, "line-opacity": 1.0 }}
+            />
+            {/* Dashed Line */}
+            <Layer
+              id="return-walk-line"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "butt" }}
+              paint={{ "line-color": COLOR_DESCENT, "line-width": 4.5, "line-dasharray": [1, 1], "line-opacity": 0.8 }}
+            />
+          </Source>
+        )}
+
+        {/* Return Bus Part (Triple-Layer Road) */}
+        {returnBusGeoJSON && (
+          <Source id="return-bus-route" type="geojson" data={returnBusGeoJSON}>
+            {/* Casing (Outer) */}
+            <Layer
+              id="return-bus-casing"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 13, "line-opacity": 1.0 }}
+            />
+            {/* Glow */}
+            <Layer
+              id="return-bus-glow"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": returnBusInfo?.color ?? COLOR_BUS, "line-width": 16, "line-opacity": 0.12 }}
+            />
+            {/* Main Road Line */}
+            <Layer
+              id="return-bus-line"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": returnBusInfo?.color ?? COLOR_BUS, "line-width": 10, "line-opacity": 1.0 }}
+            />
+            {/* Center Stripe */}
+            <Layer
+              id="return-bus-center"
+              type="line"
+              layout={{ "line-join": "round", "line-cap": "round" }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 1.5, "line-opacity": 0.9 }}
+            />
+          </Source>
+        )}
+
+        {/* Ascending trail — trailhead → summit (Emerald Green) */}
         <Source id="trail-ascend" type="geojson" data={ascendGeoJSON}>
+          {/* Casing */}
           <Layer
             id="trail-ascend-casing"
             type="line"
             layout={{ "line-join": "round", "line-cap": "round" }}
-            paint={{ "line-color": "#ffffff", "line-width": 7, "line-opacity": 1.0 }}
+            paint={{ "line-color": COLOR_CASING, "line-width": 8.5, "line-opacity": 1.0 }}
           />
+          {/* Main Line */}
           <Layer
             id="trail-ascend-line"
             type="line"
             layout={{ "line-join": "round", "line-cap": "round" }}
-            paint={{ "line-color": COLOR_PRIMARY, "line-width": 5 }}
+            paint={{ "line-color": COLOR_ASCENT, "line-width": 5 }}
+          />
+          {/* Footprints */}
+          <Layer
+            id="trail-ascend-footprints"
+            type="symbol"
+            minzoom={14}
+            layout={{
+              "icon-image": "footprint",
+              "icon-size": 0.45,
+              "symbol-placement": "line",
+              "symbol-spacing": 60,
+              "icon-rotate": 90,
+              "icon-allow-overlap": true
+            }}
           />
         </Source>
 
-        {/* Descending trail — summit → end (Cool-Down Blue) */}
+        {/* Descending trail — summit → end (Purple Indigo) */}
         {descendGeoJSON && (
           <Source id="trail-descend" type="geojson" data={descendGeoJSON}>
+            {/* Casing */}
             <Layer
               id="trail-descend-casing"
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": "#ffffff", "line-width": 7, "line-opacity": 1.0 }}
+              paint={{ "line-color": COLOR_CASING, "line-width": 8.5, "line-opacity": 1.0 }}
             />
+            {/* Main Line */}
             <Layer
               id="trail-descend-line"
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": COLOR_DESCEND, "line-width": 5 }}
+              paint={{ "line-color": COLOR_DESCENT, "line-width": 5 }}
+            />
+            {/* Footprints */}
+            <Layer
+              id="trail-descend-footprints"
+              type="symbol"
+              minzoom={14}
+              layout={{
+                "icon-image": "footprint",
+                "icon-size": 0.45,
+                "symbol-placement": "line",
+                "symbol-spacing": 60,
+                "icon-rotate": 90,
+                "icon-allow-overlap": true
+              }}
             />
           </Source>
         )}
@@ -817,21 +976,67 @@ export default function MapView({
         </Source>
 
         {/* Waypoint markers */}
-        {waypoints.map((wpt, idx) => (
+        {waypoints.map((wpt, idx) => {
+          // Calculate rotation for start/end points to point along the trail
+          let rotation = 0;
+          if (track && track.length >= 2) {
+            const dStart = haversineM(wpt.lat, wpt.lon, track[0][1], track[0][0]);
+            const dEnd = haversineM(wpt.lat, wpt.lon, track[track.length - 1][1], track[track.length - 1][0]);
+            
+            if (dStart < 40) {
+              // Point directed towards the first segment
+              rotation = getBearing(track[0][1], track[0][0], track[1][1], track[1][0]);
+            } else if (dEnd < 40) {
+              // Point directed along the last segment
+              rotation = getBearing(track[track.length - 2][1], track[track.length - 2][0], track[track.length - 1][1], track[track.length - 1][0]);
+            }
+          }
+
+          return (
+            <Marker
+              key={`${wpt.lon}-${wpt.lat}`}
+              longitude={wpt.lon}
+              latitude={wpt.lat}
+              anchor="center"
+            >
+              <WaypointDot
+                wpt={wpt}
+                onClick={() => onWaypointClick?.(wpt)}
+                isSelected={selectedWaypointIndex === idx}
+                locale={locale}
+                rotation={rotation}
+              />
+            </Marker>
+          );
+        })}
+
+        {/* Bus stop markers — shown at the boarding/alighting point of bus segments */}
+        {approachIsBus && approachBusInfo?.stopCoord && (
           <Marker
-            key={`${wpt.lon}-${wpt.lat}`}
-            longitude={wpt.lon}
-            latitude={wpt.lat}
-            anchor="center"
+            longitude={approachBusInfo.stopCoord[0]}
+            latitude={approachBusInfo.stopCoord[1]}
+            anchor="bottom"
           >
-            <WaypointDot
-              wpt={wpt}
-              onClick={() => onWaypointClick?.(wpt)}
-              isSelected={selectedWaypointIndex === idx}
-              locale={locale}
+            <BusChip 
+              busNumbers={approachBusInfo.busNumbers} 
+              color={approachBusInfo.color} 
+              chipTextColor={approachBusInfo.chipTextColor} 
             />
           </Marker>
-        ))}
+        )}
+        {returnIsBus && returnBusInfo?.stopCoord && (
+          <Marker
+            longitude={returnBusInfo.stopCoord[0]}
+            latitude={returnBusInfo.stopCoord[1]}
+            anchor="bottom"
+          >
+            <BusChip 
+              busNumbers={returnBusInfo.busNumbers} 
+              color={returnBusInfo.color} 
+              chipTextColor={returnBusInfo.chipTextColor} 
+            />
+          </Marker>
+        )}
 
         {/* Elevation-chart hover sync marker */}
         {hoveredPoint && (
@@ -846,6 +1051,7 @@ export default function MapView({
             <GpsArrow rotation={arrowRotation} isOffRoute={isOffRoute} />
           </Marker>
         )}
+
       </Map>
 
       {/* GPS Secure Origin (HTTPS) warning pill */}

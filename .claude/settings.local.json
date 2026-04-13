@@ -4,7 +4,8 @@
       "Bash(npx tsc:*)",
       "Bash(node -e \"const r = require\\('./node_modules/recharts'\\); console.log\\(Object.keys\\(r\\).filter\\(k => k.toLowerCase\\(\\).includes\\('scale'\\) || k.toLowerCase\\(\\).includes\\('plot'\\) || k.toLowerCase\\(\\).includes\\('axis'\\)\\)\\)\")",
       "Bash(node -e \"const r = require\\('./node_modules/recharts'\\); const C = r.Customized; console.log\\(C.toString\\(\\).slice\\(0, 500\\)\\)\")",
-      "WebSearch"
+      "WebSearch",
+      "Bash(ls d:/projects/summit/src/app/route/[slug]/)"
     ]
   }
 }

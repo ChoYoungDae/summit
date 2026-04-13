@@ -98,12 +98,104 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("segments")
-    .select("id, slug, segment_type, start_waypoint_id, end_waypoint_id, distance_m, total_ascent_m, total_descent_m, estimated_time_min, difficulty")
+    .select("id, slug, name, segment_type, start_waypoint_id, end_waypoint_id, distance_m, total_ascent_m, total_descent_m, estimated_time_min, difficulty, is_bus_combined, bus_details")
     .eq("mountain_id", mountainId)
     .order("id");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
+}
+
+// PATCH /api/admin/segments — FormData; all fields optional except id
+export async function PATCH(req: NextRequest) {
+  const form             = await req.formData();
+  const id               = parseInt(form.get("id") as string);
+  const segmentType      = (form.get("segmentType") as string | null)?.trim().toUpperCase();
+  const startWaypointId  = parseInt(form.get("startWaypointId") as string) || null;
+  const endWaypointId    = parseInt(form.get("endWaypointId")   as string) || null;
+  const estimatedTimeMin = parseInt(form.get("estimatedTimeMin") as string) || null;
+  const difficulty       = parseInt(form.get("difficulty")       as string) || null;
+  const gpxFile          = form.get("gpx");
+  const isBusCombined      = form.get("isBusCombined") === "true";
+  const busGpxFile         = form.get("busGpx");
+  const midWaypointId      = parseInt(form.get("midWaypointId") as string) || null;
+  const busType            = form.get("busType")            as string | null;
+  const busNumber          = form.get("busNumber")          as string | null;
+  const busColor           = form.get("busColor")           as string | null;
+  const stationBusStopName = (form.get("stationBusStopName") as string | null)?.trim() || null;
+  const busInstruction     = (form.get("busInstruction")     as string | null)?.trim() || null;
+  const busDurationMin     = parseInt(form.get("busDurationMin") as string) || null;
+  const nameEn             = (form.get("nameEn") as string | null)?.trim() || null;
+  const nameKo             = (form.get("nameKo") as string | null)?.trim() || null;
+
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  const updates: Record<string, unknown> = {};
+  if (segmentType)      updates.segment_type      = segmentType;
+  if (startWaypointId)  updates.start_waypoint_id = startWaypointId;
+  if (endWaypointId)    updates.end_waypoint_id   = endWaypointId;
+  updates.estimated_time_min = estimatedTimeMin;
+  updates.difficulty         = difficulty;
+  
+  if (nameEn || nameKo) {
+    updates.name = { en: nameEn, ko: nameKo };
+  }
+
+  // Walk GPX
+  if (gpxFile instanceof File && gpxFile.size > 0) {
+    const text   = await gpxFile.text();
+    const points = gpxFile.name.toLowerCase().endsWith(".geojson") ? parseGeoJson(text) : parseGpx(text);
+    const stats  = computeStats(points);
+    updates.track_data      = { type: "LineString", coordinates: points };
+    updates.distance_m      = stats.distance_m;
+    updates.total_ascent_m  = stats.total_ascent_m;
+    updates.total_descent_m = stats.total_descent_m;
+  }
+
+  // Bus combined
+  updates.is_bus_combined = isBusCombined;
+  if (isBusCombined) {
+    // Fetch existing bus_details to preserve bus_track_data if no new busGpx
+    let busTrackData: unknown = null;
+    if (busGpxFile instanceof File && busGpxFile.size > 0) {
+      const busText   = await busGpxFile.text();
+      const busPoints = busGpxFile.name.toLowerCase().endsWith(".geojson") ? parseGeoJson(busText) : parseGpx(busText);
+      busTrackData = { type: "LineString", coordinates: busPoints };
+    } else {
+      // Keep existing bus_track_data from DB
+      const { data } = await supabaseAdmin.from("segments").select("bus_details").eq("id", id).single();
+      busTrackData = (data?.bus_details as Record<string, unknown> | null)?.bus_track_data ?? null;
+    }
+    updates.bus_details = {
+      bus_stop_id_key:       midWaypointId ? String(midWaypointId) : undefined,
+      bus_numbers:           busNumber ? [busNumber] : [],
+      route_color:           busColor,
+      bus_track_data:        busTrackData,
+      station_bus_stop_name: stationBusStopName,
+      instruction:           busInstruction,
+      ...(busDurationMin != null ? { bus_duration_min: busDurationMin } : {}),
+    };
+    updates.sub_segments = segmentType === "APPROACH"
+      ? [{ mode: "bus" }, { mode: "walk" }]
+      : [{ mode: "walk" }, { mode: "bus" }];
+  } else {
+    updates.bus_details  = null;
+    updates.sub_segments = null;
+  }
+
+  const { error } = await supabaseAdmin.from("segments").update(updates).eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+// DELETE /api/admin/segments?id=X
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  const { error } = await supabaseAdmin.from("segments").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
 
 // POST /api/admin/segments — FormData with GPX
@@ -118,6 +210,8 @@ export async function POST(req: NextRequest) {
     const estimatedTimeMin = parseInt(form.get("estimatedTimeMin") as string) || null;
     const difficulty       = parseInt(form.get("difficulty")       as string) || null;
     const slug             = (form.get("slug") as string | null)?.trim() || null;
+    const nameEn           = (form.get("nameEn") as string | null)?.trim() || null;
+    const nameKo           = (form.get("nameKo") as string | null)?.trim() || null;
 
     if (!(gpxFile instanceof File)) {
       return NextResponse.json({ error: "Track file (GPX or GeoJSON) required" }, { status: 400 });
@@ -138,7 +232,37 @@ export async function POST(req: NextRequest) {
       : parseGpx(text);
     const stats  = computeStats(points);
 
+    const isBusCombined      = form.get("isBusCombined") === "true";
+    const busGpx             = form.get("busGpx");
+    const midWaypointId      = parseInt(form.get("midWaypointId") as string) || null;
+    const busType            = form.get("busType") as string || null;
+    const busNumber          = form.get("busNumber") as string || null;
+    const busColor           = form.get("busColor") as string || null;
+    const stationBusStopName = (form.get("stationBusStopName") as string | null)?.trim() || null;
+    const busInstruction     = (form.get("busInstruction")     as string | null)?.trim() || null;
+
     const trackData = { type: "LineString", coordinates: points };
+    
+    let busDetails = null;
+    let subSegments = null;
+
+    if (isBusCombined && busGpx instanceof File) {
+      const busText = await busGpx.text();
+      const busPoints = busGpx.name.toLowerCase().endsWith(".geojson")
+        ? parseGeoJson(busText)
+        : parseGpx(busText);
+      busDetails = {
+        bus_stop_id_key:       midWaypointId ? String(midWaypointId) : undefined,
+        bus_numbers:           busNumber ? [busNumber] : [],
+        route_color:           busColor,
+        bus_track_data:        { type: "LineString", coordinates: busPoints },
+        station_bus_stop_name: stationBusStopName,
+        instruction:           busInstruction,
+      };
+      subSegments = segmentType === "APPROACH"
+        ? [{ mode: "bus" }, { mode: "walk" }]
+        : [{ mode: "walk" }, { mode: "bus" }];
+    }
 
     const { data, error } = await supabaseAdmin.from("segments").insert({
       mountain_id:       mountainId,
@@ -146,10 +270,14 @@ export async function POST(req: NextRequest) {
       start_waypoint_id: startWaypointId,
       end_waypoint_id:   endWaypointId,
       track_data:        trackData,
+      is_bus_combined:   isBusCombined,
+      bus_details:       busDetails,
+      sub_segments:      subSegments,
       ...stats,
       ...(estimatedTimeMin ? { estimated_time_min: estimatedTimeMin } : {}),
       ...(difficulty       ? { difficulty }                           : {}),
       ...(slug             ? { slug }                                 : {}),
+      ...(nameEn || nameKo ? { name: { en: nameEn, ko: nameKo } }     : {}),
     }).select("id").single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

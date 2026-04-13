@@ -27,12 +27,16 @@ export function buildSegmentSlug(
   segmentType: SegmentType,
   startWpSlug: string,
   endWpSlug: string,
+  trailNameSlug?: string | null,
 ): string {
-  return [
+  const parts = [
     mountainSlug,
     DIRECTION[segmentType],
     TYPE_ABBR[segmentType],
     startWpSlug,
     endWpSlug,
-  ].join("-");
+  ];
+  if (trailNameSlug) parts.push(trailNameSlug);
+  return parts.join("-");
 }
+

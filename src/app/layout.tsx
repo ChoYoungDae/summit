@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Nunito } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
+import FontLoader from "@/components/ui/FontLoader";
 
-const inter = Inter({
+const nunito = Nunito({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-nunito",
   display: "swap",
 });
 
@@ -26,9 +28,10 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full`}>
+    <html lang="en" className={`${nunito.variable} h-full`}>
       <body className="flex flex-col h-full bg-[var(--bg)] text-[var(--fg)]">
         <ServiceWorkerRegister />
+        <FontLoader />
         {children}
       </body>
     </html>

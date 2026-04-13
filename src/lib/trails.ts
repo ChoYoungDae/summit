@@ -22,6 +22,7 @@ interface MountainRow {
   image_url?: string;
   region?: string;
   max_elevation_m?: number;
+  terrain_tags?: { id: string; en: string; ko?: string }[];
 }
 
 interface WaypointRow {
@@ -35,6 +36,8 @@ interface WaypointRow {
   image_url?: string;
   description?: LocalizedText;
   exit_number?: string;
+  subway_line?: string;
+  bus_numbers?: string;
 }
 
 interface SegmentRow {
@@ -49,6 +52,16 @@ interface SegmentRow {
   total_descent_m?: number;
   estimated_time_min?: number;
   difficulty?: number;
+  is_bus_combined?: boolean;
+  bus_details?: {
+    bus_stop_id_key?: string;
+    bus_numbers?: string[];
+    route_color?: string;
+    bus_track_data?: GeoJsonLineString;
+    station_bus_stop_name?: string;
+    instruction?: string;
+  } | null;
+  sub_segments?: { mode: "bus" | "walk"; duration?: number }[] | null;
 }
 
 interface RouteRow {
@@ -74,6 +87,7 @@ function rowToMountain(row: MountainRow): Mountain {
     imageUrl: row.image_url,
     region: row.region,
     maxElevationM: row.max_elevation_m,
+    terrainTags: row.terrain_tags,
   };
 }
 
@@ -89,6 +103,8 @@ function rowToWaypoint(row: WaypointRow): Waypoint {
     imageUrl: row.image_url,
     description: row.description,
     exitNumber: row.exit_number,
+    subwayLine: row.subway_line,
+    busNumbers: row.bus_numbers,
   };
 }
 
@@ -105,6 +121,9 @@ function rowToSegment(row: SegmentRow): Segment {
     totalDescentM: row.total_descent_m,
     estimatedTimeMin: row.estimated_time_min,
     difficulty: row.difficulty,
+    isBusCombined: row.is_bus_combined,
+    busDetails: row.bus_details ?? undefined,
+    subSegments: row.sub_segments ?? undefined,
   };
 }
 
@@ -129,7 +148,7 @@ function rowToRoute(row: RouteRow): Route {
 export const fetchMountains = cache(async (): Promise<Mountain[]> => {
   const { data, error } = await supabase
     .from("mountains")
-    .select("id, slug, name, image_url, region, max_elevation_m")
+    .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
     .order("id");
 
   if (error || !data) return [];
@@ -141,6 +160,10 @@ export interface RouteWithTrack {
   route: Route;
   /** Combined elevation track from all segments in segment order. */
   elevationTrack: [number, number, number][];
+  /** Ordered unique waypoints for the route title (start of first seg + end of each seg). */
+  waypoints: Waypoint[];
+  /** Total bus riding time in minutes across all bus-combined segments. */
+  busDurationMin: number;
 }
 
 export interface MountainGroup {
@@ -160,25 +183,58 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
   const mountainIds = [...new Set((routeRows as RouteRow[]).map((r) => r.mountain_id))];
   const { data: mtRows } = await supabase
     .from("mountains")
-    .select("id, slug, name, image_url, region, max_elevation_m")
+    .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
     .in("id", mountainIds);
 
   const mountainMap = new Map<number, Mountain>(
     ((mtRows ?? []) as MountainRow[]).map((m) => [m.id, rowToMountain(m)])
   );
 
-  // Fetch track_data for all segments referenced by listed routes
+  // Fetch track_data + waypoint IDs for all segments referenced by listed routes
   const allSegmentIds = [
     ...new Set((routeRows as RouteRow[]).flatMap((r) => r.segment_ids ?? [])),
   ];
+
+  interface SegmentSummary {
+    id: number;
+    track_data: GeoJsonLineString;
+    start_waypoint_id: number;
+    end_waypoint_id: number;
+    is_bus_combined?: boolean;
+    bus_details?: { bus_numbers?: string[]; route_color?: string; bus_duration_min?: number };
+  }
+
   const trackMap = new Map<number, GeoJsonLineString>();
+  const segSummaryMap = new Map<number, SegmentSummary>();
+
   if (allSegmentIds.length > 0) {
     const { data: segRows } = await supabase
       .from("segments")
-      .select("id, track_data")
+      .select("id, track_data, start_waypoint_id, end_waypoint_id, is_bus_combined, bus_details")
       .in("id", allSegmentIds);
-    for (const s of (segRows ?? []) as { id: number; track_data: GeoJsonLineString }[]) {
+    for (const s of (segRows ?? []) as SegmentSummary[]) {
       trackMap.set(s.id, s.track_data);
+      segSummaryMap.set(s.id, s);
+    }
+  }
+
+  // Fetch all waypoints needed for route titles
+  const allWaypointIds = [
+    ...new Set(
+      Array.from(segSummaryMap.values()).flatMap((s) => [
+        s.start_waypoint_id,
+        s.end_waypoint_id,
+      ])
+    ),
+  ];
+  const waypointMap = new Map<number, Waypoint>();
+  if (allWaypointIds.length > 0) {
+    const { data: wptRows } = await supabase
+      .from("waypoints")
+      .select("id, mountain_id, name, type, lat, lon, elevation_m, image_url, description, exit_number, subway_line, bus_numbers")
+      .in("id", allWaypointIds);
+    for (const w of (wptRows ?? []) as WaypointRow[]) {
+      waypointMap.set(w.id, rowToWaypoint(w));
     }
   }
 
@@ -204,7 +260,53 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
       }
     );
 
-    groups.get(row.mountain_id)!.routes.push({ route: rowToRoute(row), elevationTrack });
+    // Build ordered unique waypoint list: start of first seg, then end of each seg
+    const segIds = row.segment_ids ?? [];
+    const waypointIds: number[] = [];
+    for (let i = 0; i < segIds.length; i++) {
+      const seg = segSummaryMap.get(segIds[i]);
+      if (!seg) continue;
+      if (i === 0) waypointIds.push(seg.start_waypoint_id);
+      waypointIds.push(seg.end_waypoint_id);
+    }
+    const waypoints = waypointIds
+      .filter((id, idx, arr) => arr.indexOf(id) === idx) // deduplicate
+      .map((id) => waypointMap.get(id))
+      .filter(Boolean) as Waypoint[];
+
+    // Sum bus riding time across bus-combined segments
+    const busDurationMin = segIds.reduce((sum, sid) => {
+      const seg = segSummaryMap.get(sid);
+      if (!seg?.is_bus_combined) return sum;
+      return sum + (seg.bus_details?.bus_duration_min ?? 0);
+    }, 0);
+
+    // Inject bus info from bus-combined segments
+    for (const segId of segIds) {
+      const seg = segSummaryMap.get(segId);
+      if (!seg?.is_bus_combined || !seg.bus_details?.bus_numbers?.length) continue;
+      const color = seg.bus_details.route_color;
+      const busNums = seg.bus_details.bus_numbers.join(", ");
+
+      // End waypoint (station) gets bus badge
+      const endIdx = waypoints.findIndex((w) => w.id === seg.end_waypoint_id);
+      if (endIdx !== -1) {
+        waypoints[endIdx] = { ...waypoints[endIdx], busNumbers: busNums, busRouteColor: color };
+      }
+
+      // Mid waypoint (BUS_STOP) also gets route color so its badge renders correctly
+      const midId = seg.bus_details.bus_stop_id_key
+        ? parseInt(seg.bus_details.bus_stop_id_key)
+        : null;
+      if (midId) {
+        const midIdx = waypoints.findIndex((w) => w.id === midId);
+        if (midIdx !== -1) {
+          waypoints[midIdx] = { ...waypoints[midIdx], busRouteColor: color };
+        }
+      }
+    }
+
+    groups.get(row.mountain_id)!.routes.push({ route: rowToRoute(row), elevationTrack, waypoints, busDurationMin });
   }
 
   return Array.from(groups.values());
@@ -260,7 +362,7 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
   // Fetch mountain
   const { data: mtRow } = await supabase
     .from("mountains")
-    .select("id, slug, name, image_url, region, max_elevation_m")
+    .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
     .eq("id", route.mountainId)
     .single();
 
@@ -273,6 +375,120 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     mountain,
     segments: resolvedSegments,
   };
+});
+
+// ── Home map data ─────────────────────────────────────────────────────────────
+
+export interface MountainPin {
+  id: number;
+  slug: string;
+  nameEn: string;
+  nameKo?: string;
+  lat: number;
+  lon: number;
+  href: string;
+}
+
+export interface StationPin {
+  id: number;
+  nameEn: string;
+  nameKo?: string;
+  lat: number;
+  lon: number;
+  lines: number[];
+}
+
+/** Approximate mountain-center coordinates (used when no SUMMIT waypoint exists). */
+const MOUNTAIN_FALLBACK_COORDS: Record<string, [number, number]> = {
+  gwanaksan: [126.9627, 37.4431],
+  bukhansan: [126.9770, 37.6594],
+  inwangsan: [126.9680, 37.5776],
+  ansan:     [126.9480, 37.5742],
+};
+
+/** Subway lines that serve each mountain's trailhead station. */
+const MOUNTAIN_SUBWAY_LINES: Record<string, number[]> = {
+  gwanaksan: [2, 4],
+  bukhansan: [3],
+  inwangsan: [5],
+  ansan:     [3],
+};
+
+/** First active route href per mountain slug. */
+const MOUNTAIN_ROUTE_HREF: Record<string, string> = {
+  gwanaksan: "/route/1",
+};
+
+export const fetchHomeMapData = cache(async (): Promise<{
+  mountains: MountainPin[];
+  stations: StationPin[];
+}> => {
+  // 1. Fetch all mountains
+  const { data: mtRows } = await supabase
+    .from("mountains")
+    .select("id, slug, name")
+    .order("id");
+
+  const mountains: Mountain[] = ((mtRows ?? []) as MountainRow[]).map(rowToMountain);
+
+  // 2. Fetch SUMMIT waypoints to get mountain coordinates
+  const mountainIds = mountains.map((m) => m.id);
+  const { data: summitRows } = mountainIds.length
+    ? await supabase
+        .from("waypoints")
+        .select("id, mountain_id, name, type, lat, lon, elevation_m, image_url, description, exit_number")
+        .in("mountain_id", mountainIds)
+        .eq("type", "SUMMIT")
+    : { data: [] };
+
+  // Index: mountainId → first summit waypoint
+  const summitByMountain = new Map<number, WaypointRow>();
+  for (const row of (summitRows ?? []) as WaypointRow[]) {
+    if (!summitByMountain.has(row.mountain_id)) {
+      summitByMountain.set(row.mountain_id, row);
+    }
+  }
+
+  const mountainPins: MountainPin[] = mountains.map((m) => {
+    const summit = summitByMountain.get(m.id);
+    const fallback = MOUNTAIN_FALLBACK_COORDS[m.slug] ?? [126.977, 37.566];
+    return {
+      id:      m.id,
+      slug:    m.slug,
+      nameEn:  m.name.en,
+      nameKo:  m.name.ko,
+      lat:     summit?.lat  ?? fallback[1],
+      lon:     summit?.lon  ?? fallback[0],
+      href:    MOUNTAIN_ROUTE_HREF[m.slug] ?? "/route",
+    };
+  });
+
+  // 3. Fetch STATION waypoints for subway markers
+  const { data: stationRows } = mountainIds.length
+    ? await supabase
+        .from("waypoints")
+        .select("id, mountain_id, name, type, lat, lon, elevation_m, image_url, description, exit_number")
+        .in("mountain_id", mountainIds)
+        .eq("type", "STATION")
+    : { data: [] };
+
+  // Build a slug lookup for fast mountainId → slug
+  const mountainSlugById = new Map<number, string>(mountains.map((m) => [m.id, m.slug]));
+
+  const stationPins: StationPin[] = ((stationRows ?? []) as WaypointRow[]).map((row) => {
+    const slug  = mountainSlugById.get(row.mountain_id) ?? "";
+    const lines = MOUNTAIN_SUBWAY_LINES[slug] ?? [];
+    return {
+      id:     row.id,
+      nameEn: row.name.en,
+      nameKo: row.name.ko,
+      lat:    row.lat,
+      lon:    row.lon,
+      lines,
+    };
+  });
+
+  return { mountains: mountainPins, stations: stationPins };
 });
 
 /** Waypoints for a given mountain (all types). */

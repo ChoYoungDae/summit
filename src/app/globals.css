@@ -1,6 +1,7 @@
 /* ─── All @imports must precede any rules (CSS spec) ────────── */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+/* Noto Sans KR: always loaded — Korean appears on all trail signage regardless of UI locale */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap");
 @import "mapbox-gl/dist/mapbox-gl.css";
 @import "tailwindcss";
 
@@ -29,20 +30,23 @@
 
   /* Text */
   --color-text-primary:    #111116;
-  --color-text-body:       #6B7280; /* Body / description paragraphs — between primary and muted */
-  --color-text-muted:      #AAABB8;
+  --color-text-body:       #4B5563; /* Body / description paragraphs — between primary and muted */
+  --color-text-muted:      #6B7280;
   --color-text-on-primary: #FFFFFF;
 
   /* Fonts */
-  --font-en: "Inter", "Roboto", ui-sans-serif, system-ui, sans-serif;
-  --font-ko: "Pretendard", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-en: var(--font-nunito), "Noto Sans KR", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  --font-ko: "Pretendard", "Noto Sans KR", var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  --font-num: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-en);
 
   /* Border */
   --color-border:          #E8E8EE;
 
   /* Radius tokens */
-  --radius-card: 0.75rem; /* 12px */
+  --radius-card: 1rem;    /* 16px — rounded UI theme */
+  --radius-chip: 9999px;  /* pill chips & tags */
+  --radius-btn:  9999px;  /* pill buttons */
   --radius-pill: 9999px;
 }
 
@@ -78,6 +82,15 @@ body {
 /* ─── Korean font utility ───────────────────────────────────── */
 .font-ko {
   font-family: var(--font-ko);
+  letter-spacing: 0.015em; /* slight tracking to match Nunito's open feel */
+}
+
+/* ─── Numeric data utility (Nunito only — no CJK fallback) ─── */
+/* Use for stats: "7.1 km", "3h 40m", "632 m", time values     */
+.font-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em; /* Nunito numbers read better slightly tighter */
 }
 
 /* ─── ETA number update animation ──────────────────────────── */
@@ -90,4 +103,16 @@ body {
 @keyframes offRoutePulse {
   0%, 100% { box-shadow: 0 0 0 0   rgba(200, 54, 42, 0.55); }
   50%       { box-shadow: 0 0 0 8px rgba(200, 54, 42, 0);    }
+}
+
+/* ─── Home map: sketch/pencil filter applied to canvas only ── */
+/* HTML marker overlays (.mapboxgl-marker) remain unfiltered   */
+.sketch-map .mapboxgl-canvas-container {
+  filter: grayscale(1) contrast(1.35) brightness(1.09) sepia(0.08);
+}
+
+/* Remove default Mapbox attribution for the home map */
+.sketch-map .mapboxgl-ctrl-attrib,
+.sketch-map .mapboxgl-ctrl-logo {
+  display: none !important;
 }

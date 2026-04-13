@@ -22,21 +22,69 @@ Mobile web app for foreign hikers — Seoul hiking routes accessible by subway.
 | `--color-bg-light` | `#F7F7FA` | Light mode background |
 | `--color-bg-dark` | `#111116` | Dark mode background |
 | `--color-card` | `#FFFFFF` | Card surface |
-| `--color-text-body` | `#6B7280` | Body / description paragraphs |
-| `--color-text-muted` | `#AAABB8` | Secondary text (sub-labels, meta info, placeholders) |
+| `--color-text-body` | `#4B5563` | Body / description paragraphs |
+| `--color-text-muted` | `#6B7280` | Secondary text (sub-labels, meta info, placeholders) |
+
+### Radius Tokens
+
+| Token | Value | Usage |
+|---|---|---|
+| `--radius-card` | `1rem` (16px) | Cards — rounded UI theme |
+| `--radius-chip` | `9999px` | Tag pills, info chips |
+| `--radius-btn` | `9999px` | CTA buttons |
+
+Bump card radius only upward. Never add a `rounded-*` class that overrides these tokens.
+
+### Typography Scale (AllTrails-aligned)
+
+| Element | Size | Weight | Notes |
+|---|---|---|---|
+| Card title | `text-base` (16px) | `font-bold` | Route / trail names |
+| Body / description | `text-sm` (14px) | `font-normal` | Paragraph text |
+| Info chips & labels | `text-sm` (14px) | `font-medium` | Distance, duration, difficulty |
+| CTA button text | `text-sm` (14px) | `font-semibold` | "View Route" etc. |
+| Safety / meta sub-labels | `text-[10px]–text-[11px]` | `font-semibold` | Uppercase tracking labels only |
+
+Minimum readable body size is `text-sm` (14px). Do not use `text-xs` (12px) for paragraph or chip text.
 
 ## Fonts
 
-- **English:** `Inter` (next/font/google) → CSS variable `--font-en`
-- **Korean:** `Pretendard` (CDN, globals.css @import) → CSS variable `--font-ko`
-- Register any new fonts the same way as a `--font-xx` CSS variable.
+### Font Strategy — "Nunito Round UI"
+
+The app concept is *light subway hiking* — friendly, accessible, not intimidating. All fonts follow this principle.
+
+| CSS Variable | Font | Loading | Usage |
+|---|---|---|---|
+| `--font-en` | **Nunito** → Noto Sans KR → Noto Sans JP | `next/font/google` (`--font-nunito`) | All UI text — default |
+| `--font-ko` | Pretendard → Noto Sans KR → Nunito | CDN `@import` | Korean sub-labels (DualText) |
+| `--font-num` | Nunito only | Same as `--font-en` | **Numeric data: distances, times, elevations** |
+
+### Numeric Data Rule
+
+All stats (`7.1 km`, `3h 40m`, `632 m`, time values) **must** use `font-num` class or `fontFamily: "var(--font-num)"`.
+
+```tsx
+// Tailwind utility class
+<p className="font-num text-sm font-bold">3h 40m</p>
+
+// Inline style (for dynamic/complex elements)
+<span style={{ fontFamily: "var(--font-num)" }}>632m</span>
+```
+
+Nunito's rounded digits make numbers feel approachable and "doable" — a key psychological goal for the app.
+
+### CJK Fallback
+
+Korean/Japanese characters in `--font-en` fall through to Noto Sans KR/JP (loaded via CDN). The `.font-ko` utility adds `letter-spacing: 0.015em` to visually match Nunito's open spacing.
+
+- Register any new fonts as `--font-xx` CSS variable + `next/font` loader.
 
 ## Layout Shell (`src/app/layout.tsx`)
 
 ```
 <html>
   <body>
-    <Header />          ← fixed top, h-14 (56px), bg-primary
+    <Header />          ← fixed top, h-14 (56px)
     <main pt-14 pb-16>  ← scrollable area
       {children}
     </main>
@@ -44,6 +92,15 @@ Mobile web app for foreign hikers — Seoul hiking routes accessible by subway.
   </body>
 </html>
 ```
+
+### Header behavior (`src/components/layout/Header.tsx`)
+
+| Pathname | Header style |
+|---|---|
+| `/` (home) | Full logo: Mountain icon + "Seoul Subway to Summit" |
+| `/route/*` | Slim back nav: `‹ Mountains` link (primary color, no border) |
+
+The Header component reads `usePathname()` and switches automatically. Do not add a full logo header to any route-context page.
 
 - When creating a new page, write content directly inside `<main>` with no extra padding.
 

@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
         hostname: "xtuqpqvjgxnclgkkxwgs.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "api.mapbox.com",
+      },
     ],
   },
   // Allow development access from local IP (mobile)

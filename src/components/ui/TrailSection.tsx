@@ -7,6 +7,7 @@ import WaypointSheet from "./WaypointSheet";
 import GuideCard from "./GuideCard";
 import FloatingTrailHeader from "./FloatingTrailHeader";
 import HikingBottomSheet from "./HikingBottomSheet";
+import type { SegmentElevationInfo } from "./ElevationChart";
 import { useHikingGPS } from "@/lib/useHikingGPS";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
@@ -58,12 +59,24 @@ function findNearestWaypoint(pt: [number, number], waypoints: Waypoint[]): Waypo
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+interface BusInfo {
+  stopCoord?: [number, number];
+  busNumbers?: string;
+  color?: string;
+}
+
 interface Props {
   route: ResolvedRoute;
   track: [number, number, number][];
   waypoints: Waypoint[];
-  approachTrack: [number, number][];
-  returnTrack: [number, number][];
+  approachBusTrack?: [number, number][];
+  approachWalkTrack?: [number, number][];
+  returnBusTrack?: [number, number][];
+  returnWalkTrack?: [number, number][];
+  approachIsBus?: boolean;
+  returnIsBus?: boolean;
+  approachBusInfo?: BusInfo;
+  returnBusInfo?: BusInfo;
   locale?: string;
   sunsetMin?: number | null;
   approachTimeMin?: number;
@@ -79,8 +92,14 @@ export default function TrailSection({
   route,
   track,
   waypoints,
-  approachTrack,
-  returnTrack,
+  approachBusTrack = [],
+  approachWalkTrack = [],
+  returnBusTrack = [],
+  returnWalkTrack = [],
+  approachIsBus = false,
+  returnIsBus = false,
+  approachBusInfo,
+  returnBusInfo,
   locale = "en",
   sunsetMin,
   approachTimeMin,
@@ -134,6 +153,37 @@ export default function TrailSection({
     enabled: isHiking && hikingMode === "active",
     nearestTrackIndex: gps.nearestTrackIndex,
   });
+
+  // ── Elevation segments for multi-segment chart ───────────────────────────
+  const elevationSegments = useMemo<SegmentElevationInfo[]>(() => {
+    return route.segments.map((seg) => {
+      // Base walk/hiking coordinates with elevation
+      let points: [number, number, number][] = seg.trackData.coordinates.map(
+        (c) => [c[0], c[1], c[2] ?? 0]
+      );
+
+      // For bus-combined segments, prepend bus track (APPROACH) or append (RETURN)
+      // Bus GPS usually lacks elevation so those points appear flat at ele=0.
+      if (seg.isBusCombined && seg.busDetails?.bus_track_data) {
+        const busPts: [number, number, number][] =
+          seg.busDetails.bus_track_data.coordinates.map(
+            (c) => [c[0], c[1], c[2] ?? 0]
+          );
+        if (seg.segmentType === "APPROACH") {
+          points = [...busPts, ...points];
+        } else if (seg.segmentType === "RETURN") {
+          points = [...points, ...busPts];
+        }
+      }
+
+      return {
+        type: seg.segmentType,
+        isBus: seg.isBusCombined ?? false,
+        busColor: seg.busDetails?.route_color,
+        points,
+      };
+    });
+  }, [route.segments]);
 
   // ── Station info ──────────────────────────────────────────────────────────
   const stationInfo = useMemo<StationInfo | undefined>(() => {
@@ -262,8 +312,14 @@ export default function TrailSection({
         onTrailPointClick={handleTrailPointClick}
         isHiking={isHiking}
         selectedWaypointIndex={selectedWaypointIndex}
-        accessTrack={approachTrack}
-        returnTrack={returnTrack}
+        approachBusTrack={approachBusTrack}
+        approachWalkTrack={approachWalkTrack}
+        returnBusTrack={returnBusTrack}
+        returnWalkTrack={returnWalkTrack}
+        approachIsBus={approachIsBus}
+        returnIsBus={returnIsBus}
+        approachBusInfo={approachBusInfo}
+        returnBusInfo={returnBusInfo}
         bottomPadding={sheetHeightPx}
         controlsBottomOffset={sheetHeightPx}
         locale={locale}
@@ -357,6 +413,7 @@ export default function TrailSection({
         onToggleHiking={handleToggleHiking}
         gps={gps}
         track={track}
+        elevationSegments={elevationSegments}
         onHover={handleHover}
         highlightIndex={elevationHighlightIndex}
         onSheetHeightChange={setSheetHeightPx}

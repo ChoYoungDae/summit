@@ -72,14 +72,14 @@ export default function ElevationPreview({ track }: Props) {
     const label = `${peakEle} m`;
     return (
       <g key={`peak-${index}`}>
-        <circle cx={cx} cy={cy} r={3} fill={COLOR_ASCENT} stroke="white" strokeWidth={1.5} />
+        <circle cx={cx} cy={cy} r={3} fill="#C8362A" stroke="white" strokeWidth={1.5} />
         <text
           x={cx}
           y={cy - 7}
           textAnchor="middle"
           fontSize={9}
           fontWeight={700}
-          fill={COLOR_ASCENT}
+          fill="#C8362A"
           style={{ fontFamily: "var(--font-en)" }}
         >
           {label}

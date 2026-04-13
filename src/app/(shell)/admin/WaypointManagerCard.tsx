@@ -13,7 +13,7 @@ const BTN_DANGER    = "flex items-center justify-center gap-1 rounded-lg border 
 
 type Mountain = { id: number; name: { en?: string; ko?: string } };
 
-type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "JUNCTION" | "SHELTER";
+type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "JUNCTION" | "SHELTER" | "BUS_STOP";
 
 type Waypoint = {
   id: number;
@@ -27,6 +27,10 @@ type Waypoint = {
   image_url?: string | null;
   description?: { en?: string; ko?: string } | null;
   exit_number?: string | null;
+  subway_line?: string | null;
+  subway_station?: string | null;
+  ars_id?: string | null;
+  bus_numbers?: string | null;
 };
 
 type FormState = {
@@ -35,6 +39,10 @@ type FormState = {
   descEn: string; descKo: string;
   slug: string;
   exitNumber: string;
+  subwayLine: string;
+  subwayStation: string;
+  arsId: string;
+  busNumbers: string;
   imageFile: File | null; imagePreview: string;
 };
 
@@ -44,6 +52,10 @@ const EMPTY_FORM: FormState = {
   descEn: "", descKo: "",
   slug: "",
   exitNumber: "",
+  subwayLine: "",
+  subwayStation: "",
+  arsId: "",
+  busNumbers: "",
   imageFile: null, imagePreview: "",
 };
 
@@ -53,6 +65,7 @@ const TYPE_LABELS: Record<WaypointType, string> = {
   SUMMIT:   "Summit",
   JUNCTION: "Junction",
   SHELTER:  "Shelter",
+  BUS_STOP: "Bus Stop",
 };
 
 const TYPE_COLORS: Record<WaypointType, string> = {
@@ -61,6 +74,7 @@ const TYPE_COLORS: Record<WaypointType, string> = {
   SUMMIT:   "bg-amber-100 text-amber-700",
   JUNCTION: "bg-purple-100 text-purple-700",
   SHELTER:  "bg-gray-100 text-gray-600",
+  BUS_STOP: "bg-teal-100 text-teal-700",
 };
 
 function Alert({ type, message }: { type: "success" | "error" | "loading"; message: string }) {
@@ -205,26 +219,55 @@ function WaypointForm({
           <option value="SUMMIT">Summit</option>
           <option value="JUNCTION">Junction</option>
           <option value="SHELTER">Shelter</option>
+          <option value="BUS_STOP">Bus Stop</option>
         </select>
       </label>
 
-      {/* Exit Number — only for Stations */}
+      {/* Subway Info — only for Stations */}
       {f.type === "STATION" && (
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-[var(--color-text-muted)]">Subway Exit Number (e.g. 4)</span>
-          <div className="flex items-center gap-2">
-            <div className="w-[30px] h-[30px] rounded-lg bg-[#2D2D2D] flex items-center justify-center text-[#FFCE00] font-black text-[16px]">
-              {f.exitNumber || "?"}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="flex flex-col gap-1">
+             <span className="text-xs text-[var(--color-text-muted)]">Station Name (e.g. 사당 / Sadang)</span>
+             <input type="text" placeholder="사당 (Sadang)" value={f.subwayStation} onChange={set("subwayStation")} className={INPUT} />
+          </label>
+          <label className="flex flex-col gap-1">
+             <span className="text-xs text-[var(--color-text-muted)]">Subway Line (e.g. 2,4)</span>
+             <input type="text" placeholder="2, 4" value={f.subwayLine} onChange={set("subwayLine")} className={INPUT} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">Exit (e.g. 4)</span>
+            <div className="flex items-center gap-2">
+              <div className="w-[36px] h-[36px] rounded-lg bg-[#2D2D2D] flex items-center justify-center text-[#FFCE00] font-black text-[16px] flex-shrink-0">
+                {f.exitNumber || "?"}
+              </div>
+              <input type="text" placeholder="4" value={f.exitNumber} onChange={set("exitNumber")} className={`${INPUT} flex-1 min-w-0`} />
             </div>
-            <input
-              type="text"
-              placeholder="4"
-              value={f.exitNumber}
-              onChange={set("exitNumber")}
-              className={`${INPUT} flex-1`}
-            />
-          </div>
-        </label>
+          </label>
+        </div>
+      )}
+
+      {/* ARS ID & Bus Numbers — only for Bus Stops */}
+      {f.type === "BUS_STOP" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">ARS ID (e.g. 22194)</span>
+            <div className="flex items-center gap-2">
+              <div className="w-[36px] h-[36px] rounded-lg bg-[#2D2D2D] flex items-center justify-center text-teal-400 font-black text-[12px] flex-shrink-0">
+                ID
+              </div>
+              <input type="text" placeholder="22194" value={f.arsId} onChange={set("arsId")} className={`${INPUT} flex-1`} />
+            </div>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">Bus Numbers (e.g. 704, 34)</span>
+            <div className="flex items-center gap-2">
+              <div className="w-[36px] h-[36px] rounded-lg bg-[#2D2D2D] flex items-center justify-center text-teal-200 font-black text-[10px] flex-shrink-0">
+                BUS
+              </div>
+              <input type="text" placeholder="704, 34" value={f.busNumbers} onChange={set("busNumbers")} className={`${INPUT} flex-1`} />
+            </div>
+          </label>
+        </div>
       )}
 
       {/* Coordinates */}
@@ -343,6 +386,10 @@ export default function WaypointManagerCard() {
     if (f.descEn)       form.append("descEn", f.descEn);
     if (f.descKo)       form.append("descKo", f.descKo);
     if (f.exitNumber)   form.append("exit_number", f.exitNumber);
+    if (f.subwayLine)   form.append("subway_line", f.subwayLine);
+    if (f.subwayStation) form.append("subway_station", f.subwayStation);
+    if (f.arsId)        form.append("ars_id", f.arsId);
+    if (f.busNumbers)   form.append("bus_numbers", f.busNumbers);
     if (f.imageFile)    form.append("image", f.imageFile);
 
     try {
@@ -393,6 +440,10 @@ export default function WaypointManagerCard() {
       descKo: w.description?.ko ?? "",
       slug:   w.slug ?? toSlug(w.name.en),
       exitNumber: w.exit_number ?? "",
+      subwayLine: w.subway_line ?? "",
+      subwayStation: w.subway_station ?? "",
+      arsId: w.ars_id ?? "",
+      busNumbers: w.bus_numbers ?? "",
       imageFile: null, imagePreview: "",
     });
     setFormErr("");
@@ -499,10 +550,38 @@ export default function WaypointManagerCard() {
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${TYPE_COLORS[w.type] ?? "bg-gray-100 text-gray-600"}`}>
                             {TYPE_LABELS[w.type] ?? w.type}
                           </span>
-                          {w.type === "STATION" && w.exit_number && (
-                            <span className="text-[10px] bg-[#1A1A1A] text-[#F5C842] px-1.5 py-0.5 rounded-md font-black border border-[#F5C842]/40">
-                              Exit {w.exit_number}
-                            </span>
+                          {w.type === "STATION" && (
+                            <div className="flex gap-1 flex-wrap">
+                              {w.subway_line && w.subway_line.split(",").map(line => (
+                                <span key={line.trim()} className="text-[10px] bg-[#EEF5F1] text-[#2E5E4A] px-1.5 py-0.5 rounded-md font-black border border-[#2E5E4A]/30">
+                                  {line.trim()}
+                                </span>
+                              ))}
+                              {w.subway_station && (
+                                <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-md font-medium border border-[var(--color-border)]">
+                                  {w.subway_station}
+                                </span>
+                              )}
+                              {w.exit_number && (
+                                <span className="text-[10px] bg-[#1A1A1A] text-[#F5C842] px-1.5 py-0.5 rounded-md font-black border border-[#F5C842]/40">
+                                  Exit {w.exit_number}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {w.type === "BUS_STOP" && (
+                            <div className="flex gap-1 flex-wrap">
+                              {w.bus_numbers && w.bus_numbers.split(",").map(num => (
+                                <span key={num.trim()} className="text-[10px] bg-[#EEF5F1] text-teal-700 px-1.5 py-0.5 rounded-md font-black border border-teal-200">
+                                  {num.trim()}
+                                </span>
+                              ))}
+                              {w.ars_id && (
+                                <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-md font-medium border border-[var(--color-border)]">
+                                  ID: {w.ars_id}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                         <div className="text-[10px] text-[var(--color-text-muted)] font-mono mt-0.5">

@@ -5,11 +5,11 @@ import Link from "next/link";
 import {
   ChevronRight,
   Ruler,
-  Clock,
+  Footprints,
   TrendingUp,
   AlertTriangle,
 } from "lucide-react";
-import ElevationPreview from "@/components/ui/ElevationPreview";
+import { Icon } from "@iconify/react";
 import { t } from "@/lib/i18n";
 import { formatMinutesAsTime, nowKSTMin } from "@/lib/safetyEngine";
 import type { Route } from "@/types/trail";
@@ -27,7 +27,8 @@ function formatDistanceKm(metres: number): string {
 
 interface RouteCardProps {
   route: Route;
-  elevationTrack?: [number, number, number][];
+  /** Total bus riding time in minutes (sum across all bus-combined segments). */
+  busDurationMin?: number;
   /** Latest departure time in minutes from midnight (KST). Null = no data. */
   latestStartMin?: number | null;
   locale?: string;
@@ -35,7 +36,7 @@ interface RouteCardProps {
 
 export default function RouteCard({
   route,
-  elevationTrack,
+  busDurationMin = 0,
   latestStartMin,
   locale = "en",
 }: RouteCardProps) {
@@ -44,7 +45,6 @@ export default function RouteCard({
   const isPastLatestStart =
     latestStartMin != null && nowKSTMin() > latestStartMin;
 
-  const routeLabel = t(route.name, locale);
   const description = route.description ? t(route.description, locale) : null;
 
   return (
@@ -69,7 +69,7 @@ export default function RouteCard({
           />
           <span className="text-[11px] font-semibold text-white uppercase tracking-wide">
             Last safe start&nbsp;
-            <span className="tabular-nums">{formatMinutesAsTime(latestStartMin)}</span>
+            <span className="font-num">{formatMinutesAsTime(latestStartMin)}</span>
           </span>
         </div>
       )}
@@ -78,16 +78,11 @@ export default function RouteCard({
       <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
         {/* Title */}
         <h2
-          className="text-sm font-bold leading-snug text-center"
+          className="text-base font-bold leading-snug text-center flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1"
           style={{ fontFamily: "var(--font-en)" }}
         >
-          {routeLabel}
+          {t(route.name, locale)}
         </h2>
-
-        {/* Elevation preview */}
-        {elevationTrack && elevationTrack.length > 0 && (
-          <ElevationPreview track={elevationTrack} />
-        )}
 
         {/* Info chips */}
         <div className="flex flex-wrap gap-1.5 justify-center">
@@ -98,10 +93,23 @@ export default function RouteCard({
             />
           )}
           {route.totalDurationMin != null && (
-            <InfoChip
-              icon={<Clock size={12} strokeWidth={2} />}
-              label={formatTime(route.totalDurationMin)}
-            />
+            busDurationMin > 0 ? (
+              <span
+                className="font-num inline-flex items-center rounded-full px-2.5 py-1 text-sm font-medium gap-1.5"
+                style={{ background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }}
+              >
+                <Footprints size={12} strokeWidth={2} />
+                {formatTime(route.totalDurationMin - busDurationMin)}
+                <span style={{ opacity: 0.3, margin: "0 1px" }}>|</span>
+                <Icon icon="ph:bus" width={13} height={13} style={{ color: "#0052A4" }} />
+                <span style={{ color: "#0052A4" }}>{formatTime(busDurationMin)}</span>
+              </span>
+            ) : (
+              <InfoChip
+                icon={<Footprints size={12} strokeWidth={2} />}
+                label={formatTime(route.totalDurationMin)}
+              />
+            )
           )}
           {route.totalDifficulty != null && (
             <DifficultyChip difficulty={route.totalDifficulty} />
@@ -118,7 +126,7 @@ export default function RouteCard({
               Last safe start:
             </span>
             <span
-              className="text-[11px] font-medium tabular-nums"
+              className="font-num text-[11px] font-medium"
               style={{ color: "var(--color-text-body)" }}
             >
               {formatMinutesAsTime(latestStartMin)}
@@ -130,7 +138,7 @@ export default function RouteCard({
         {description && (
           <div>
             <p
-              className={`text-xs leading-relaxed ${descExpanded ? "" : "line-clamp-3"}`}
+              className={`text-sm leading-relaxed ${descExpanded ? "" : "line-clamp-3"}`}
               style={{ color: "var(--color-text-body)" }}
             >
               {description}
@@ -138,7 +146,7 @@ export default function RouteCard({
             {!descExpanded && description.length > 120 && (
               <button
                 onClick={() => setDescExpanded(true)}
-                className="text-xs font-semibold mt-0.5"
+                className="text-sm font-semibold mt-0.5"
                 style={{ color: "var(--color-primary)" }}
               >
                 ...more
@@ -159,8 +167,8 @@ export default function RouteCard({
               fontFamily: "var(--font-en)",
             }}
           >
-            <span className="text-xs font-semibold">View Route</span>
-            <ChevronRight size={12} strokeWidth={2} />
+            <span className="text-sm font-semibold">View Route</span>
+            <ChevronRight size={14} strokeWidth={2} />
           </Link>
         </div>
       </div>
@@ -173,17 +181,20 @@ export default function RouteCard({
 function InfoChip({
   icon,
   label,
+  variant = "default",
 }: {
   icon: React.ReactNode;
   label: string;
+  variant?: "default" | "bus";
 }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
-      style={{
-        background: "rgba(46,94,74,0.08)",
-        color: "var(--color-primary)",
-      }}
+      className="font-num inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium"
+      style={
+        variant === "bus"
+          ? { background: "rgba(0,82,164,0.08)", color: "#0052A4" }
+          : { background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }
+      }
     >
       {icon}
       {label}
@@ -204,7 +215,7 @@ function DifficultyChip({ difficulty }: { difficulty: number }) {
   const isHard = difficulty >= 4;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium"
       style={{
         background: isHard ? "rgba(200,54,42,0.08)" : "rgba(46,94,74,0.08)",
         color: isHard ? "#C8362A" : "var(--color-primary)",

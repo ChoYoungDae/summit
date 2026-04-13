@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import ElevationChart from "./ElevationChart";
+import type { SegmentElevationInfo } from "./ElevationChart";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import type { HikingGPSState, HikingPhase } from "@/lib/useHikingGPS";
 
@@ -46,6 +47,7 @@ interface Props {
   onToggleHiking: () => void;
   gps: HikingGPSState;
   track: [number, number, number][];
+  elevationSegments?: SegmentElevationInfo[];
   onHover: (pt: [number, number, number] | null) => void;
   highlightIndex: number | null;
   onSheetHeightChange?: (heightPx: number) => void;
@@ -58,6 +60,7 @@ export default function HikingBottomSheet({
   onToggleHiking,
   gps,
   track,
+  elevationSegments,
   onHover,
   highlightIndex,
   onSheetHeightChange,
@@ -281,12 +284,16 @@ export default function HikingBottomSheet({
         <div className="px-5 pt-4 overflow-y-auto" style={{ maxHeight: "80vh" }}>
 
           {/* Elevation chart */}
-          {track.length > 0 && (
+          {(elevationSegments?.some((s) => s.points.length > 0) ?? track.length > 0) && (
             <div className="mb-4">
               <ElevationChart
-                track={track}
+                segments={
+                  elevationSegments && elevationSegments.length > 0
+                    ? elevationSegments
+                    : [{ type: "ASCENT", isBus: false, points: track }]
+                }
                 onHover={onHover}
-                highlightIndex={highlightIndex}
+                highlightTrackIndex={highlightIndex}
               />
             </div>
           )}

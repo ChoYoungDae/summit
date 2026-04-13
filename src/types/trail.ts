@@ -9,6 +9,8 @@ export interface Mountain {
   imageUrl?: string;
   region?: string;
   maxElevationM?: number;
+  /** Stored as jsonb[] in DB: [{id, en, ko}] */
+  terrainTags?: { id: string; en: string; ko?: string }[];
 }
 
 // ── Waypoint ──────────────────────────────────────────────────────────────────
@@ -18,7 +20,8 @@ export type WaypointType =
   | "TRAILHEAD"
   | "SUMMIT"
   | "JUNCTION"
-  | "SHELTER";
+  | "SHELTER"
+  | "BUS_STOP";
 
 /** Turn direction used at JUNCTION waypoints. */
 export type TurnDirection = "left" | "right" | "straight";
@@ -37,6 +40,14 @@ export interface Waypoint {
   direction?: TurnDirection;
   /** Optional subway exit number — e.g. "4" */
   exitNumber?: string;
+  /** Subway lines serving this station — e.g. "2, 4" */
+  subwayLine?: string;
+  /** Optional Bus Stop ID (ARS ID) — e.g. "22194" */
+  arsId?: string;
+  /** Optional bus numbers — e.g. "704, 34" */
+  busNumbers?: string;
+  /** Bus route color injected from segment.bus_details.route_color */
+  busRouteColor?: string;
 }
 
 // ── Segment ───────────────────────────────────────────────────────────────────
@@ -47,6 +58,19 @@ export interface GeoJsonLineString {
   type: "LineString";
   /** GeoJSON order: [lon, lat] or [lon, lat, elevation] */
   coordinates: ([number, number] | [number, number, number])[];
+}
+
+export interface BusDetails {
+  bus_stop_id_key?: string;
+  bus_numbers?: string[];
+  route_color?: string;
+  bus_track_data?: GeoJsonLineString;
+  bus_duration_min?: number;
+}
+
+export interface SubSegment {
+  mode: "bus" | "walk";
+  duration?: number;
 }
 
 export interface Segment {
@@ -61,6 +85,11 @@ export interface Segment {
   totalDescentM?: number;
   estimatedTimeMin?: number;
   difficulty?: number;
+  
+  // Combined bus fields
+  isBusCombined?: boolean;
+  busDetails?: BusDetails;
+  subSegments?: SubSegment[];
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
