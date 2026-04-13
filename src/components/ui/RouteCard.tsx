@@ -29,6 +29,8 @@ interface RouteCardProps {
   route: Route;
   /** Total bus riding time in minutes (sum across all bus-combined segments). */
   busDurationMin?: number;
+  /** Number of segments that involve a bus. */
+  busSegmentCount?: number;
   /** Latest departure time in minutes from midnight (KST). Null = no data. */
   latestStartMin?: number | null;
   locale?: string;
@@ -37,6 +39,7 @@ interface RouteCardProps {
 export default function RouteCard({
   route,
   busDurationMin = 0,
+  busSegmentCount = 0,
   latestStartMin,
   locale = "en",
 }: RouteCardProps) {
@@ -102,7 +105,11 @@ export default function RouteCard({
                 {formatTime(route.totalDurationMin - busDurationMin)}
                 <span style={{ opacity: 0.3, margin: "0 1px" }}>|</span>
                 <Icon icon="ph:bus" width={13} height={13} style={{ color: "#0052A4" }} />
-                <span style={{ color: "#0052A4" }}>{formatTime(busDurationMin)}</span>
+                <span style={{ color: "#0052A4" }}>
+                  {busSegmentCount > 1
+                    ? `${Math.round(busDurationMin / busSegmentCount)}m × ${busSegmentCount}`
+                    : formatTime(busDurationMin)}
+                </span>
               </span>
             ) : (
               <InfoChip

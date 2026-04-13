@@ -180,7 +180,7 @@ export default async function RouteListPage() {
 
             {/* Route cards */}
             <div className="flex flex-col gap-3 px-4 pt-3">
-              {routes.map(({ route, busDurationMin }) => {
+              {routes.map(({ route, busDurationMin, busSegmentCount }) => {
                 const latestStartMin =
                   sunsetMin !== null && route.totalDurationMin != null
                     ? calcLatestStartFromDuration(route.totalDurationMin, sunsetMin)
@@ -190,6 +190,7 @@ export default async function RouteListPage() {
                     key={route.id}
                     route={route}
                     busDurationMin={busDurationMin}
+                    busSegmentCount={busSegmentCount}
                     latestStartMin={latestStartMin}
                     locale={locale}
                   />

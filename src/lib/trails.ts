@@ -164,6 +164,8 @@ export interface RouteWithTrack {
   waypoints: Waypoint[];
   /** Total bus riding time in minutes across all bus-combined segments. */
   busDurationMin: number;
+  /** Number of segments that involve a bus. */
+  busSegmentCount: number;
 }
 
 export interface MountainGroup {
@@ -201,7 +203,7 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
     start_waypoint_id: number;
     end_waypoint_id: number;
     is_bus_combined?: boolean;
-    bus_details?: { bus_numbers?: string[]; route_color?: string; bus_duration_min?: number };
+    bus_details?: { bus_numbers?: string[]; route_color?: string; bus_duration_min?: number; bus_stop_id_key?: string };
   }
 
   const trackMap = new Map<number, GeoJsonLineString>();
@@ -275,9 +277,11 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
       .filter(Boolean) as Waypoint[];
 
     // Sum bus riding time across bus-combined segments
+    let busSegmentCount = 0;
     const busDurationMin = segIds.reduce((sum, sid) => {
       const seg = segSummaryMap.get(sid);
       if (!seg?.is_bus_combined) return sum;
+      busSegmentCount++;
       return sum + (seg.bus_details?.bus_duration_min ?? 0);
     }, 0);
 
@@ -306,7 +310,7 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
       }
     }
 
-    groups.get(row.mountain_id)!.routes.push({ route: rowToRoute(row), elevationTrack, waypoints, busDurationMin });
+    groups.get(row.mountain_id)!.routes.push({ route: rowToRoute(row), elevationTrack, waypoints, busDurationMin, busSegmentCount });
   }
 
   return Array.from(groups.values());

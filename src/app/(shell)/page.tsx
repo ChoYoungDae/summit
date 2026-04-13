@@ -75,6 +75,26 @@ export default function HomePage() {
       {/* ── Interest Chips + Mountain Illustration (shared state) ── */}
       <MountainDiscovery />
 
+      {/* ── Personal Note ────────────────────────────────────────── */}
+      <section 
+        className="mt-2 rounded-[24px] border border-[#4A5D4E]/20 bg-[#F9F9F9] p-6 flex flex-col gap-4 shadow-sm"
+      >
+        <div className="flex">
+          <span 
+            className="inline-flex items-center bg-[#4A5D4E] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em]"
+            style={{ fontFamily: "var(--font-en)" }}
+          >
+            April 13, 2026
+          </span>
+        </div>
+        <p 
+          className="text-[0.9375rem] leading-[1.6] text-[#3A3A45]"
+          style={{ letterSpacing: "-0.01em" }}
+        >
+          Hi! I'm personally mapping out the Seoul trails I’ve loved and walked for decades. I’m currently uploading my favorite routes, vivid photos, and hidden tips one by one. Please visit often to see my journey unfold and find your next adventure!
+        </p>
+      </section>
+
     </div>
   );
 }

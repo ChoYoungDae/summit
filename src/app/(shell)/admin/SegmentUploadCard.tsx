@@ -19,6 +19,8 @@ type Segment   = {
   start_waypoint_id: number;
   end_waypoint_id: number;
   name?: { en?: string; ko?: string } | null;
+  difficulty?: number | null;
+  estimated_time_min?: number | null;
 };
 type Phase     = "input" | "preview" | "uploading" | "done" | "error";
 
