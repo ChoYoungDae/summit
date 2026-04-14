@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 // ── Geographic projection ────────────────────────────────────────
 // Real Seoul bounding box → SVG viewBox 0 0 400 300
@@ -523,17 +524,17 @@ export default function SeoulMountainsIllustration({ highlightSlugs }: Props = {
             style={{ opacity: highlighted(m.slug) ? 1 : 0.15, transition: "opacity 0.3s ease" }}
           >
             {/* Invisible tap target */}
-            <button
-              onClick={() => router.push(`/route#${m.slug}`)}
-              className="absolute bg-transparent border-0 p-0 cursor-pointer
-                         active:bg-[var(--color-primary)]/[0.07] transition-colors rounded-sm
+            <Link
+              href={`/hiking/route#${m.slug}`}
+              className="absolute bg-transparent border-0 p-0 cursor-pointer z-20
+                         active:scale-[0.98] transition-transform rounded-sm
                          focus-visible:outline focus-visible:outline-2
                          focus-visible:outline-[var(--color-primary)]"
               style={{
                 left:      `${xPct}%`,
                 top:       `${btnYPct}%`,
-                width:     btnW,
-                height:    btnH,
+                width:     btnW + 10,  // slighly wider hit area
+                height:    btnH + 10,  // slightly taller hit area
                 transform: "translate(-50%, -50%)",
               }}
               aria-label={`${m.nameEn} (${m.nameKo}) · ${m.elevation}m — tap to explore`}

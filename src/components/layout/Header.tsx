@@ -6,13 +6,13 @@ import { usePathname } from "next/navigation";
 
 export function Header() {
   const pathname = usePathname();
-  const isRouteContext = pathname.startsWith("/route");
+  const isRouteContext = pathname.startsWith("/hiking/route");
 
   if (isRouteContext) {
     return (
       <header className="fixed top-0 inset-x-0 z-50 h-14 bg-white/80 backdrop-blur-sm flex items-center px-4">
         <Link
-          href="/"
+          href="/hiking"
           className="inline-flex items-center gap-0.5 text-[var(--color-primary)] active:opacity-70 transition-opacity"
         >
           <ChevronLeft className="w-5 h-5" strokeWidth={2} />

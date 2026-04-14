@@ -285,7 +285,7 @@ export default function SegmentUploadCard() {
   }
 
   const stepNum = phase === "input" ? 1 : phase === "preview" ? 2 : 3;
-  const canPreview = !!parsed && !!mountainId && !!startWpId && !!endWpId && 
+  const canPreview = (!!parsed || !!editingId) && !!mountainId && !!startWpId && !!endWpId && 
     (!isBusCombined || (!!midWpId && !!busNumber));
 
   const eleRange = parsed
@@ -564,7 +564,7 @@ export default function SegmentUploadCard() {
       )}
 
       {/* ── Step 2 ── */}
-      {phase === "preview" && parsed && (
+      {phase === "preview" && (parsed || editingId) && (
         <div className="flex flex-col gap-3">
           <div className="rounded-xl border border-[var(--color-border)] divide-y divide-[var(--color-border)] text-sm">
             {[
@@ -579,8 +579,8 @@ export default function SegmentUploadCard() {
               ["Slug",           segmentSlugPreview?.slug ?? "—"],
               ["Est. Time",      estimatedMin ? `${estimatedMin} min` : "—"],
               ...(segType !== "APPROACH" && segType !== "RETURN" ? [["Difficulty", difficulty || "—"]] : []),
-              ["GPX Points",     parsed.points.length.toLocaleString()],
-              ["Elevation Range", eleRange],
+              ["GPX Points",     parsed?.points.length.toLocaleString() ?? "(Unchanged)"],
+              ["Elevation Range", parsed ? eleRange : "(Unchanged)"],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between px-3 py-2">
                 <span className="text-[var(--color-text-muted)]">{k}</span>

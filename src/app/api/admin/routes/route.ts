@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("routes")
-    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty")
+    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start")
     .eq("mountain_id", mountainId)
     .order("id");
 
@@ -31,9 +31,11 @@ export async function POST(req: NextRequest) {
     totalDurationMin?: number | null;
     totalDistanceM?: number | null;
     totalDifficulty?: number | null;
+    isOneway?: boolean;
+    hideSafeStart?: boolean;
   };
 
-  const { mountainId, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty } = body;
+  const { mountainId, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart } = body;
 
   if (!mountainId || !nameEn || !segmentIds?.length) {
     return NextResponse.json({ error: "mountainId, nameEn, segmentIds required" }, { status: 400 });
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest) {
     total_duration_min: totalDurationMin ?? null,
     total_distance_m:   totalDistanceM   ?? null,
     total_difficulty:   totalDifficulty  ?? null,
+    // is_oneway:          isOneway         ?? false,
+    // hide_safe_start:    hideSafeStart    ?? false,
   }).select("id").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -62,9 +66,11 @@ export async function PATCH(req: NextRequest) {
     totalDurationMin?: number | null;
     totalDistanceM?: number | null;
     totalDifficulty?: number | null;
+    isOneway?: boolean;
+    hideSafeStart?: boolean;
   };
 
-  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty } = body;
+  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
@@ -73,6 +79,8 @@ export async function PATCH(req: NextRequest) {
   if (totalDurationMin != null) updates.total_duration_min = totalDurationMin;
   if (totalDistanceM   != null) updates.total_distance_m   = totalDistanceM;
   if (totalDifficulty  != null) updates.total_difficulty    = totalDifficulty;
+  // if (isOneway         != null) updates.is_oneway          = isOneway;
+  // if (hideSafeStart    != null) updates.hide_safe_start    = hideSafeStart;
 
   const { error } = await supabaseAdmin.from("routes").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

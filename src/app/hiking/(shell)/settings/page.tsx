@@ -266,7 +266,7 @@ export default function SettingsPage() {
         style={{ background: "var(--color-card)", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}
       >
         <Link
-          href="/help"
+          href="/hiking/help"
           className="flex items-center justify-between px-4 py-3.5"
           style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
         >

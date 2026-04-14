@@ -47,6 +47,8 @@ type Route = {
   total_duration_min?: number | null;
   total_distance_m?: number | null;
   total_difficulty?: number | null;
+  is_oneway?: boolean | null;
+  hide_safe_start?: boolean | null;
 };
 
 type Phase = "idle" | "saving" | "done" | "error" | "deleting";
@@ -101,6 +103,8 @@ export default function RouteBuilderCard() {
 
   const [phase, setPhase]           = useState<Phase>("idle");
   const [msg, setMsg]               = useState("");
+  const [isOneway, setIsOneway]     = useState(false);
+  const [hideSafeStart, setHideSafeStart] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/mountains").then(r => r.json())
@@ -114,6 +118,7 @@ export default function RouteBuilderCard() {
     setSelectedIds([]); setAddingId("");
     setEditingRouteId(null);
     setNameEn(""); setNameKo("");
+    setIsOneway(false);
     setPhase("idle"); setMsg("");
     if (!mid) return;
     setLoadingData(true);
@@ -135,6 +140,8 @@ export default function RouteBuilderCard() {
     setNameEn(route.name.en ?? "");
     setNameKo(route.name.ko ?? "");
     setSelectedIds(route.segment_ids ?? []);
+    setIsOneway(!!route.is_oneway);
+    setHideSafeStart(!!route.hide_safe_start);
     setAddingId("");
     setPhase("idle");
     setMsg("");
@@ -215,6 +222,8 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
               nameEn:          en,
               nameKo:          ko || en,
               segmentIds:      selectedIds,
+              isOneway,
+              hideSafeStart,
               totalDurationMin,
               totalDistanceM,
               totalDifficulty: maxDifficulty,
@@ -224,6 +233,8 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
               nameEn:          en,
               nameKo:          ko || en,
               segmentIds:      selectedIds,
+              isOneway,
+              hideSafeStart,
               totalDurationMin,
               totalDistanceM,
               totalDifficulty: maxDifficulty,
@@ -238,7 +249,7 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
 
       if (isEdit) {
         setRoutes(prev => prev.map(r => r.id === editingRouteId
-          ? { ...r, name: { en, ko: ko || en }, segment_ids: selectedIds }
+          ? { ...r, name: { en, ko: ko || en }, segment_ids: selectedIds, is_oneway: isOneway, hide_safe_start: hideSafeStart }
           : r
         ));
         setMsg(`Route #${editingRouteId} "${en}" updated`);
@@ -248,6 +259,8 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
           id,
           name: { en, ko: ko || en },
           segment_ids: selectedIds,
+          is_oneway: isOneway,
+          hide_safe_start: hideSafeStart,
           total_duration_min: totalDurationMin,
           total_distance_m: totalDistanceM,
           total_difficulty: maxDifficulty,
@@ -263,6 +276,8 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
 
   function reset() {
     setNameEn(""); setNameKo(""); setSelectedIds([]); setAddingId("");
+    setIsOneway(false);
+    setHideSafeStart(false);
     setMsg(""); setPhase("idle"); setEditingRouteId(null);
   }
 
@@ -462,6 +477,16 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
                   style={{ fontFamily: "var(--font-ko)" }} />
               </label>
             </div>
+            <div className="flex flex-wrap gap-4 px-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={isOneway} onChange={e => setIsOneway(e.target.checked)} className="w-4 h-4 rounded text-primary focus:ring-primary/40 border-[var(--color-border)]" />
+                <span className="text-sm font-medium">Is One-Way</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={hideSafeStart} onChange={e => setHideSafeStart(e.target.checked)} className="w-4 h-4 rounded text-primary focus:ring-primary/40 border-[var(--color-border)]" />
+                <span className="text-sm font-medium">Hide Safety Alert (Safe Start Time)</span>
+              </label>
+            </div>
           </div>
 
           {/* Segment ordering */}
@@ -510,6 +535,10 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
                       </div>
 
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={() => openSegEdit(seg)}
+                          className="flex items-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] px-2 py-1 text-xs hover:border-primary hover:text-primary transition-colors">
+                          <Pencil className="w-3 h-3" />
+                        </button>
                         <button onClick={() => removeSegment(i)}
                           className="flex items-center rounded-lg border border-red-200 text-red-500 px-2 py-1 text-xs hover:bg-red-50 transition-colors"
                           title="코스에서 제외">

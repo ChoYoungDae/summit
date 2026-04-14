@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import ElevationChart from "./ElevationChart";
 import type { SegmentElevationInfo } from "./ElevationChart";
+import type { RoutePhoto } from "@/types/trail";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import type { HikingGPSState, HikingPhase } from "@/lib/useHikingGPS";
 
@@ -51,6 +52,8 @@ interface Props {
   onHover: (pt: [number, number, number] | null) => void;
   highlightIndex: number | null;
   onSheetHeightChange?: (heightPx: number) => void;
+  photos?: RoutePhoto[];
+  onPhotoClick?: (photo: RoutePhoto) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -64,6 +67,8 @@ export default function HikingBottomSheet({
   onHover,
   highlightIndex,
   onSheetHeightChange,
+  photos = [],
+  onPhotoClick,
 }: Props) {
   const [snap, setSnap] = useState<Snap>("min");
   const [liveY, setLiveY] = useState<number | null>(null);
@@ -235,7 +240,7 @@ export default function HikingBottomSheet({
             <div className="flex items-center justify-between gap-4">
               {/* Current level chip — taps through to Settings */}
               <Link
-                href="/settings"
+                href="/hiking/settings"
                 className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 active:opacity-70 transition-opacity"
                 style={{ background: "var(--color-bg-light)" }}
               >
@@ -294,6 +299,8 @@ export default function HikingBottomSheet({
                 }
                 onHover={onHover}
                 highlightTrackIndex={highlightIndex}
+                photos={photos}
+                onPhotoClick={onPhotoClick}
               />
             </div>
           )}

@@ -9,7 +9,7 @@ import Map, {
 } from "react-map-gl";
 import type { MapRef } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import type { Waypoint } from "@/types/trail";
+import type { Waypoint, RoutePhoto } from "@/types/trail";
 import { Footprints, GitFork, Camera, Flag, TrainFront, Bus } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { t } from "@/lib/i18n";
@@ -289,6 +289,29 @@ function BusChip({ busNumbers, color, chipTextColor }: { busNumbers?: string; co
   );
 }
 
+function PhotoMarker({ onClick }: { onClick: () => void }) {
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: "50%",
+        background: "#F59E0B",
+        border: "2px solid #fff",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        userSelect: "none",
+      }}
+    >
+      <Icon icon="ph:camera" width={14} height={14} color="#fff" />
+    </div>
+  );
+}
+
 function HoverDot({ ele }: { ele?: number }) {
   return (
     <div className="flex flex-col items-center group pointer-events-none">
@@ -390,6 +413,10 @@ export interface MapViewProps {
   approachBusInfo?: BusSegmentInfo;
   /** Bus chip info for the return segment */
   returnBusInfo?: BusSegmentInfo;
+  /** Trail photos to show as camera markers on the map. */
+  photos?: RoutePhoto[];
+  /** Called when a photo marker is tapped. */
+  onPhotoClick?: (photo: RoutePhoto) => void;
   /**
    * Pixels of bottom padding for the Mapbox camera.
    * When the bottom sheet rises, pass its visible height so the trail
@@ -423,6 +450,8 @@ export default function MapView({
   returnIsBus = false,
   approachBusInfo,
   returnBusInfo,
+  photos = [],
+  onPhotoClick,
   bottomPadding = 0,
   controlsBottomOffset = 88,
   locale = "en",
@@ -1037,6 +1066,18 @@ export default function MapView({
             />
           </Marker>
         )}
+
+        {/* Photo markers — amber camera dots */}
+        {photos.filter(p => p.lat != null && p.lon != null).map(photo => (
+          <Marker
+            key={`photo-${photo.id}`}
+            longitude={photo.lon!}
+            latitude={photo.lat!}
+            anchor="center"
+          >
+            <PhotoMarker onClick={() => onPhotoClick?.(photo)} />
+          </Marker>
+        ))}
 
         {/* Elevation-chart hover sync marker */}
         {hoveredPoint && (

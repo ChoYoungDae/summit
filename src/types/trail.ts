@@ -107,6 +107,25 @@ export interface Route {
   /** Up to 3 hero images shown in the card carousel */
   heroImages?: string[];
   description?: LocalizedText;
+  isOneway?: boolean;
+  hideSafeStart?: boolean;
+}
+
+
+
+// ── Route Photo ───────────────────────────────────────────────────────────────
+
+export interface RoutePhoto {
+  id: number;
+  routeId: number;
+  segmentId?: number | null;
+  lat?: number | null;
+  lon?: number | null;
+  url: string;
+  descriptionEn?: string | null;
+  descriptionKo?: string | null;
+  orderIndex: number;
+  createdAt?: string;
 }
 
 // ── Station info (for FloatingTrailHeader subway chip) ───────────────────────

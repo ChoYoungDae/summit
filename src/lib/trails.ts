@@ -7,6 +7,7 @@ import type {
   Segment,
   SegmentType,
   Route,
+  RoutePhoto,
   ResolvedRoute,
   ResolvedSegment,
   GeoJsonLineString,
@@ -75,6 +76,8 @@ interface RouteRow {
   route_preview_img?: string;
   hero_images?: string[];
   description?: LocalizedText;
+  is_oneway?: boolean;
+  hide_safe_start?: boolean;
 }
 
 // ── Row → App type converters ─────────────────────────────────────────────────
@@ -139,6 +142,8 @@ function rowToRoute(row: RouteRow): Route {
     routePreviewImg: row.route_preview_img,
     heroImages: row.hero_images ?? [],
     description: row.description,
+    isOneway: row.is_oneway ?? false,
+    hideSafeStart: row.hide_safe_start ?? false,
   };
 }
 
@@ -420,7 +425,7 @@ const MOUNTAIN_SUBWAY_LINES: Record<string, number[]> = {
 
 /** First active route href per mountain slug. */
 const MOUNTAIN_ROUTE_HREF: Record<string, string> = {
-  gwanaksan: "/route/1",
+  gwanaksan: "/hiking/route/1",
 };
 
 export const fetchHomeMapData = cache(async (): Promise<{
@@ -463,7 +468,7 @@ export const fetchHomeMapData = cache(async (): Promise<{
       nameKo:  m.name.ko,
       lat:     summit?.lat  ?? fallback[1],
       lon:     summit?.lon  ?? fallback[0],
-      href:    MOUNTAIN_ROUTE_HREF[m.slug] ?? "/route",
+      href:    MOUNTAIN_ROUTE_HREF[m.slug] ?? "/hiking/route",
     };
   });
 
@@ -505,3 +510,44 @@ export const fetchWaypoints = cache(async (mountainId: number): Promise<Waypoint
   if (error || !data) return [];
   return (data as WaypointRow[]).map(rowToWaypoint);
 });
+
+// ── Route Photos ──────────────────────────────────────────────────────────────
+
+interface RoutePhotoRow {
+  id: number;
+  route_id: number;
+  segment_id?: number | null;
+  lat?: number | null;
+  lon?: number | null;
+  url: string;
+  description_en?: string | null;
+  description_ko?: string | null;
+  order_index: number;
+  created_at?: string;
+}
+
+function rowToRoutePhoto(row: RoutePhotoRow): RoutePhoto {
+  return {
+    id:            row.id,
+    routeId:       row.route_id,
+    segmentId:     row.segment_id ?? null,
+    lat:           row.lat ?? null,
+    lon:           row.lon ?? null,
+    url:           row.url,
+    descriptionEn: row.description_en ?? null,
+    descriptionKo: row.description_ko ?? null,
+    orderIndex:    row.order_index ?? 0,
+    createdAt:     row.created_at,
+  };
+}
+
+export async function fetchRoutePhotos(routeId: number): Promise<RoutePhoto[]> {
+  const { data, error } = await supabase
+    .from("route_photos")
+    .select("*")
+    .eq("route_id", routeId)
+    .order("order_index");
+
+  if (error || !data) return [];
+  return (data as RoutePhotoRow[]).map(rowToRoutePhoto);
+}

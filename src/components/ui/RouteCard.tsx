@@ -7,7 +7,6 @@ import {
   Ruler,
   Footprints,
   TrendingUp,
-  AlertTriangle,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { t } from "@/lib/i18n";
@@ -59,17 +58,12 @@ export default function RouteCard({
       }}
     >
       {/* ── Safety banner ── */}
-      {isPastLatestStart && latestStartMin != null && (
+      {!route.hideSafeStart && isPastLatestStart && latestStartMin != null && (
         <div
           className="flex items-center gap-2 px-4 py-1.5"
           style={{ background: "#EF4444" }}
         >
-          <AlertTriangle
-            className="shrink-0"
-            size={13}
-            strokeWidth={2}
-            color="white"
-          />
+          <Icon icon="ph:warning-circle" width={13} height={13} style={{ color: "white" }} />
           <span className="text-[11px] font-semibold text-white uppercase tracking-wide">
             Last safe start&nbsp;
             <span className="font-num">{formatMinutesAsTime(latestStartMin)}</span>
@@ -80,14 +74,25 @@ export default function RouteCard({
       {/* ── Card body ── */}
       <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
         {/* Title */}
-        <h2
-          className="text-base font-bold leading-snug text-center flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1"
-          style={{ fontFamily: "var(--font-en)" }}
-        >
-          {t(route.name, locale)}
-        </h2>
+        <div className="flex flex-col items-center gap-1">
+          <h2
+            className="text-base font-bold leading-snug text-center flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1"
+            style={{ fontFamily: "var(--font-en)" }}
+          >
+            {t(route.name, locale)}
+          </h2>
+          {route.isOneway && (
+            <span
+              className="px-2 py-0.5 rounded-full border border-primary/30 text-[10px] font-bold text-primary uppercase tracking-tight"
+              style={{ background: "rgba(46,94,74,0.05)" }}
+            >
+              {locale === "ko" ? "상행 전용" : "One-Way Ascent"}
+            </span>
+          )}
+        </div>
 
         {/* Info chips */}
+
         <div className="flex flex-wrap gap-1.5 justify-center">
           {route.totalDistanceM != null && (
             <InfoChip
@@ -124,7 +129,7 @@ export default function RouteCard({
         </div>
 
         {/* Safety: last safe start when NOT past deadline */}
-        {!isPastLatestStart && latestStartMin != null && (
+        {!route.hideSafeStart && !isPastLatestStart && latestStartMin != null && (
           <div className="flex items-center gap-1.5">
             <span
               className="text-[10px] font-semibold uppercase tracking-wide"
@@ -165,7 +170,7 @@ export default function RouteCard({
         {/* CTA */}
         <div className="flex justify-center pt-0.5">
           <Link
-            href={`/route/${route.id}`}
+            href={`/hiking/route/${route.id}`}
             className="inline-flex items-center gap-1 px-4 py-1 rounded-full border
                        active:opacity-70 transition-opacity"
             style={{

@@ -30,7 +30,7 @@ export default function FloatingTrailHeader({
   peakETAMin,
   finalETAMin,
   routeName,
-  backHref = "/route",
+  backHref = "/hiking/route",
 }: Props) {
   const cardStyle = {
     background: "rgba(255,255,255,0.88)",

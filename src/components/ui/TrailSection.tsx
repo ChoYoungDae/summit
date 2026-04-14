@@ -14,7 +14,7 @@ import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
 import { useOffRouteAlert } from "@/lib/useOffRouteAlert";
 import { calcLatestStartMin, nowKSTMin } from "@/lib/safetyEngine";
 import { Icon } from "@iconify/react";
-import type { Waypoint, ResolvedRoute, StationInfo } from "@/types/trail";
+import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto } from "@/types/trail";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -114,6 +114,18 @@ export default function TrailSection({
   const [isHiking,              setIsHiking]              = useState(false);
   const [startedAtMin,          setStartedAtMin]          = useState<number | null>(null);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
+
+  // ── Route photos ──────────────────────────────────────────────────────────
+  const [photos,        setPhotos]        = useState<RoutePhoto[]>([]);
+  const [activePhoto,   setActivePhoto]   = useState<RoutePhoto | null>(null);
+
+  // Fetch route photos once on mount
+  useEffect(() => {
+    fetch(`/api/admin/route-photos?routeId=${route.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: RoutePhoto[]) => { if (Array.isArray(data)) setPhotos(data); })
+      .catch(() => {});
+  }, [route.id]);
 
   // ── Hiking mode: "preview" (far from trailhead) | "active" (within 500 m) ──
   const [hikingMode, setHikingMode] = useState<"preview" | "active">("preview");
@@ -323,6 +335,8 @@ export default function TrailSection({
         bottomPadding={sheetHeightPx}
         controlsBottomOffset={sheetHeightPx}
         locale={locale}
+        photos={photos}
+        onPhotoClick={setActivePhoto}
       />
 
       <div
@@ -417,6 +431,8 @@ export default function TrailSection({
         onHover={handleHover}
         highlightIndex={elevationHighlightIndex}
         onSheetHeightChange={setSheetHeightPx}
+        photos={photos}
+        onPhotoClick={setActivePhoto}
       />
 
       {selectedWaypointIndex !== null && waypoints.length > 0 && (
@@ -427,6 +443,59 @@ export default function TrailSection({
           onSelect={handleWaypointSelect}
           locale={locale}
         />
+      )}
+
+      {/* ── Photo description popup ──────────────────────────────────────── */}
+      {activePhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+          onClick={() => setActivePhoto(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl overflow-hidden"
+            style={{ background: "var(--color-card)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Photo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activePhoto.url}
+              alt=""
+              className="w-full object-cover"
+              style={{ maxHeight: "55vw" }}
+            />
+            {/* Description */}
+            <div className="px-5 py-4">
+              {(activePhoto.descriptionEn || activePhoto.descriptionKo) ? (
+                <>
+                  {activePhoto.descriptionEn && (
+                    <p className="text-sm text-[var(--color-text-body)] leading-relaxed">
+                      {activePhoto.descriptionEn}
+                    </p>
+                  )}
+                  {activePhoto.descriptionKo && (
+                    <p
+                      className="text-sm text-[var(--color-text-muted)] leading-relaxed mt-1"
+                      style={{ fontFamily: "var(--font-ko)" }}
+                    >
+                      {activePhoto.descriptionKo}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-[var(--color-text-muted)] italic">No description</p>
+              )}
+              <button
+                onClick={() => setActivePhoto(null)}
+                className="mt-4 w-full rounded-xl py-2.5 text-sm font-semibold"
+                style={{ background: "var(--color-bg-light)", color: "var(--color-primary)" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

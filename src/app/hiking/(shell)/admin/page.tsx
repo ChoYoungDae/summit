@@ -1,6 +1,7 @@
 import WaypointManagerCard from "./WaypointManagerCard";
 import SegmentUploadCard from "./SegmentUploadCard";
 import RouteBuilderCard from "./RouteBuilderCard";
+import PhotoUploadCard from "./PhotoUploadCard";
 
 export default function AdminPage() {
   return (
@@ -22,6 +23,9 @@ export default function AdminPage() {
 
       {/* Step 3: Route composition */}
       <RouteBuilderCard />
+
+      {/* Step 4: Photo upload */}
+      <PhotoUploadCard />
     </div>
   );
 }

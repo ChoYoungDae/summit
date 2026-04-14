@@ -11,7 +11,8 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Bus, Footprints, Flag } from "lucide-react";
-import type { SegmentType } from "@/types/trail";
+import type { SegmentType, RoutePhoto } from "@/types/trail";
+import { Icon } from "@iconify/react";
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 const COLOR_ASCENT   = "#10B981"; // Emerald green — climbing
@@ -190,6 +191,57 @@ function NodeIconLabel({
   );
 }
 
+// ── Photo camera label (rendered inside Recharts SVG via ReferenceLine label) ─
+
+function PhotoIconLabel({
+  viewBox,
+  onClick,
+}: {
+  viewBox?: { x: number; y: number; width: number; height: number };
+  onClick?: () => void;
+}) {
+  if (!viewBox) return null;
+  const { x } = viewBox;
+  return (
+    <g style={{ cursor: "pointer" }} onClick={onClick}>
+      <circle cx={x} cy={11} r={10} fill="white" opacity={0.9} />
+      <circle cx={x} cy={11} r={9} fill="#F59E0B" />
+      <foreignObject x={x - 6} y={5} width={12} height={12}>
+        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+        {/* @ts-ignore — xmlns attribute required for foreignObject HTML context */}
+        <div
+          style={{
+            width: 12,
+            height: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon icon="ph:camera" width={9} height={9} color="#fff" />
+        </div>
+      </foreignObject>
+    </g>
+  );
+}
+
+// ── Find dist value for a lat/lon in the elevation data ───────────────────────
+function findDistForCoord(
+  data: { dist: number; origPt: [number, number, number] }[],
+  lat: number,
+  lon: number,
+): number | null {
+  if (data.length === 0) return null;
+  let minDist = Infinity;
+  let best = data[0].dist;
+  for (const pt of data) {
+    const [pLon, pLat] = pt.origPt;
+    const d = (pLat - lat) ** 2 + (pLon - lon) ** 2;
+    if (d < minDist) { minDist = d; best = pt.dist; }
+  }
+  return best;
+}
+
 // ── Legend row ────────────────────────────────────────────────────────────────
 
 function LegendDash({
@@ -229,11 +281,15 @@ interface Props {
    * Built by gps.nearestTrackIndex or chart click.
    */
   highlightTrackIndex?: number | null;
+  /** Route photos to show as camera markers along the elevation profile. */
+  photos?: RoutePhoto[];
+  /** Called when a photo marker is clicked. */
+  onPhotoClick?: (photo: RoutePhoto) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ElevationChart({ segments, onHover, highlightTrackIndex }: Props) {
+export default function ElevationChart({ segments, onHover, highlightTrackIndex, photos = [], onPhotoClick }: Props) {
   const { data, trackIndexMap, boundaries } = useMemo(
     () => buildData(segments),
     [segments]
@@ -480,6 +536,28 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex 
                   }
                 />
               ))}
+
+              {/* ── Photo camera markers ── */}
+              {photos
+                .filter(p => p.lat != null && p.lon != null)
+                .map(photo => {
+                  const dist = findDistForCoord(data, photo.lat!, photo.lon!);
+                  if (dist === null) return null;
+                  return (
+                    <ReferenceLine
+                      key={`photo-${photo.id}`}
+                      x={dist}
+                      stroke="rgba(245,158,11,0.4)"
+                      strokeWidth={1}
+                      strokeDasharray="2 3"
+                      ifOverflow="visible"
+                      label={
+                        <PhotoIconLabel onClick={() => onPhotoClick?.(photo)} />
+                      }
+                    />
+                  );
+                })
+              }
             </AreaChart>
           </ResponsiveContainer>
         </div>
