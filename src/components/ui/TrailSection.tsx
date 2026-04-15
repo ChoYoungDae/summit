@@ -13,6 +13,7 @@ import { useHikingLevel } from "@/lib/useHikingLevel";
 import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
 import { useOffRouteAlert } from "@/lib/useOffRouteAlert";
 import { calcLatestStartMin, nowKSTMin } from "@/lib/safetyEngine";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Icon } from "@iconify/react";
 import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto } from "@/types/trail";
 
@@ -446,57 +447,88 @@ export default function TrailSection({
       )}
 
       {/* ── Photo description popup ──────────────────────────────────────── */}
-      {activePhoto && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
-          onClick={() => setActivePhoto(null)}
-        >
+      {activePhoto && (() => {
+        const photoIndex = photos.findIndex(p => p.id === activePhoto.id);
+        const canPrev    = photoIndex > 0;
+        const canNext    = photoIndex < photos.length - 1;
+        return (
           <div
-            className="w-full max-w-lg rounded-t-3xl overflow-hidden"
-            style={{ background: "var(--color-card)" }}
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+            onClick={() => setActivePhoto(null)}
           >
-            {/* Photo */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activePhoto.url}
-              alt=""
-              className="w-full object-cover"
-              style={{ maxHeight: "55vw" }}
-            />
-            {/* Description */}
-            <div className="px-5 py-4">
-              {(activePhoto.descriptionEn || activePhoto.descriptionKo) ? (
-                <>
-                  {activePhoto.descriptionEn && (
-                    <p className="text-sm text-[var(--color-text-body)] leading-relaxed">
-                      {activePhoto.descriptionEn}
-                    </p>
-                  )}
-                  {activePhoto.descriptionKo && (
+            <div
+              className="w-full max-w-lg rounded-3xl overflow-hidden"
+              style={{ background: "var(--color-card)" }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Photo + X button */}
+              <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={activePhoto.url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: "center 65%" }}
+                />
+                {/* X */}
+                <button
+                  onClick={() => setActivePhoto(null)}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center
+                             bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
+                  aria-label="Close"
+                >
+                  <X size={13} strokeWidth={2.5} />
+                </button>
+                {/* Prev arrow */}
+                {canPrev && (
+                  <button
+                    onClick={() => setActivePhoto(photos[photoIndex - 1])}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center
+                               bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
+                    aria-label="Previous photo"
+                  >
+                    <ChevronLeft size={18} strokeWidth={2.5} />
+                  </button>
+                )}
+                {/* Next arrow */}
+                {canNext && (
+                  <button
+                    onClick={() => setActivePhoto(photos[photoIndex + 1])}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center
+                               bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
+                    aria-label="Next photo"
+                  >
+                    <ChevronRight size={18} strokeWidth={2.5} />
+                  </button>
+                )}
+                {/* Counter */}
+                {photos.length > 1 && (
+                  <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] font-num text-white/70 bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                    {photoIndex + 1} / {photos.length}
+                  </p>
+                )}
+              </div>
+
+              {/* Description */}
+              {(() => {
+                const desc = locale === "ko" ? activePhoto.descriptionKo : activePhoto.descriptionEn;
+                if (!desc) return null;
+                return (
+                  <div className="px-5 py-4">
                     <p
-                      className="text-sm text-[var(--color-text-muted)] leading-relaxed mt-1"
-                      style={{ fontFamily: "var(--font-ko)" }}
+                      className="text-sm text-[var(--color-text-body)] leading-relaxed text-center"
+                      style={locale === "ko" ? { fontFamily: "var(--font-ko)" } : undefined}
                     >
-                      {activePhoto.descriptionKo}
+                      {desc}
                     </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-[var(--color-text-muted)] italic">No description</p>
-              )}
-              <button
-                onClick={() => setActivePhoto(null)}
-                className="mt-4 w-full rounded-xl py-2.5 text-sm font-semibold"
-                style={{ background: "var(--color-bg-light)", color: "var(--color-primary)" }}
-              >
-                Close
-              </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

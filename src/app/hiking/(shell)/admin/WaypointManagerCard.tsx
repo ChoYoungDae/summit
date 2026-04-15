@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import exifr from "exifr";
-import { MapPin, Plus, Pencil, Trash2, CheckCircle, AlertCircle, X, ChevronDown, ImageIcon, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MapPin, Plus, Pencil, Trash2, CheckCircle, AlertCircle, X, ChevronDown, RefreshCw } from "lucide-react";
 import { toSlug } from "@/lib/slug";
 
 const CARD          = "rounded-2xl bg-card border border-[var(--color-border)] p-5 flex flex-col gap-4";
@@ -43,7 +42,6 @@ type FormState = {
   subwayStation: string;
   arsId: string;
   busNumbers: string;
-  imageFile: File | null; imagePreview: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -56,7 +54,6 @@ const EMPTY_FORM: FormState = {
   subwayStation: "",
   arsId: "",
   busNumbers: "",
-  imageFile: null, imagePreview: "",
 };
 
 const TYPE_LABELS: Record<WaypointType, string> = {
@@ -93,87 +90,23 @@ function Alert({ type, message }: { type: "success" | "error" | "loading"; messa
 }
 
 function WaypointForm({
-  initial, existingImage, mountainSlug,
+  initial,
   onSave, onCancel, saving, error,
 }: {
   initial: FormState;
-  existingImage?: string | null;
-  mountainSlug: string;
   onSave: (f: FormState) => void;
   onCancel: () => void;
   saving: boolean;
   error: string;
 }) {
-  const [f, setF]         = useState<FormState>(initial);
-  const [exifHit, setExifHit] = useState<boolean | null>(null);
-  const photoRef          = useRef<HTMLInputElement>(null);
+  const [f, setF] = useState<FormState>(initial);
 
   const set = (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setF(prev => ({ ...prev, [k]: e.target.value }));
 
-  async function handleImageChange(file: File | null) {
-    if (!file) {
-      setF(prev => ({ ...prev, imageFile: null, imagePreview: "" }));
-      setExifHit(null);
-      return;
-    }
-    const preview = URL.createObjectURL(file);
-    setF(prev => ({ ...prev, imageFile: file, imagePreview: preview }));
-    try {
-      const tags = await exifr.parse(file, { gps: true }) as Record<string, number> | null;
-      const lat  = tags?.latitude  ?? tags?.GPSLatitude;
-      const lon  = tags?.longitude ?? tags?.GPSLongitude;
-      const alt  = tags?.altitude  ?? tags?.GPSAltitude;
-      if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        setF(prev => ({
-          ...prev,
-          lat: (lat as number).toFixed(6),
-          lon: (lon as number).toFixed(6),
-          ...(Number.isFinite(alt) ? { elevation_m: String(Math.round(alt as number)) } : {}),
-        }));
-        setExifHit(true);
-      } else {
-        setExifHit(false);
-      }
-    } catch {
-      setExifHit(false);
-    }
-  }
-
-  const displayImage = f.imagePreview || existingImage || null;
-
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg-light)]">
-      {/* Image — top so EXIF fills coords before user touches other fields */}
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-[var(--color-text-muted)]">
-          Photo <span className="text-[10px]">(GPS auto-filled from EXIF)</span>
-        </span>
-        <div className="flex items-center gap-3">
-          {displayImage ? (
-            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-[var(--color-border)] flex-shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={displayImage} alt="" className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={() => { handleImageChange(null); if (photoRef.current) photoRef.current.value = ""; }}
-                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="w-16 h-16 rounded-lg border-2 border-dashed border-[var(--color-border)] flex items-center justify-center flex-shrink-0">
-              <ImageIcon className="w-5 h-5 text-[var(--color-text-muted)]" />
-            </div>
-          )}
-          <input ref={photoRef} type="file" accept="image/*"
-            onChange={e => handleImageChange(e.target.files?.[0] ?? null)}
-            className="text-sm file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-xs file:cursor-pointer" />
-        </div>
-      </div>
-
       {/* Name */}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
@@ -273,9 +206,9 @@ function WaypointForm({
       {/* Coordinates */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--color-text-muted)]">Lat / Lon / Elevation (m) *</span>
-          {exifHit === true  && <span className="text-[10px] bg-[#EEF5F1] text-[#2E5E4A] px-1.5 py-0.5 rounded-full">GPS from EXIF</span>}
-          {exifHit === false && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full">No GPS — enter manually</span>}
+          <span className="text-xs text-[var(--color-text-muted)]">
+            Lat / Lon / Elevation (m){f.type === "SUMMIT" ? " *" : ""}
+          </span>
         </div>
         <div className="grid grid-cols-3 gap-2">
           <input type="text" inputMode="decimal" placeholder="37.123456" value={f.lat} onChange={set("lat")}
@@ -308,7 +241,7 @@ function WaypointForm({
           <X className="w-4 h-4" /> Cancel
         </button>
         <button onClick={() => onSave(f)}
-          disabled={saving || !f.nameEn || !f.lat || !f.lon || !f.slug}
+          disabled={saving || !f.nameEn || !f.lat || !f.lon || !f.slug || (f.type === "SUMMIT" && !f.elevation_m)}
           className={BTN_PRIMARY}>
           {saving
             ? <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -390,7 +323,6 @@ export default function WaypointManagerCard() {
     if (f.subwayStation) form.append("subway_station", f.subwayStation);
     if (f.arsId)        form.append("ars_id", f.arsId);
     if (f.busNumbers)   form.append("bus_numbers", f.busNumbers);
-    if (f.imageFile)    form.append("image", f.imageFile);
 
     try {
       const res = await fetch("/api/admin/waypoints", {
@@ -444,7 +376,6 @@ export default function WaypointManagerCard() {
       subwayStation: w.subway_station ?? "",
       arsId: w.ars_id ?? "",
       busNumbers: w.bus_numbers ?? "",
-      imageFile: null, imagePreview: "",
     });
     setFormErr("");
     setMode(w.id);
@@ -500,7 +431,6 @@ export default function WaypointManagerCard() {
           {mode === "add" && (
             <WaypointForm
               initial={formInit}
-              mountainSlug={mountainSlug}
               onSave={handleSave}
               onCancel={() => setMode("none")}
               saving={saving}
@@ -519,8 +449,6 @@ export default function WaypointManagerCard() {
                   {mode === w.id ? (
                     <WaypointForm
                       initial={formInit}
-                      existingImage={w.image_url}
-                      mountainSlug={mountainSlug}
                       onSave={handleSave}
                       onCancel={() => setMode("none")}
                       saving={saving}
@@ -528,17 +456,6 @@ export default function WaypointManagerCard() {
                     />
                   ) : (
                     <div className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] px-3 py-2.5">
-                      {w.image_url ? (
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-[var(--color-border)] flex-shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={w.image_url} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-[var(--color-bg-light)] border border-dashed border-[var(--color-border)] flex items-center justify-center flex-shrink-0">
-                          <ImageIcon className="w-4 h-4 text-[var(--color-text-muted)]" />
-                        </div>
-                      )}
-
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium truncate">{w.name.en}</span>

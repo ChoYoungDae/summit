@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Camera, CheckCircle, AlertCircle, Trash2, Save } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Icon } from "@iconify/react";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
@@ -29,10 +30,22 @@ interface PhotoEntry {
   segmentId:     number | null;
   /** Was the segment auto-mapped by the server? */
   autoMapped:    boolean;
+  /** Cumulative metres from route start — used for sort order */
+  orderIndex:    number;
   descriptionEn: string;
   descriptionKo: string;
   state: "pending" | "uploading" | "uploaded" | "saving" | "saved" | "error";
   errorMsg?: string;
+}
+
+/** Keep saved photos sorted by trail position; in-progress ones stay at the end */
+function sortPhotos(photos: PhotoEntry[]): PhotoEntry[] {
+  return [...photos].sort((a, b) => {
+    const aInProgress = a.state === "pending" || a.state === "uploading";
+    const bInProgress = b.state === "pending" || b.state === "uploading";
+    if (aInProgress !== bInProgress) return aInProgress ? 1 : -1;
+    return a.orderIndex - b.orderIndex;
+  });
 }
 
 // ── Client-side helpers ───────────────────────────────────────────────────────
@@ -114,6 +127,84 @@ function StatusPill({ state, errorMsg }: { state: PhotoEntry["state"]; errorMsg?
   return null;
 }
 
+function Lightbox({
+  photos,
+  index,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  photos: PhotoEntry[];
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const entry = photos[index];
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape")     onClose();
+      if (e.key === "ArrowLeft")  onPrev();
+      if (e.key === "ArrowRight") onNext();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, onPrev, onNext]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      {/* Close */}
+      <button
+        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+        onClick={onClose}
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Prev */}
+      {photos.length > 1 && (
+        <button
+          className="absolute left-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          onClick={e => { e.stopPropagation(); onPrev(); }}
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={entry.previewUrl}
+        alt=""
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      />
+
+      {/* Next */}
+      {photos.length > 1 && (
+        <button
+          className="absolute right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          onClick={e => { e.stopPropagation(); onNext(); }}
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Counter */}
+      {photos.length > 1 && (
+        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/60 font-num">
+          {index + 1} / {photos.length}
+        </p>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function PhotoUploadCard() {
@@ -124,7 +215,9 @@ export default function PhotoUploadCard() {
   const [segments, setSegments]     = useState<Segment[]>([]);
   const [photos, setPhotos]         = useState<PhotoEntry[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const uploadingKeys = useRef(new Set<string>());
 
   // Load mountains on mount
   useEffect(() => {
@@ -162,7 +255,8 @@ export default function PhotoUploadCard() {
       if (Array.isArray(data)) {
         const existing: PhotoEntry[] = data.map((p: {
           id: number; url: string; lat: number | null; lon: number | null;
-          segmentId: number | null; descriptionEn: string | null; descriptionKo: string | null;
+          segmentId: number | null; orderIndex: number | null;
+          descriptionEn: string | null; descriptionKo: string | null;
         }) => ({
           key:           `existing-${p.id}`,
           file:          new File([], ""),
@@ -174,11 +268,12 @@ export default function PhotoUploadCard() {
           url:           p.url,
           segmentId:     p.segmentId,
           autoMapped:    false,
+          orderIndex:    p.orderIndex ?? 999_999,
           descriptionEn: p.descriptionEn ?? "",
           descriptionKo: p.descriptionKo ?? "",
           state:         "saved" as const,
         }));
-        setPhotos(existing);
+        setPhotos(existing); // API already returns them ordered by order_index
       }
     } catch { /* ignore */ }
   }
@@ -197,6 +292,7 @@ export default function PhotoUploadCard() {
       hasGps:        false,
       segmentId:     null,
       autoMapped:    false,
+      orderIndex:    999_999,
       descriptionEn: "",
       descriptionKo: "",
       state:         "pending",
@@ -206,6 +302,8 @@ export default function PhotoUploadCard() {
 
     // Process + upload each file
     for (const entry of newEntries) {
+      if (uploadingKeys.current.has(entry.key)) continue;
+      uploadingKeys.current.add(entry.key);
       // Mark uploading
       setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, state: "uploading" } : p));
 
@@ -233,11 +331,11 @@ export default function PhotoUploadCard() {
           throw new Error(error);
         }
         const { photos: uploaded } = await res.json() as { photos: {
-          id: number; url: string; segmentId: number | null; autoMapped: boolean;
+          id: number; url: string; segmentId: number | null; autoMapped: boolean; orderIndex: number;
         }[] };
         const up = uploaded[0];
 
-        setPhotos(prev => prev.map(p =>
+        setPhotos(prev => sortPhotos(prev.map(p =>
           p.key !== entry.key ? p : {
             ...p,
             lat:        gps?.lat ?? null,
@@ -247,9 +345,10 @@ export default function PhotoUploadCard() {
             url:        up.url,
             segmentId:  up.segmentId,
             autoMapped: up.autoMapped,
+            orderIndex: up.orderIndex ?? 999_999,
             state:      "uploaded",
           }
-        ));
+        )));
       } catch (err) {
         setPhotos(prev => prev.map(p =>
           p.key !== entry.key ? p : {
@@ -258,6 +357,8 @@ export default function PhotoUploadCard() {
             errorMsg: err instanceof Error ? err.message : "Upload failed",
           }
         ));
+      } finally {
+        uploadingKeys.current.delete(entry.key);
       }
     }
   }
@@ -378,9 +479,8 @@ export default function PhotoUploadCard() {
       {/* Upload area */}
       {canUpload && (
         <>
-          <div
+          <label
             className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-6 flex flex-col items-center gap-3 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
             onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
             onDrop={e => {
               e.preventDefault();
@@ -391,7 +491,7 @@ export default function PhotoUploadCard() {
             <div className="text-center">
               <p className="text-sm font-medium">Tap to select photos</p>
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                Or drag &amp; drop — WebP ·  max 1200px · GPS auto-mapped
+                Or drag &amp; drop — WebP · max 1200px · GPS auto-mapped
               </p>
             </div>
             <input
@@ -402,7 +502,7 @@ export default function PhotoUploadCard() {
               className="hidden"
               onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }}
             />
-          </div>
+          </label>
 
           {/* Photo list */}
           {photos.length > 0 && (
@@ -417,7 +517,10 @@ export default function PhotoUploadCard() {
                   {/* Top row: thumbnail + GPS info + status */}
                   <div className="flex gap-3 p-3">
                     {/* Thumbnail */}
-                    <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    <div
+                      className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 cursor-pointer"
+                      onClick={() => setLightboxIndex(photos.indexOf(entry))}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={entry.previewUrl}
@@ -480,8 +583,7 @@ export default function PhotoUploadCard() {
                           <option value="">— None —</option>
                           {segments.map(s => (
                             <option key={s.id} value={s.id}>
-                              <span className={SEG_TYPE_COLORS[s.segment_type]}>{s.segment_type}</span>
-                              {" "}#{s.id}
+                              {s.segment_type} #{s.id}
                             </option>
                           ))}
                         </select>
@@ -519,7 +621,7 @@ export default function PhotoUploadCard() {
                       {/* Save button */}
                       <button
                         onClick={() => saveDescription(entry)}
-                        disabled={entry.state === "saving" || entry.state === "uploading"}
+                        disabled={entry.state === "saving" || entry.state === "uploading" || entry.state === "saved"}
                         className={BTN_PRIMARY + " w-full"}
                       >
                         <Save className="w-3.5 h-3.5" />
@@ -532,6 +634,16 @@ export default function PhotoUploadCard() {
             </div>
           )}
         </>
+      )}
+
+      {lightboxIndex !== null && (
+        <Lightbox
+          photos={photos}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex(i => i !== null ? (i - 1 + photos.length) % photos.length : null)}
+          onNext={() => setLightboxIndex(i => i !== null ? (i + 1) % photos.length : null)}
+        />
       )}
     </div>
   );
