@@ -1,37 +1,61 @@
 "use client";
 
-import { useState } from "react";
-import InterestChips from "./InterestChips";
-import SeoulMountainsIllustration from "./SeoulMountainsIllustration";
-
-const CHIP_MOUNTAINS: Record<string, string[]> = {
-  "challenge":    ["bukhansan", "gwanaksan"],
-  "city-views":   ["inwangsan"],
-  "nature-walk":  ["inwangsan", "ansan"],
-};
+import { useEffect, useState } from "react";
+import { fetchMountainSummaries } from "@/lib/trails";
+import type { MountainSummary } from "@/lib/trails";
+import { useLanguage } from "@/lib/useLanguage";
+import { tUI } from "@/lib/i18n";
+import MountainCard from "./MountainCard";
 
 export default function MountainDiscovery() {
-  const [selected, setSelected] = useState<string | null>(null);
-  const highlightSlugs = selected ? (CHIP_MOUNTAINS[selected] ?? null) : null;
+  const { locale } = useLanguage();
+  const [mountains, setMountains] = useState<MountainSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const data = await fetchMountainSummaries();
+      // Sort specifically as Ansan, Inwangsan, Gwanaksan, Bukhansan (by elevation ascending)
+      const sorted = [...data].sort((a, b) => (a.maxElevationM || 0) - (b.maxElevationM || 0));
+      setMountains(sorted);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-4 animate-pulse">
+        <div className="h-6 w-1/3 bg-gray-200 rounded-md" />
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-44 bg-gray-200 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <section>
-        <InterestChips selected={selected} onSelect={setSelected} />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <p
-          className="text-[0.9375rem] font-semibold leading-snug text-[var(--color-text-primary)]"
-          style={{ fontFamily: "var(--font-en)" }}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2
+          className="text-lg font-bold leading-tight"
+          style={{ fontFamily: locale === "ko" ? "var(--font-ko)" : "var(--font-en)" }}
         >
-          Discover Your Peak
-        </p>
-        <SeoulMountainsIllustration highlightSlugs={highlightSlugs} />
-        <p className="text-center text-[0.6875rem] text-[var(--color-text-muted)]">
-          Tap a mountain to explore routes
-        </p>
-      </section>
-    </>
+          {tUI("discoverYourPeak", locale)}
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {mountains.map((mt) => (
+          <MountainCard key={mt.id} mountain={mt} locale={locale} />
+        ))}
+      </div>
+
+      <p className="text-center text-[11px] text-[var(--color-text-muted)] mt-1">
+        {tUI("tapMountain", locale)}
+      </p>
+    </div>
   );
 }

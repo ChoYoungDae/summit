@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import { Icon } from "@iconify/react";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
@@ -419,6 +419,56 @@ export default function PhotoUploadCard() {
     ));
   }
 
+  async function movePhoto(index: number, direction: -1 | 1) {
+    const j = index + direction;
+    if (j < 0 || j >= photos.length) return;
+
+    const newPhotos = [...photos];
+    // Swap positions
+    [newPhotos[index], newPhotos[j]] = [newPhotos[newPhotos.length > j ? j : index], newPhotos[index]];
+    // To fix out of bounds if j was bad, but we checked.
+    // Re-index all to be safe and ensure unique orderIndex
+    const payload = newPhotos
+      .map((p, i) => ({ ...p, orderIndex: i * 100 }));
+    
+    setPhotos(payload);
+
+    // Save strictly to DB
+    const dbPayload = payload
+      .filter(p => p.id)
+      .map(p => ({ id: p.id, order_index: p.orderIndex }));
+    
+    if (dbPayload.length) {
+      fetch("/api/admin/route-photos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbPayload),
+      }).catch(console.error);
+    }
+  }
+
+  async function recalculateOrder(entry: PhotoEntry) {
+    if (!entry.id) return;
+    setPhotos(prev => prev.map(p => p.id === entry.id ? { ...p, state: "saving" } : p));
+    try {
+      const res = await fetch("/api/admin/route-photos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.id, recalculate: true }),
+      });
+      if (!res.ok) throw new Error("Recalculate failed");
+      const updated = await res.json();
+      setPhotos(prev => sortPhotos(prev.map(p => p.id === entry.id ? {
+        ...p,
+        orderIndex: updated.orderIndex,
+        segmentId:  updated.segmentId,
+        state:      "saved",
+      } : p)));
+    } catch (err) {
+      setPhotos(prev => prev.map(p => p.id === entry.id ? { ...p, state: "error", errorMsg: "Recalculate failed" } : p));
+    }
+  }
+
   const SEG_TYPE_COLORS: Record<string, string> = {
     APPROACH: "text-blue-600", ASCENT: "text-emerald-600",
     DESCENT: "text-purple-600", RETURN: "text-gray-500",
@@ -538,13 +588,33 @@ export default function PhotoUploadCard() {
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xs font-medium truncate">{entry.file.name || "Photo"}</p>
-                        <button
-                          onClick={() => deletePhoto(entry)}
-                          className="flex-shrink-0 p-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                          title="Delete photo"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-0.5">
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => movePhoto(photos.indexOf(entry), -1)}
+                              disabled={photos.indexOf(entry) <= 0}
+                              className="p-0.5 text-[var(--color-text-muted)] hover:text-primary disabled:opacity-20"
+                              title="Move up"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => movePhoto(photos.indexOf(entry), 1)}
+                              disabled={photos.indexOf(entry) >= photos.length - 1}
+                              className="p-0.5 text-[var(--color-text-muted)] hover:text-primary disabled:opacity-20"
+                              title="Move down"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => deletePhoto(entry)}
+                            className="flex-shrink-0 p-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            title="Delete photo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* GPS badge */}
@@ -619,14 +689,24 @@ export default function PhotoUploadCard() {
                       </label>
 
                       {/* Save button */}
-                      <button
-                        onClick={() => saveDescription(entry)}
-                        disabled={entry.state === "saving" || entry.state === "uploading" || entry.state === "saved"}
-                        className={BTN_PRIMARY + " w-full"}
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        Save Description
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => recalculateOrder(entry)}
+                          disabled={!entry.hasGps || entry.state === "saving"}
+                          className="flex-none flex items-center justify-center rounded-xl bg-[var(--color-bg-light)] border border-[var(--color-border)] text-[var(--color-text-muted)] px-3 py-2 text-xs hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
+                          title="GPS 기반 순서 재계산"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${entry.state === "saving" ? "animate-spin" : ""}`} />
+                        </button>
+                        <button
+                          onClick={() => saveDescription(entry)}
+                          disabled={entry.state === "saving" || entry.state === "uploading" || entry.state === "saved"}
+                          className={BTN_PRIMARY + " flex-1"}
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          Save Info
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

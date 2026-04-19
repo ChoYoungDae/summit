@@ -11,7 +11,10 @@ import type {
   ResolvedRoute,
   ResolvedSegment,
   GeoJsonLineString,
+  MountainSummary,
 } from "@/types/trail";
+
+export type { MountainSummary };
 import type { LocalizedText } from "./i18n";
 
 // ── DB row shapes ─────────────────────────────────────────────────────────────
@@ -158,6 +161,31 @@ export const fetchMountains = cache(async (): Promise<Mountain[]> => {
 
   if (error || !data) return [];
   return (data as MountainRow[]).map(rowToMountain);
+});
+
+export const fetchMountainSummaries = cache(async (): Promise<MountainSummary[]> => {
+  // Use existing fetchMountains
+  const mountains = await fetchMountains();
+  if (!mountains.length) return [];
+
+  // Get route counts per mountain
+  const { data: routeCounts, error: countErr } = await supabase
+    .from("routes")
+    .select("mountain_id");
+
+  if (countErr || !routeCounts) {
+    return mountains.map(m => ({ ...m, routeCount: 0 }));
+  }
+
+  const counts: Record<number, number> = {};
+  for (const r of routeCounts as { mountain_id: number }[]) {
+    counts[r.mountain_id] = (counts[r.mountain_id] || 0) + 1;
+  }
+
+  return mountains.map(m => ({
+    ...m,
+    routeCount: counts[m.id] || 0
+  }));
 });
 
 /** All routes, grouped by mountain. Used on the route list page. */

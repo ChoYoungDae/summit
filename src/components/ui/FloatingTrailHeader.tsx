@@ -4,8 +4,9 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getLineColor } from "@/lib/subway";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
-import { t } from "@/lib/i18n";
+import { t, tUI } from "@/lib/i18n";
 import type { StationInfo } from "@/types/trail";
+import { useLanguage } from "@/lib/useLanguage";
 
 interface Props {
   isHiking: boolean;
@@ -32,6 +33,7 @@ export default function FloatingTrailHeader({
   routeName,
   backHref = "/hiking/route",
 }: Props) {
+  const { locale } = useLanguage();
   const cardStyle = {
     background: "rgba(255,255,255,0.88)",
     backdropFilter: "blur(12px)",
@@ -94,7 +96,7 @@ export default function FloatingTrailHeader({
                   color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)",
                 }}
               >
-                Last Safe Start
+                {tUI("lastSafeStart", locale)}
               </span>
               <span
                 key={latestStartMin}
@@ -119,7 +121,7 @@ export default function FloatingTrailHeader({
               className="text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: "var(--color-text-muted)" }}
             >
-              ▲ Peak ETA
+              ▲ {tUI("ascending", locale)} ETA
             </span>
             <span
               key={peakETAMin}
@@ -145,7 +147,7 @@ export default function FloatingTrailHeader({
               className="text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: "var(--color-text-muted)" }}
             >
-              🏁 Final ETA
+              🏁 {tUI("descending", locale)} ETA
             </span>
             <span
               key={finalETAMin}

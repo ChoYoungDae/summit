@@ -21,6 +21,14 @@ type Segment   = {
   name?: { en?: string; ko?: string } | null;
   difficulty?: number | null;
   estimated_time_min?: number | null;
+  is_bus_combined?: boolean;
+  bus_details?: {
+    bus_stop_id_key?: string;
+    bus_numbers?: string[];
+    route_color?: string;
+    station_bus_stop_name?: string;
+    bus_duration_min?: number;
+  } | null;
 };
 type Phase     = "input" | "preview" | "uploading" | "done" | "error";
 
@@ -32,10 +40,17 @@ const SEG_TYPE_LABELS: Record<SegType, string> = {
 };
 
 const BUS_COLORS: Record<string, string> = {
-  BLUE: "#0052A4",
+  BLUE: "#0068B7",
   GREEN: "#00A84D",
   RED: "#F33535",
   YELLOW: "#FFB300",
+};
+
+const SEG_TYPE_PRIORITY: Record<string, number> = {
+  APPROACH: 1,
+  ASCENT: 2,
+  DESCENT: 3,
+  RETURN: 4,
 };
 
 function Alert({ type, message }: { type: "success" | "error" | "loading"; message: string }) {
@@ -115,6 +130,7 @@ export default function SegmentUploadCard() {
   const [stationBusStopName, setStationBusStopName] = useState("");
   const [nameEn, setNameEn]             = useState("");
   const [nameKo, setNameKo]             = useState("");
+  const [busDurationMin, setBusDurationMin] = useState("");
 
   const [file, setFile]                 = useState<File | null>(null);
   const [busFile, setBusFile]           = useState<File | null>(null);
@@ -181,6 +197,19 @@ export default function SegmentUploadCard() {
     setNameKo(s.name?.ko ?? "");
     setDifficulty(s.difficulty ? String(s.difficulty) : "");
     setEstimatedMin(s.estimated_time_min ? String(s.estimated_time_min) : "");
+    
+    // Bus fields
+    const bd = s.bus_details;
+    setIsBusCombined(!!s.is_bus_combined);
+    setBusNumber(bd?.bus_numbers?.[0] ?? "");
+    setMidWpId(bd?.bus_stop_id_key ?? "");
+    setStationBusStopName(bd?.station_bus_stop_name ?? "");
+    setBusDurationMin(bd?.bus_duration_min ? String(bd.bus_duration_min) : "");
+    
+    // Reverse-map color to type
+    const color = bd?.route_color;
+    const typeEntry = Object.entries(BUS_COLORS).find(([, v]) => v === color);
+    setBusType(typeEntry?.[0] ?? "BLUE");
     // Note: We don't automatically fill GPX data because we don't have the File object.
     setParsed(null);
     setFile(null);
@@ -192,7 +221,7 @@ export default function SegmentUploadCard() {
     setPhase("input");
     setFile(null); setParsed(null); setBusFile(null); setBusParsed(null); setParsing(false); setParseErr("");
     setStartWpId(""); setEndWpId(""); setMidWpId(""); setEstimatedMin(""); setDifficulty("");
-    setIsBusCombined(false); setBusNumber(""); setStationBusStopName("");
+    setIsBusCombined(false); setBusNumber(""); setStationBusStopName(""); setBusDurationMin("");
     setNameEn(""); setNameKo("");
     setMsg("");
     if (fileRef.current) fileRef.current.value = "";
@@ -244,6 +273,7 @@ export default function SegmentUploadCard() {
         form.append("busColor",        BUS_COLORS[busType] || "#00A84D");
         if (stationBusStopName.trim()) form.append("stationBusStopName", stationBusStopName.trim());
         if (busInstructionPreview)     form.append("busInstruction",     busInstructionPreview);
+        if (busDurationMin)            form.append("busDurationMin",     busDurationMin);
       }
 
       form.append("segmentType",     segType);
@@ -285,8 +315,8 @@ export default function SegmentUploadCard() {
   }
 
   const stepNum = phase === "input" ? 1 : phase === "preview" ? 2 : 3;
-  const canPreview = (!!parsed || !!editingId) && !!mountainId && !!startWpId && !!endWpId && 
-    (!isBusCombined || (!!midWpId && !!busNumber));
+  const canPreview = (!!parsed || !!editingId) && !!mountainId && !!startWpId && !!endWpId && !!nameKo && 
+    (!isBusCombined || (!!midWpId && !!busNumber && !!busDurationMin));
 
   const eleRange = parsed
     ? (() => { const e = parsed.points.map(p => p[2]); return `${Math.min(...e).toFixed(0)}m — ${Math.max(...e).toFixed(0)}m`; })()
@@ -365,15 +395,15 @@ export default function SegmentUploadCard() {
             </select>
           </label>
 
-          {/* Trail Names (Internal) */}
+          {/* Segment Names (Internal) */}
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-[var(--color-text-muted)]">Trail Name (EN)</span>
+              <span className="text-xs text-[var(--color-text-muted)]">Segment Name (EN)</span>
               <input type="text" placeholder="e.g. Bukhansanseong Trail" value={nameEn}
                 onChange={e => setNameEn(e.target.value)} className={INPUT} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-[var(--color-text-muted)]">Trail Name (KO)</span>
+              <span className="text-xs text-[var(--color-text-muted)]">Segment Name (KO) *</span>
               <input type="text" placeholder="e.g. 북한산성 코스" value={nameKo}
                 onChange={e => setNameKo(e.target.value)} className={INPUT}
                 style={{ fontFamily: "var(--font-ko)" }} />
@@ -436,6 +466,10 @@ export default function SegmentUploadCard() {
                   className={`${INPUT} border-[#2E5E4A]/30`}
                 />
               </label>
+              <label className="col-span-2 flex flex-col gap-1">
+                <span className="text-xs text-[#2E5E4A]">Bus Riding Time (min) *</span>
+                <input type="number" placeholder="20" value={busDurationMin} onChange={e => setBusDurationMin(e.target.value)} className={`${INPUT} border-[#2E5E4A]/30`} />
+              </label>
               {busInstructionPreview && (
                 <div className="col-span-2 rounded-lg bg-[#2E5E4A]/10 px-3 py-2 text-xs text-[#2E5E4A]">
                   <span className="opacity-60 mr-1">Preview:</span>{busInstructionPreview}
@@ -493,7 +527,9 @@ export default function SegmentUploadCard() {
           {/* Optional fields */}
           <div className={`grid gap-3 ${segType === "APPROACH" || segType === "RETURN" ? "grid-cols-1" : "grid-cols-2"}`}>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-[var(--color-text-muted)]">Est. Time (min)</span>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                {isBusCombined ? "Total Est. Time (Bus + Walk) (min) — 합친 시간 *" : "Est. Time (min)"}
+              </span>
               <input type="number" placeholder="45" value={estimatedMin}
                 onChange={e => setEstimatedMin(e.target.value)} className={INPUT} />
             </label>
@@ -575,6 +611,7 @@ export default function SegmentUploadCard() {
               ...(isBusCombined ? [[segType === "APPROACH" ? "Bus Drop-off Stop (하차)" : "Bus Boarding Stop (승차)", waypointLabel(midWpId)]] : []),
               ["End Waypoint",   waypointLabel(endWpId)],
               ...(isBusCombined ? [["Bus Info", `${busType} - ${busNumber}`]] : []),
+              ...(isBusCombined ? [["Bus Riding Time", busDurationMin ? `${busDurationMin} min` : "—"]] : []),
               ...(isBusCombined && busInstructionPreview ? [["Bus Instruction", busInstructionPreview]] : []),
               ["Slug",           segmentSlugPreview?.slug ?? "—"],
               ["Est. Time",      estimatedMin ? `${estimatedMin} min` : "—"],
@@ -617,50 +654,85 @@ export default function SegmentUploadCard() {
         </div>
       )}
       {/* ── Management List ── */}
-      {mountainId && !loadingSeg && segments.length > 0 && phase === "input" && (
-        <div className="mt-4 flex flex-col gap-2 pt-4 border-t border-[var(--color-border)]">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
-            Existing Segments for {mountainLabel()}
-          </div>
-          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 text-sm">
-            {segments.map(s => (
-              <div key={s.id} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition-colors ${
-                editingId === s.id ? "border-primary bg-primary/5" : "border-[var(--color-border)] bg-[var(--color-bg-light)]"
-              }`}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{s.segment_type}</span>
-                    <span className={`font-medium truncate ${editingId === s.id ? "text-primary" : ""}`}>
-                      {s.name?.en || s.name?.ko ? `${s.name.en ?? ""}${s.name.ko ? ` (${s.name.ko})` : ""}` : `#${s.id}`}
-                    </span>
+      {mountainId && !loadingSeg && segments.length > 0 && phase === "input" && (() => {
+        const grouped = segments.reduce((acc, s) => {
+          const wpId = s.start_waypoint_id;
+          if (!acc[wpId]) acc[wpId] = [];
+          acc[wpId].push(s);
+          return acc;
+        }, {} as Record<number, Segment[]>);
+
+        const sortedWpIds = Object.keys(grouped)
+          .map(Number)
+          .sort((a, b) => {
+            const getPriority = (wpId: number) => {
+              const types = grouped[wpId].map(s => s.segment_type);
+              return Math.min(...types.map(t => SEG_TYPE_PRIORITY[t] ?? 5));
+            };
+            const pa = getPriority(a);
+            const pb = getPriority(b);
+            if (pa !== pb) return pa - pb;
+            return waypointLabel(String(a)).localeCompare(waypointLabel(String(b)));
+          });
+
+        return (
+          <div className="mt-4 flex flex-col gap-2 pt-4 border-t border-[var(--color-border)]">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+              Existing Segments for {mountainLabel()}
+            </div>
+            <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-1 text-sm">
+              {sortedWpIds.map(wpId => (
+                <div key={wpId} className="flex flex-col gap-2">
+                  <div className="text-[10px] text-primary font-bold bg-primary/5 px-2 py-1 rounded-md border border-primary/10">
+                    {waypointLabel(String(wpId))}
                   </div>
-                  <div className="text-[10px] text-[var(--color-text-muted)] truncate mt-0.5">
-                    {waypointLabel(String(s.start_waypoint_id))} → {waypointLabel(String(s.end_waypoint_id))}
+                  <div className="flex flex-col gap-1.5 pl-1">
+                    {grouped[wpId]
+                      .sort((a, b) => (SEG_TYPE_PRIORITY[a.segment_type] ?? 5) - (SEG_TYPE_PRIORITY[b.segment_type] ?? 5))
+                      .map((s, idx) => (
+                      <div key={s.id} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                        editingId === s.id ? "border-primary bg-primary/5" : "border-[var(--color-border)] bg-[var(--color-bg-light)]"
+                      }`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{s.segment_type}</span>
+                            <span className="text-[10px] font-bold text-[var(--color-text-muted)]">#{idx+1}</span>
+                            <span className={`font-medium truncate ${editingId === s.id ? "text-primary" : ""}`}>
+                              {s.name?.en || s.name?.ko ? `${s.name.en ?? ""}${s.name.ko ? ` (${s.name.ko})` : ""}` : `Segment ${s.id}`}
+                            </span>
+                            <span className="text-[10px] text-[var(--color-text-muted)] font-mono opacity-50">(ID: {s.id})</span>
+                          </div>
+                          <div className="text-[10px] text-[var(--color-text-muted)] truncate mt-0.5">
+                            → {waypointLabel(String(s.end_waypoint_id))}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => startEdit(s)}
+                            disabled={isPending}
+                            className="flex items-center justify-center p-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-primary hover:border-primary transition-colors disabled:opacity-30"
+                            title="Edit segment metadata"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSegment(s.id)}
+                            disabled={isPending}
+                            className="flex items-center justify-center p-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => startEdit(s)}
-                    disabled={isPending}
-                    className="flex items-center justify-center p-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-primary hover:border-primary transition-colors disabled:opacity-30"
-                    title="Edit segment metadata"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSegment(s.id)}
-                    disabled={isPending}
-                    className="flex items-center justify-center p-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
-                    title="Delete permanently"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

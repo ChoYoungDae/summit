@@ -70,7 +70,7 @@ function seoulBusStyle(busNumbers: string | undefined): { color: string; chipTex
   const first = busNumbers.split(",")[0].trim();
   if (/^M\d+$/i.test(first) || /^9\d{3}$/.test(first)) return { color: "#F33535", chipTextColor: "#FFFFFF" }; // 광역
   if (/^\d{1,2}$/.test(first))                           return { color: "#FFB300", chipTextColor: "#212529" }; // 순환
-  if (/^\d{3}$/.test(first))                             return { color: "#0052A4", chipTextColor: "#FFFFFF" }; // 간선
+  if (/^\d{3}$/.test(first))                             return { color: "#0068B7", chipTextColor: "#FFFFFF" }; // 간선
   return { color: "#33B02B", chipTextColor: "#FFFFFF" };                                                        // 지선/마을
 }
 
@@ -108,7 +108,7 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
 
   const approachBusInfo = approachIsBus ? {
     stopCoord: approachBusStopRaw
-      ? ([approachBusStopRaw[approachBusStopRaw.length - 1][0], approachBusStopRaw[approachBusStopRaw.length - 1][1]] as [number, number])
+      ? ([approachBusStopRaw[Math.floor(approachBusStopRaw.length / 2)][0], approachBusStopRaw[Math.floor(approachBusStopRaw.length / 2)][1]] as [number, number])
       : undefined,
     busNumbers: approachBusNumbers,
     color: approachStyle.color,
@@ -117,7 +117,7 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
 
   const returnBusInfo = returnIsBus ? {
     stopCoord: returnBusStopRaw
-      ? ([returnBusStopRaw[0][0], returnBusStopRaw[0][1]] as [number, number])
+      ? ([returnBusStopRaw[Math.floor(returnBusStopRaw.length / 2)][0], returnBusStopRaw[Math.floor(returnBusStopRaw.length / 2)][1]] as [number, number])
       : undefined,
     busNumbers: returnBusNumbers,
     color: returnStyle.color,

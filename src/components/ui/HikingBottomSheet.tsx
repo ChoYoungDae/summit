@@ -8,6 +8,8 @@ import type { SegmentElevationInfo } from "./ElevationChart";
 import type { RoutePhoto } from "@/types/trail";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import type { HikingGPSState, HikingPhase } from "@/lib/useHikingGPS";
+import { useLanguage } from "@/lib/useLanguage";
+import { tUI } from "@/lib/i18n";
 
 // ── Re-export for callers that still import from this module ──────────────────
 export { SKILL_LEVELS } from "@/lib/hikingLevel";
@@ -37,8 +39,8 @@ function fmtKm(metres: number): string {
     : `${Math.round(metres)} m`;
 }
 
-function phaseLabel(phase: HikingPhase): string {
-  return phase === "ascent" ? "to peak" : "to trailhead";
+function phaseLabel(phase: HikingPhase, locale: string): string {
+  return phase === "ascent" ? tUI("toPeak", locale) : tUI("toTrailhead", locale);
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -78,6 +80,7 @@ export default function HikingBottomSheet({
   const isDragging  = useRef(false);
 
   const { skill } = useHikingLevel();
+  const { locale } = useLanguage();
 
   const progressPct = Math.round(gps.progressRatio * 100);
 
@@ -201,13 +204,13 @@ export default function HikingBottomSheet({
                     className="text-[11px] font-semibold uppercase tracking-wide"
                     style={{ color: "var(--color-text-muted)" }}
                   >
-                    {gps.phase === "ascent" ? "Ascending" : "Descending"} · {progressPct}%
+                    {gps.phase === "ascent" ? tUI("ascending", locale) : tUI("descending", locale)} · {progressPct}%
                   </span>
                   <span
                     className="text-[11px] font-medium tabular-nums"
                     style={{ color: "var(--color-text-muted)" }}
                   >
-                    {fmtKm(gps.remainingM)} {phaseLabel(gps.phase)}
+                    {fmtKm(gps.remainingM)} {phaseLabel(gps.phase, locale)}
                   </span>
                 </div>
                 <div
@@ -229,10 +232,10 @@ export default function HikingBottomSheet({
 
               <button
                 onClick={onToggleHiking}
-                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-opacity active:opacity-70"
                 style={{ background: "var(--color-secondary)" }}
               >
-                End Hike
+                {tUI("endHike", locale)}
               </button>
             </div>
           ) : (
@@ -249,7 +252,7 @@ export default function HikingBottomSheet({
                     className="text-[10px] font-semibold uppercase tracking-wide leading-none"
                     style={{ color: "var(--color-text-muted)" }}
                   >
-                    My Hiking Level
+                    {tUI("myHikingLevel", locale)}
                   </span>
                   <div className="flex items-baseline gap-1 mt-0.5">
                     <span
@@ -277,7 +280,7 @@ export default function HikingBottomSheet({
                 className="shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm active:scale-95 transition-transform"
                 style={{ background: "var(--color-primary)" }}
               >
-                Start Hiking
+                {tUI("startHiking", locale)}
               </button>
             </div>
           )}

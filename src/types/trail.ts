@@ -13,6 +13,10 @@ export interface Mountain {
   terrainTags?: { id: string; en: string; ko?: string }[];
 }
 
+export interface MountainSummary extends Mountain {
+  routeCount: number;
+}
+
 // ── Waypoint ──────────────────────────────────────────────────────────────────
 
 export type WaypointType =

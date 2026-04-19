@@ -14,7 +14,14 @@ type Mountain = { id: number; name: { en?: string; ko?: string } };
 type Waypoint = { id: number; name: { en: string; ko?: string }; type: string };
 
 const BUS_COLORS: Record<string, string> = {
-  BLUE: "#0052A4", GREEN: "#00A84D", RED: "#F33535", YELLOW: "#FFB300",
+  BLUE: "#0068B7", GREEN: "#00A84D", RED: "#F33535", YELLOW: "#FFB300",
+};
+
+const SEG_TYPE_PRIORITY: Record<string, number> = {
+  APPROACH: 1,
+  ASCENT: 2,
+  DESCENT: 3,
+  RETURN: 4,
 };
 
 type BusDetails = {
@@ -380,6 +387,29 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
   // ────────────────────────────────────────────────────────────────────────
 
   const availableToAdd = segments.filter(s => !selectedIds.includes(s.id));
+  
+  // Group available segments by start waypoint
+  const availableGroups = availableToAdd.reduce((acc, s) => {
+    const wpId = s.start_waypoint_id;
+    if (!acc[wpId]) acc[wpId] = [];
+    acc[wpId].push(s);
+    return acc;
+  }, {} as Record<number, Segment[]>);
+
+  // Sort waypoint IDs by their localized name
+  const sortedWpIds = Object.keys(availableGroups)
+    .map(Number)
+    .sort((a, b) => {
+      const getPriority = (wpId: number) => {
+        const types = availableGroups[wpId].map(s => s.segment_type);
+        return Math.min(...types.map(t => SEG_TYPE_PRIORITY[t] ?? 5));
+      };
+      const pa = getPriority(a);
+      const pb = getPriority(b);
+      if (pa !== pb) return pa - pb;
+      return waypointName(a).localeCompare(waypointName(b));
+    });
+
   const isEditMode = editingRouteId !== null;
 
   return (
@@ -558,10 +588,16 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
                 <select value={addingId} onChange={e => setAddingId(e.target.value)}
                   className={`${INPUT} flex-1 min-w-0`}>
                   <option value="">— Add segment —</option>
-                  {availableToAdd.map(s => (
-                    <option key={s.id} value={s.id}>
-                      [{s.segment_type}] #{s.id}{segmentName(s) ? ` — ${segmentName(s)}` : ""} ({waypointName(s.start_waypoint_id)} → {waypointName(s.end_waypoint_id)})
-                    </option>
+                  {sortedWpIds.map(wpId => (
+                    <optgroup key={wpId} label={waypointName(wpId)}>
+                      {availableGroups[wpId]
+                        .sort((a, b) => (SEG_TYPE_PRIORITY[a.segment_type] ?? 5) - (SEG_TYPE_PRIORITY[b.segment_type] ?? 5))
+                        .map((s, idx) => (
+                        <option key={s.id} value={s.id}>
+                          [{s.segment_type}] #{idx + 1} {segmentName(s) ? ` — ${segmentName(s)}` : ""} → {waypointName(s.end_waypoint_id)} (ID: {s.id})
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 <button onClick={addSegment} disabled={!addingId} className="flex-none flex items-center justify-center rounded-xl bg-primary text-white px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed">

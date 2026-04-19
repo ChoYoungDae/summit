@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
-import { t } from "@/lib/i18n";
+import { t, tUI } from "@/lib/i18n";
 import { formatMinutesAsTime, nowKSTMin } from "@/lib/safetyEngine";
 import type { Route } from "@/types/trail";
 
@@ -65,7 +65,7 @@ export default function RouteCard({
         >
           <Icon icon="ph:warning-circle" width={13} height={13} style={{ color: "white" }} />
           <span className="text-[11px] font-semibold text-white uppercase tracking-wide">
-            Last safe start&nbsp;
+            {tUI("lastSafeStart", locale)}&nbsp;
             <span className="font-num">{formatMinutesAsTime(latestStartMin)}</span>
           </span>
         </div>
@@ -109,8 +109,8 @@ export default function RouteCard({
                 <Footprints size={12} strokeWidth={2} />
                 {formatTime(route.totalDurationMin - busDurationMin)}
                 <span style={{ opacity: 0.3, margin: "0 1px" }}>|</span>
-                <Icon icon="ph:bus" width={13} height={13} style={{ color: "#0052A4" }} />
-                <span style={{ color: "#0052A4" }}>
+                <Icon icon="ph:bus" width={13} height={13} style={{ color: "#0068B7" }} />
+                <span style={{ color: "#0068B7" }}>
                   {busSegmentCount > 1
                     ? `${Math.round(busDurationMin / busSegmentCount)}m × ${busSegmentCount}`
                     : formatTime(busDurationMin)}
@@ -124,7 +124,7 @@ export default function RouteCard({
             )
           )}
           {route.totalDifficulty != null && (
-            <DifficultyChip difficulty={route.totalDifficulty} />
+            <DifficultyChip difficulty={route.totalDifficulty} locale={locale} />
           )}
         </div>
 
@@ -135,7 +135,7 @@ export default function RouteCard({
               className="text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: "var(--color-text-muted)" }}
             >
-              Last safe start:
+              {tUI("lastSafeStart", locale)}:
             </span>
             <span
               className="font-num text-[11px] font-medium"
@@ -161,7 +161,7 @@ export default function RouteCard({
                 className="text-sm font-semibold mt-0.5"
                 style={{ color: "var(--color-primary)" }}
               >
-                ...more
+                {locale === "ko" ? "...더보기" : "...more"}
               </button>
             )}
           </div>
@@ -179,7 +179,7 @@ export default function RouteCard({
               fontFamily: "var(--font-en)",
             }}
           >
-            <span className="text-sm font-semibold">View Route</span>
+            <span className="text-sm font-semibold">{tUI("viewRoute", locale)}</span>
             <ChevronRight size={14} strokeWidth={2} />
           </Link>
         </div>
@@ -204,7 +204,7 @@ function InfoChip({
       className="font-num inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium"
       style={
         variant === "bus"
-          ? { background: "rgba(0,82,164,0.08)", color: "#0052A4" }
+          ? { background: "rgba(0,104,183,0.08)", color: "#0068B7" }
           : { background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }
       }
     >
@@ -214,16 +214,25 @@ function InfoChip({
   );
 }
 
-const DIFFICULTY_LABELS: Record<number, string> = {
-  1: "Easy",
-  2: "Novice",
-  3: "Intermediate",
-  4: "Advanced",
-  5: "Expert",
+const DIFFICULTY_LABELS: Record<string, Record<number, string>> = {
+  en: {
+    1: "Easy",
+    2: "Novice",
+    3: "Intermediate",
+    4: "Advanced",
+    5: "Expert",
+  },
+  ko: {
+    1: "매우 쉬움",
+    2: "쉬움",
+    3: "보통",
+    4: "약간 어려움",
+    5: "매우 어려움",
+  },
 };
 
-function DifficultyChip({ difficulty }: { difficulty: number }) {
-  const label = DIFFICULTY_LABELS[difficulty] ?? "Unknown";
+function DifficultyChip({ difficulty, locale = "en" }: { difficulty: number; locale?: string }) {
+  const label = DIFFICULTY_LABELS[locale]?.[difficulty] || DIFFICULTY_LABELS.en[difficulty] || "Unknown";
   const isHard = difficulty >= 4;
   return (
     <span

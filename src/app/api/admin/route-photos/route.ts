@@ -39,16 +39,17 @@ async function resolvePhotoMeta(
 
   const { data: segments } = await supabaseAdmin
     .from("segments")
-    .select("id, track_data")
+    .select("id, track_data, segment_type, bus_details, is_bus_combined")
     .in("id", route.segment_ids);
 
   if (!segments?.length) return { segmentId: null, distM: Infinity, orderIndex: 999_999 };
 
   // Preserve the route's declared segment order
-  const segMap = new Map(segments.map(s => [s.id as number, s]));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const segMap = new Map(segments.map(s => [s.id as number, s as any]));
   const orderedSegs = (route.segment_ids as number[])
     .map(id => segMap.get(id))
-    .filter(Boolean) as typeof segments;
+    .filter(Boolean);
 
   let cumDist = 0;
   let bestSegId: number | null = null;
@@ -57,8 +58,23 @@ async function resolvePhotoMeta(
   let prevCoord: [number, number] | null = null; // [lon, lat]
 
   for (const seg of orderedSegs) {
-    const coords = (seg.track_data?.coordinates ?? []) as [number, number, number][];
-    for (const [sLon, sLat] of coords) {
+    const walkPoints = (seg.track_data?.coordinates ?? []) as [number, number, number][];
+    const busPoints  = (seg.bus_details?.bus_track_data?.coordinates ?? []) as [number, number, number][];
+
+    let combined: [number, number, number][] = [];
+    if (seg.is_bus_combined) {
+      if (seg.segment_type === "APPROACH") {
+        combined = [...busPoints, ...walkPoints];
+      } else if (seg.segment_type === "RETURN") {
+        combined = [...walkPoints, ...busPoints];
+      } else {
+        combined = walkPoints;
+      }
+    } else {
+      combined = walkPoints;
+    }
+
+    for (const [sLon, sLat] of combined) {
       if (prevCoord) {
         cumDist += haversineM(prevCoord[1], prevCoord[0], sLat, sLon);
       }
@@ -101,7 +117,8 @@ export async function GET(req: NextRequest) {
     .from("route_photos")
     .select("*")
     .eq("route_id", parseInt(routeId))
-    .order("order_index");
+    .order("order_index", { ascending: true })
+    .order("id", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json((data ?? []).map(toPhoto));
@@ -200,13 +217,42 @@ export async function POST(req: NextRequest) {
 // Body: { id, description_en?, description_ko?, segment_id? }
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, description_en, description_ko, segment_id } = await req.json();
+    const body = await req.json();
+
+    // Support bulk reorder if body is an array
+    if (Array.isArray(body)) {
+      const results = [];
+      for (const item of body) {
+        if (!item.id) continue;
+        const { data, error } = await supabaseAdmin
+          .from("route_photos")
+          .update({ order_index: item.order_index })
+          .eq("id", item.id)
+          .select("*")
+          .single();
+        if (!error) results.push(toPhoto(data));
+      }
+      return NextResponse.json({ photos: results });
+    }
+
+    const { id, description_en, description_ko, segment_id, order_index, recalculate } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     const patch: Record<string, unknown> = {};
     if (description_en !== undefined) patch.description_en = description_en;
     if (description_ko !== undefined) patch.description_ko = description_ko;
     if (segment_id     !== undefined) patch.segment_id     = segment_id;
+    if (order_index    !== undefined) patch.order_index    = order_index;
+
+    // Handle recalculation request
+    if (recalculate) {
+      const { data: photo } = await supabaseAdmin.from("route_photos").select("route_id, lat, lon").eq("id", id).single();
+      if (photo?.lat && photo?.lon) {
+        const { segmentId: sid, orderIndex: oi } = await resolvePhotoMeta(photo.route_id, photo.lat, photo.lon);
+        patch.segment_id = sid;
+        patch.order_index = oi;
+      }
+    }
 
     const { data, error } = await supabaseAdmin
       .from("route_photos")

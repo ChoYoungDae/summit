@@ -240,6 +240,7 @@ export async function POST(req: NextRequest) {
     const busColor           = form.get("busColor") as string || null;
     const stationBusStopName = (form.get("stationBusStopName") as string | null)?.trim() || null;
     const busInstruction     = (form.get("busInstruction")     as string | null)?.trim() || null;
+    const busDurationMin     = parseInt(form.get("busDurationMin") as string) || null;
 
     const trackData = { type: "LineString", coordinates: points };
     
@@ -258,6 +259,7 @@ export async function POST(req: NextRequest) {
         bus_track_data:        { type: "LineString", coordinates: busPoints },
         station_bus_stop_name: stationBusStopName,
         instruction:           busInstruction,
+        ...(busDurationMin != null ? { bus_duration_min: busDurationMin } : {}),
       };
       subSegments = segmentType === "APPROACH"
         ? [{ mode: "bus" }, { mode: "walk" }]
