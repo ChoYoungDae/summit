@@ -103,11 +103,7 @@ export default function HomePage() {
             className="inline-flex items-center bg-[#4A5D4E] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em]"
             style={{ fontFamily: "var(--font-en)" }}
           >
-            {new Date().toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {tUI("personalNoteDate", locale)}
           </span>
         </div>
         <p 
