@@ -53,7 +53,7 @@ export default function MountainDiscovery() {
         ))}
       </div>
 
-      <p className="text-center text-[11px] text-[var(--color-text-muted)] mt-1">
+      <p className="text-center text-[13px] text-[var(--color-text-muted)] mt-1">
         {tUI("tapMountain", locale)}
       </p>
     </div>

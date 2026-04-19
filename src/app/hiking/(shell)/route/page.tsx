@@ -50,18 +50,36 @@ const TERRAIN_TAG_ICON: Record<string, LucideIcon> = {
   exposed:      Flame,
 };
 
-export default async function RouteListPage() {
+export default async function RouteListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mountain?: string }>;
+}) {
   const locale: SupportedLocale = "en";
+  const { mountain: mountainIdParam } = await searchParams;
 
-  const [groups, sunsetMin] = await Promise.all([
+  const [allGroups, sunsetMin] = await Promise.all([
     fetchRouteList(),
     fetchSunsetMin(),
   ]);
 
-  if (!groups.length) {
+  if (!allGroups.length) {
     return (
       <div className="p-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
         No routes available yet.
+      </div>
+    );
+  }
+
+  // Filter if mountain param is present
+  const groups = mountainIdParam
+    ? allGroups.filter((g) => g.mountain.id === parseInt(mountainIdParam))
+    : allGroups;
+
+  if (mountainIdParam && !groups.length) {
+    return (
+      <div className="p-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
+        No routes found for the selected mountain.
       </div>
     );
   }
