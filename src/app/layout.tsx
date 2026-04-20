@@ -12,7 +12,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Seoul Subway to Summit (S3)",
+  title: "Seoul Routes",
   description: "Subway-accessible hiking guide for Seoul",
   applicationName: "S3",
   manifest: "/manifest.json",
