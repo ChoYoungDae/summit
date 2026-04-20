@@ -43,12 +43,14 @@ const nextConfig: NextConfig = {
     return headers;
   },
   async rewrites() {
-    return [
-      {
-        source: "/subway/:path*",
-        destination: "/subway/index.html",
-      },
-    ];
+    return {
+      afterFiles: [
+        {
+          source: "/subway/:path*",
+          destination: "/subway/index.html",
+        },
+      ],
+    };
   },
 };
 
