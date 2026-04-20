@@ -1,8 +1,0 @@
-{
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/subway", "destination": "/subway/index.html" },
-    { "source": "/subway/", "destination": "/subway/index.html" },
-    { "source": "/subway/(.*)", "destination": "/subway/$1" }
-  ]
-}
