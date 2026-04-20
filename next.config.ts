@@ -45,12 +45,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/subway",
-        destination: "https://subway-git-main-azucariya-2845s-projects.vercel.app/subway",
-      },
-      {
         source: "/subway/:path*",
-        destination: "https://subway-git-main-azucariya-2845s-projects.vercel.app/subway/:path*",
+        destination: "/subway/index.html",
       },
     ];
   },
