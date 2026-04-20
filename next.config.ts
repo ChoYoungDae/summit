@@ -46,7 +46,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/subway",
-        destination: "https://subway-git-main-azucariya-2845s-projects.vercel.app/index.html",
+        destination: "https://subway-git-main-azucariya-2845s-projects.vercel.app",
       },
       {
         source: "/subway/:path*",
