@@ -14,13 +14,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Allow development access from local IP (mobile)
   allowedDevOrigins: ["192.168.0.8", "localhost:3000"],
   async headers() {
-    const headers = [
+    return [
       {
-        // Service worker must never be served from HTTP cache so browsers
-        // always get the latest version on reload.
         source: "/sw.js",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
@@ -28,29 +25,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-
-    if (process.env.NODE_ENV === "development") {
-      headers.push({
-        source: "/:path*",
-        headers: [
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "Access-Control-Allow-Methods", value: "GET,POST,PUT,DELETE,OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
-        ],
-      });
-    }
-
-    return headers;
-  },
-  async rewrites() {
-    return {
-      afterFiles: [
-        {
-          source: "/subway/:path*",
-          destination: "/subway/index.html",
-        },
-      ],
-    };
   },
 };
 
