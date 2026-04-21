@@ -28,14 +28,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      {
-        source: "/subway/:path*",
-        destination: "https://subway-seven-amber.vercel.app/:path*",
-      },
-    ];
-  },
 };
 
 export default nextConfig;
