@@ -31,7 +31,7 @@ export default function FloatingTrailHeader({
   peakETAMin,
   finalETAMin,
   routeName,
-  backHref = "/hiking/route",
+  backHref = "/route",
 }: Props) {
   const { locale } = useLanguage();
   const cardStyle = {

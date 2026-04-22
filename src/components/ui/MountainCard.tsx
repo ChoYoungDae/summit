@@ -26,7 +26,7 @@ export default function MountainCard({ mountain, locale }: Props) {
 
   return (
     <Link
-      href={`/hiking/route?mountain=${mountain.id}`}
+      href={`/route?mountain=${mountain.id}`}
       className="group relative flex flex-col h-[180px] rounded-2xl overflow-hidden shadow-sm active:scale-[0.98] transition-all duration-200"
     >
       {/* Background Image */}

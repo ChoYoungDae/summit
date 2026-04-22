@@ -170,7 +170,7 @@ export default function RouteCard({
         {/* CTA */}
         <div className="flex justify-center pt-0.5">
           <Link
-            href={`/hiking/route/${route.id}`}
+            href={`/route/${route.id}`}
             className="inline-flex items-center gap-1 px-4 py-1 rounded-full border
                        active:opacity-70 transition-opacity"
             style={{

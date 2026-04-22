@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { House, Map, Info, Phone, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/hiking",          icon: House,      label: "Home",     exact: true  },
-  { href: "/hiking/route",    icon: Map,        label: "Route",    exact: false },
-  { href: "/hiking/info",     icon: Info,       label: "Info",     exact: false },
-  { href: "/hiking/help",     icon: Phone,      label: "Help",     exact: false },
-  { href: "/hiking/settings", icon: Settings,   label: "Settings", exact: false },
+  { href: "/",          icon: House,      label: "Home",     exact: true  },
+  { href: "/route",    icon: Map,        label: "Route",    exact: false },
+  { href: "/info",     icon: Info,       label: "Info",     exact: false },
+  { href: "/help",     icon: Phone,      label: "Help",     exact: false },
+  { href: "/settings", icon: Settings,   label: "Settings", exact: false },
 ] as const;
 
 export function BottomNav() {

@@ -64,24 +64,28 @@ export default function HomePage() {
         </div>
 
         {/* ── 1x4 Card Row ── */}
-        <div className="grid grid-cols-4 gap-2">
-          {coreValues.map(({ Icon, title, color, bgColor }) => (
+        <div className="grid grid-cols-4 px-1">
+          {coreValues.map(({ Icon, title, color, bgColor }, index) => (
             <div 
               key={title} 
-              className="flex flex-col items-center justify-center gap-2.5 p-3 rounded-[20px] bg-white border border-[#E9E9EB] shadow-sm active:bg-[#F9F9F9] transition-colors h-[100px]"
+              className="relative flex flex-col items-center gap-2 py-1"
             >
+              {/* Vertical Divider */}
+              {index < 3 && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[0.5px] h-7 bg-[#E9E9EB]" />
+              )}
               <div 
-                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                 style={{ backgroundColor: bgColor }}
               >
                 <Icon
-                  className="w-[18px] h-[18px]"
+                  className="w-5 h-5"
                   style={{ color: color }}
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                 />
               </div>
               <p
-                className="text-[10px] font-bold text-center leading-tight uppercase tracking-tight"
+                className="text-[9px] font-bold text-center leading-tight uppercase tracking-tight"
                 style={{ fontFamily: "var(--font-en)", color: color }}
               >
                 {title}

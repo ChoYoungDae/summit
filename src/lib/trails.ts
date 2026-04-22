@@ -453,7 +453,7 @@ const MOUNTAIN_SUBWAY_LINES: Record<string, number[]> = {
 
 /** First active route href per mountain slug. */
 const MOUNTAIN_ROUTE_HREF: Record<string, string> = {
-  gwanaksan: "/hiking/route/1",
+  gwanaksan: "/route/1",
 };
 
 export const fetchHomeMapData = cache(async (): Promise<{
@@ -496,7 +496,7 @@ export const fetchHomeMapData = cache(async (): Promise<{
       nameKo:  m.name.ko,
       lat:     summit?.lat  ?? fallback[1],
       lon:     summit?.lon  ?? fallback[0],
-      href:    MOUNTAIN_ROUTE_HREF[m.slug] ?? "/hiking/route",
+      href:    MOUNTAIN_ROUTE_HREF[m.slug] ?? "/route",
     };
   });
 

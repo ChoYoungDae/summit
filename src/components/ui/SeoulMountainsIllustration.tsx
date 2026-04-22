@@ -525,7 +525,7 @@ export default function SeoulMountainsIllustration({ highlightSlugs }: Props = {
           >
             {/* Invisible tap target */}
             <Link
-              href={`/hiking/route#${m.slug}`}
+              href={`/route#${m.slug}`}
               className="absolute bg-transparent border-0 p-0 cursor-pointer z-20
                          active:scale-[0.98] transition-transform rounded-sm
                          focus-visible:outline focus-visible:outline-2
