@@ -58,33 +58,42 @@ export function DualText({
 }: DualTextProps) {
   const subFontSize = `calc(${size} * ${subRatio})`;
 
+  // If both are same (common when locale is 'ko'), only show one
+  const isDuplicate = en === ko;
+
   // Extra labels are shown between English and Korean
   const extras: SubLabel[] = extraLabels.map((l, i) => ({
     ...l,
     lang: `extra-${i}`,
   }));
 
-  const korean: SubLabel[] = ko
+  const korean: SubLabel[] = ko && !isDuplicate
     ? [{ text: ko, lang: "ko", fontFamily: "var(--font-ko)" }]
     : [];
 
   const allSubs: SubLabel[] = [...extras, ...korean];
+
+  // Heuristic to check if text is CJK to apply correct font-family
+  const isKoreanText = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(en);
 
   return (
     <span
       className={`inline-flex flex-col leading-none gap-[0.25em] ${className}`}
       {...rest}
     >
-      {/* ── Primary: English ── */}
+      {/* ── Primary ── */}
       <span
         className="font-medium text-[var(--fg)]"
-        style={{ fontSize: size, fontFamily: "var(--font-en)" }}
-        lang="en"
+        style={{ 
+          fontSize: size, 
+          fontFamily: isKoreanText ? "var(--font-ko)" : "var(--font-en)" 
+        }}
+        lang={isKoreanText ? "ko" : "en"}
       >
         {en}
       </span>
 
-      {/* ── Secondary: Extra + Korean ── */}
+      {/* ── Secondary: Extra + Korean (if not duplicate) ── */}
       {allSubs.map((sub) => (
         <span
           key={sub.lang}

@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
-import { getLineColor } from "@/lib/subway";
+import { ChevronLeft, AlertTriangle, Mountain, Flag, Train } from "lucide-react";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
 import { t, tUI } from "@/lib/i18n";
-import type { StationInfo } from "@/types/trail";
+import type { StationInfo, HikingPhase } from "@/types/trail";
 import { useLanguage } from "@/lib/useLanguage";
 
 interface Props {
@@ -13,14 +12,18 @@ interface Props {
   stationInfo?: StationInfo;
   latestStartMin?: number | null;
   isPastLatestStart: boolean;
-  /** Peak ETA in minutes from midnight (KST) — shown in Active mode */
+  /** Peak ETA in minutes from midnight (KST) */
   peakETAMin?: number | null;
-  /** Final (subway) ETA in minutes from midnight (KST) — shown in Active mode */
+  /** Trailhead ETA (end of mountain path) */
+  trailheadETAMin?: number | null;
+  /** Final (subway station) ETA */
   finalETAMin?: number | null;
-  /** Route display name — renders a back-link row at the top when provided */
+  /** Route display name */
   routeName?: string;
   /** href for the back link (defaults to /route) */
   backHref?: string;
+  locale?: string;
+  hikingPhase?: HikingPhase;
 }
 
 export default function FloatingTrailHeader({
@@ -29,140 +32,132 @@ export default function FloatingTrailHeader({
   latestStartMin,
   isPastLatestStart,
   peakETAMin,
+  trailheadETAMin,
   finalETAMin,
   routeName,
   backHref = "/route",
+  locale: propLocale,
+  hikingPhase,
 }: Props) {
-  const { locale } = useLanguage();
+  const { locale: hookLocale } = useLanguage();
+  const locale = propLocale || hookLocale;
+
   const cardStyle = {
-    background: "rgba(255,255,255,0.88)",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.13)",
+    background: "rgba(255,255,255,0.92)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.16)",
+  };
+
+  const renderETALine = (
+    label: string,
+    timeMin: number | null | undefined,
+    Icon: any,
+    color?: string,
+    iconColor?: string
+  ) => {
+    if (timeMin == null) return <div className="h-5" />;
+    return (
+      <div className="flex items-center justify-end gap-3 min-w-[145px]">
+        <div className="flex items-center gap-1.5 flex-1 justify-end">
+          <Icon
+            className="w-3.5 h-3.5"
+            style={{ color: iconColor || "var(--color-text-muted)" }}
+          />
+          <span
+            className="text-[9.5px] font-bold uppercase tracking-tight text-right leading-none"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            {label}
+          </span>
+        </div>
+        <span
+          className="text-[14px] font-black tabular-nums leading-none min-w-[66px] text-right"
+          style={{ color: color || "var(--color-primary)" }}
+        >
+          {formatMinutesAsTime(timeMin)}
+        </span>
+      </div>
+    );
   };
 
   return (
     <div
-      className="absolute top-3 left-3 right-3 z-10 rounded-xl"
+      className="absolute top-3 left-3 right-3 z-10 rounded-2xl overflow-hidden border border-white/30"
       style={cardStyle}
     >
       {/* ── Back link row ────────────────────────────────── */}
       {routeName && (
         <Link
           href={backHref}
-          className="flex items-center gap-1 px-3 pt-3 pb-2"
+          className="flex items-center gap-1 px-4 pt-2.5 pb-1"
           style={{ color: "var(--color-primary)" }}
         >
-          <ChevronLeft className="w-4 h-4 shrink-0" />
-          <span className="text-sm font-semibold leading-tight truncate">
+          <ChevronLeft className="w-5 h-5 shrink-0" />
+          <span className="text-[16px] font-extrabold tracking-tight truncate">
             {routeName}
           </span>
         </Link>
       )}
 
-      {!isHiking ? (
-        /* ── Ready to Hike Mode ─────────────────────────────── */
-        <div className={`flex items-center justify-between gap-3 px-4 ${routeName ? "pt-1 pb-3" : "py-3"}`}>
-          {/* Station info section */}
-          {stationInfo ? (
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-bold text-[0.9rem] leading-none truncate">
-                  {stationInfo.exit ? `Exit ${stationInfo.exit}, ` : ""}{t(stationInfo.name, "en")}
-                </span>
-              </div>
-              {stationInfo.name.ko && (
-                <span
-                  className="text-[11px]"
-                  style={{
-                    fontFamily: "var(--font-ko)",
-                    color: "var(--color-text-muted)",
-                  }}
-                >
-                  {stationInfo.name.ko}{stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}
-                </span>
+      <div className="flex items-center justify-between gap-6 px-4 pb-3.5 pt-1">
+        {/* Left: Station info section */}
+        {stationInfo ? (
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="font-black text-[1.15rem] leading-tight tracking-tight">
+              {locale === "ko"
+                ? `${t(stationInfo.name, "ko")}${stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}`
+                : `${stationInfo.exit ? `Exit ${stationInfo.exit}, ` : ""}${t(stationInfo.name, "en")}`}
+            </span>
+            {locale !== "ko" && stationInfo.name.ko && (
+              <span
+                className="text-[11px] font-semibold"
+                style={{
+                  fontFamily: "var(--font-ko)",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                {stationInfo.name.ko}
+                {stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div />
+        )}
+
+        {/* Right: Triple ETA Stack */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {!isHiking ? (
+            /* PRE-HIKE MODE */
+            <>
+              {renderETALine(
+                tUI("lastSafeStart", locale),
+                latestStartMin,
+                AlertTriangle,
+                isPastLatestStart ? "#EF4444" : "#D97706",
+                isPastLatestStart ? "#EF4444" : "#D97706"
               )}
-            </div>
+              {renderETALine(tUI("summitArrival", locale), peakETAMin, Flag)}
+              {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
+            </>
+          ) : hikingPhase === "ascent" ? (
+            /* ASCENT MODE */
+            <>
+              <div className="h-4" />
+              {renderETALine(tUI("summitArrival", locale), peakETAMin, Flag)}
+              {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
+            </>
           ) : (
-            <div />
-          )}
-
-          {/* Latest Start */}
-          {latestStartMin != null && (
-            <div className="flex flex-col items-end shrink-0">
-              <span
-                className="text-[10px] font-semibold uppercase tracking-wide"
-                style={{
-                  color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)",
-                }}
-              >
-                {tUI("lastSafeStart", locale)}
-              </span>
-              <span
-                key={latestStartMin}
-                className="text-sm font-bold tabular-nums"
-                style={{
-                  color: isPastLatestStart ? "#EF4444" : "var(--color-primary)",
-                  display: "inline-block",
-                  animation: "etaUpdate 0.28s ease",
-                }}
-              >
-                {formatMinutesAsTime(latestStartMin)}
-              </span>
-            </div>
+            /* DESCENT MODE */
+            <>
+              <div className="h-4" />
+              {renderETALine(tUI("trailheadArrival", locale), trailheadETAMin, Flag)}
+              {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
+            </>
           )}
         </div>
-      ) : (
-        /* ── Active Hiking Mode ─────────────────────────────── */
-        <div className={`flex items-center justify-between px-4 ${routeName ? "pt-1 pb-3" : "py-3"}`}>
-          {/* Peak ETA */}
-          <div className="flex flex-col gap-0.5">
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              ▲ {tUI("ascending", locale)} ETA
-            </span>
-            <span
-              key={peakETAMin}
-              className="text-sm font-bold tabular-nums"
-              style={{
-                color: "var(--color-primary)",
-                display: "inline-block",
-                animation: "etaUpdate 0.28s ease",
-              }}
-            >
-              {peakETAMin != null ? formatMinutesAsTime(peakETAMin) : "—"}
-            </span>
-          </div>
-
-          <div
-            className="w-px self-stretch"
-            style={{ background: "var(--color-border)" }}
-          />
-
-          {/* Final ETA */}
-          <div className="flex flex-col items-end gap-0.5">
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              🏁 {tUI("descending", locale)} ETA
-            </span>
-            <span
-              key={finalETAMin}
-              className="text-sm font-bold tabular-nums"
-              style={{
-                color: "var(--color-primary)",
-                display: "inline-block",
-                animation: "etaUpdate 0.28s ease",
-              }}
-            >
-              {finalETAMin != null ? formatMinutesAsTime(finalETAMin) : "—"}
-            </span>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

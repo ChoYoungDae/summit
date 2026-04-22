@@ -1,7 +1,9 @@
 import { fetchRouteList } from "@/lib/trails";
 
 export const dynamic = "force-dynamic";
-import { t } from "@/lib/i18n";
+import { cookies, headers } from "next/headers";
+import { t, tUI } from "@/lib/i18n";
+import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/useLanguage";
 import type { SupportedLocale } from "@/lib/i18n";
 import { fetchSunsetMin } from "@/lib/sunset";
 import { calcLatestStartFromDuration } from "@/lib/safetyEngine";
@@ -32,7 +34,7 @@ const TERRAIN_TAG_ICON: Record<string, LucideIcon> = {
   forested:     Trees,
   forest:       Trees,
   pine:         Trees,
-  ridge:        MountainSnow,
+  ridge: MountainSnow,
   view:         Eye,
   viewpoint:    Eye,
   "city-view":  Eye,
@@ -55,7 +57,19 @@ export default async function RouteListPage({
 }: {
   searchParams: Promise<{ mountain?: string }>;
 }) {
-  const locale: SupportedLocale = "en";
+  const cookieStore = await cookies();
+  const headersList = await headers();
+  const acceptLanguage = headersList.get("accept-language");
+  
+  // Try to find 'ko' in accept-language if cookie is missing
+  const hasKoInHeaders = acceptLanguage?.toLowerCase().includes("ko");
+  
+  const locale = (cookieStore.get(LANGUAGE_STORAGE_KEY)?.value as SupportedLocale) 
+    || (hasKoInHeaders ? "ko" : null)
+    || DEFAULT_LANGUAGE;
+  
+  console.log(`[Server] Detected Locale: ${locale} (Cookie: ${cookieStore.get(LANGUAGE_STORAGE_KEY)?.value}, Headers: ${acceptLanguage})`);
+  
   const { mountain: mountainIdParam } = await searchParams;
 
   const [allGroups, sunsetMin] = await Promise.all([
@@ -66,7 +80,7 @@ export default async function RouteListPage({
   if (!allGroups.length) {
     return (
       <div className="p-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
-        No routes available yet.
+        {tUI("noRoutesAvailable", locale)}
       </div>
     );
   }
@@ -79,7 +93,7 @@ export default async function RouteListPage({
   if (mountainIdParam && !groups.length) {
     return (
       <div className="p-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
-        No routes found for the selected mountain.
+        {tUI("noRoutesForMountain", locale)}
       </div>
     );
   }
@@ -126,19 +140,30 @@ export default async function RouteListPage({
                 <div className="absolute bottom-4 left-4 right-4">
                   {/* Mountain name */}
                   <div className="flex items-end gap-2.5">
-                    <h1
-                      className="text-[2rem] font-bold leading-none tracking-tight text-white"
-                      style={{ fontFamily: "var(--font-en)" }}
-                    >
-                      {nameEn}
-                    </h1>
-                    {nameKo && (
-                      <span
-                        className="text-base leading-none mb-[3px] text-white/70"
+                    {locale === "ko" ? (
+                      <h1
+                        className="text-[2rem] font-bold leading-none tracking-tight text-white"
                         style={{ fontFamily: "var(--font-ko)" }}
                       >
-                        {nameKo}
-                      </span>
+                        {nameKo || nameEn}
+                      </h1>
+                    ) : (
+                      <>
+                        <h1
+                          className="text-[2rem] font-bold leading-none tracking-tight text-white"
+                          style={{ fontFamily: "var(--font-en)" }}
+                        >
+                          {nameEn}
+                        </h1>
+                        {nameKo && (
+                          <span
+                            className="text-base leading-none mb-[3px] text-white/70"
+                            style={{ fontFamily: "var(--font-ko)" }}
+                          >
+                            {nameKo}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -159,7 +184,7 @@ export default async function RouteListPage({
                                  border border-white/50 rounded-full px-2.5 py-1 backdrop-blur-sm"
                       style={{ background: "rgba(0,0,0,0.25)" }}
                     >
-                      {routes.length} route{routes.length !== 1 ? "s" : ""} available
+                      {routes.length} {tUI("available", locale)} {routes.length === 1 ? tUI("routesCount", locale).replace(/s$/, "") : tUI("routesCount", locale)}
                     </span>
                   </div>
                 </div>
@@ -177,6 +202,7 @@ export default async function RouteListPage({
                 >
                   {terrainTags.map((tag) => {
                     const TagIcon = TERRAIN_TAG_ICON[tag.id];
+                    const tagKey = `tag_${tag.id.replace(/-([a-z])/g, (g) => g[1].toUpperCase())}`;
                     return (
                       <span
                         key={tag.id}
@@ -188,7 +214,7 @@ export default async function RouteListPage({
                         }}
                       >
                         {TagIcon && <TagIcon size={13} strokeWidth={2} />}
-                        {tag.en}
+                        {tUI(tagKey as any, locale) || t(tag, locale)}
                       </span>
                     );
                   })}

@@ -1,7 +1,7 @@
 import type { ResolvedRoute } from "@/types/trail";
 
 /** How many minutes before sunset the hiker must be off the mountain. */
-export const SUNSET_BUFFER_MIN = 60;
+export const SUNSET_BUFFER_MIN = 120;
 
 /**
  * Calculate the latest time a hiker can depart from the subway exit (KST).

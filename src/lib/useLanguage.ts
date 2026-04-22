@@ -34,6 +34,8 @@ export function useLanguage() {
   const setLanguage = useCallback((l: SupportedLocale) => {
     setLocale(l);
     localStorage.setItem(LANGUAGE_STORAGE_KEY, l);
+    // Set cookie for server components (expires in 1 year)
+    document.cookie = `${LANGUAGE_STORAGE_KEY}=${l}; path=/; max-age=31536000; SameSite=Lax`;
     window.dispatchEvent(
       new CustomEvent<{ locale: SupportedLocale }>(CHANGE_EVENT, {
         detail: { locale: l },

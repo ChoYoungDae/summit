@@ -141,6 +141,8 @@ export interface StationInfo {
   exit?: number;
 }
 
+export type HikingPhase = "ascent" | "descent";
+
 // ── Resolved (joined) shapes ──────────────────────────────────────────────────
 
 /** Segment with its start/end waypoints resolved */

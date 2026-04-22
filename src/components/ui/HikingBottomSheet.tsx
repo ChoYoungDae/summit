@@ -5,9 +5,9 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import ElevationChart from "./ElevationChart";
 import type { SegmentElevationInfo } from "./ElevationChart";
-import type { RoutePhoto } from "@/types/trail";
+import type { RoutePhoto, HikingPhase } from "@/types/trail";
 import { useHikingLevel } from "@/lib/useHikingLevel";
-import type { HikingGPSState, HikingPhase } from "@/lib/useHikingGPS";
+import type { HikingGPSState } from "@/lib/useHikingGPS";
 import { useLanguage } from "@/lib/useLanguage";
 import { tUI } from "@/lib/i18n";
 
@@ -243,7 +243,7 @@ export default function HikingBottomSheet({
             <div className="flex items-center justify-between gap-4">
               {/* Current level chip — taps through to Settings */}
               <Link
-                href="/hiking/settings"
+                href="/settings"
                 className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 active:opacity-70 transition-opacity"
                 style={{ background: "var(--color-bg-light)" }}
               >

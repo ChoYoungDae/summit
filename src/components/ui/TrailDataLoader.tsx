@@ -1,6 +1,9 @@
 import { fetchRoute } from "@/lib/trails";
 import { fetchSunsetMin } from "@/lib/sunset";
 import { t } from "@/lib/i18n";
+import { cookies, headers } from "next/headers";
+import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/useLanguage";
+import type { SupportedLocale } from "@/lib/i18n";
 import TrailSection from "./TrailSection";
 import type { ResolvedRoute, Waypoint } from "@/types/trail";
 
@@ -77,6 +80,15 @@ function seoulBusStyle(busNumbers: string | undefined): { color: string; chipTex
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default async function TrailDataLoader({ routeId }: { routeId: number }) {
+  const cookieStore = await cookies();
+  const headersList = await headers();
+  const acceptLanguage = headersList.get("accept-language");
+  const hasKoInHeaders = acceptLanguage?.toLowerCase().includes("ko");
+
+  const locale = (cookieStore.get(LANGUAGE_STORAGE_KEY)?.value as SupportedLocale)
+    || (hasKoInHeaders ? "ko" : null)
+    || DEFAULT_LANGUAGE;
+
   const [route, sunsetMin] = await Promise.all([
     fetchRoute(routeId),
     fetchSunsetMin(),
@@ -142,7 +154,8 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
       ascentMin={ascentSeg?.estimatedTimeMin}
       descentMin={descentSeg?.estimatedTimeMin}
       returnTimeMin={returnSeg?.estimatedTimeMin}
-      routeName={t(route.mountain.name, "en")}
+      routeName={t(route.mountain.name, locale)}
+      locale={locale}
     />
   );
 }

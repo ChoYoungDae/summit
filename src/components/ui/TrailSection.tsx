@@ -221,45 +221,51 @@ export default function TrailSection({
   //   Summit rest: +30 min added between peak and final ETA
   // Preview mode: static offset from segment estimates.
   const peakETAMin = useMemo(() => {
-    if (!isHiking) return null;
+    // Before hiking, show ETA as if starting at the Last Safe Start time.
+    // During hiking, show ETA based on current real time.
+    const baseMin = isHiking ? (startedAtMin ?? nowKSTMin()) : (latestStartMin ?? nowKSTMin());
+
     if (hikingMode === "active" && gps.currentPos) {
-      if (gps.phase === "descent") return null; // already past summit
+      if (gps.phase === "descent") return null;
       const mins = naismithMinutes(gps.remainingM, gps.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
       return nowKSTMin() + Math.round(mins);
     }
-    if (startedAtMin != null && ascentMin != null) {
-      return startedAtMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier);
+    if (ascentMin != null) {
+      return baseMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier);
     }
     return null;
-  // gps updates on position change — intentional exhaustive deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, startedAtMin, ascentMin, approachTimeMin, skillMultiplier]);
+  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, startedAtMin, latestStartMin, ascentMin, approachTimeMin, skillMultiplier]);
 
-  const finalETAMin = useMemo(() => {
-    if (!isHiking) return null;
+  const trailheadETAMin = useMemo(() => {
+    const baseMin = isHiking ? (startedAtMin ?? nowKSTMin()) : (latestStartMin ?? nowKSTMin());
+
     if (hikingMode === "active" && gps.currentPos) {
       if (gps.phase === "ascent") {
-        // Time to summit + rest + full descent
         const toSummitMins = naismithMinutes(gps.remainingM, gps.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
         const descentMins  = naismithMinutes(gps.totalDescentM, 0, DESCENT_SPEED_M_PER_MIN);
         return nowKSTMin() + Math.round(toSummitMins) + SUMMIT_REST_MIN + Math.round(descentMins);
       }
-      // Descent phase: summit rest already done
       return nowKSTMin() + Math.round(naismithMinutes(gps.remainingM, 0, DESCENT_SPEED_M_PER_MIN));
     }
-    if (startedAtMin != null && ascentMin != null && descentMin != null) {
+    if (ascentMin != null && descentMin != null) {
       return (
-        startedAtMin +
+        baseMin +
         (approachTimeMin ?? 0) +
         Math.round(ascentMin * skillMultiplier) +
         SUMMIT_REST_MIN +
-        Math.round(descentMin * skillMultiplier) +
-        (returnTimeMin ?? 0)
+        Math.round(descentMin * skillMultiplier)
       );
     }
     return null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, gps.totalDescentM, startedAtMin, ascentMin, descentMin, approachTimeMin, returnTimeMin, skillMultiplier]);
+  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, gps.totalDescentM, startedAtMin, latestStartMin, ascentMin, descentMin, approachTimeMin, skillMultiplier]);
+
+  const finalETAMin = useMemo(() => {
+    const thETA = trailheadETAMin;
+    if (thETA == null) return null;
+    return thETA + (returnTimeMin ?? 0);
+  }, [trailheadETAMin, returnTimeMin]);
 
   // ── Elevation chart: GPS position dot during active hiking ───────────────
   const elevationHighlightIndex =
@@ -356,8 +362,11 @@ export default function TrailSection({
         latestStartMin={latestStartMin}
         isPastLatestStart={isPastLatestStart}
         peakETAMin={peakETAMin}
+        trailheadETAMin={trailheadETAMin}
         finalETAMin={finalETAMin}
         routeName={routeName}
+        locale={locale}
+        hikingPhase={gps.phase}
       />
 
       {nearestWaypoint && (

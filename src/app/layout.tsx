@@ -3,6 +3,7 @@ import { Nunito } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
 import FontLoader from "@/components/ui/FontLoader";
+import LocaleSync from "@/components/layout/LocaleSync";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -30,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${nunito.variable} h-full`}>
       <body className="flex flex-col h-full bg-[var(--bg)] text-[var(--fg)]">
+        <LocaleSync />
         <ServiceWorkerRegister />
         <FontLoader />
         {children}

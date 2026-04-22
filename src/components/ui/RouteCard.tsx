@@ -13,11 +13,14 @@ import { t, tUI } from "@/lib/i18n";
 import { formatMinutesAsTime, nowKSTMin } from "@/lib/safetyEngine";
 import type { Route } from "@/types/trail";
 
-function formatTime(minutes: number): string {
+function formatTime(minutes: number, locale: string = "en"): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  const hLabel = tUI("hour", locale);
+  const mLabel = tUI("minute", locale);
+  
+  if (h === 0) return `${m}${mLabel}`;
+  return m === 0 ? `${h}${hLabel}` : `${h}${hLabel} ${m}${mLabel}`;
 }
 
 function formatDistanceKm(metres: number): string {
@@ -77,7 +80,7 @@ export default function RouteCard({
         <div className="flex flex-col items-center gap-1">
           <h2
             className="text-base font-bold leading-snug text-center flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1"
-            style={{ fontFamily: "var(--font-en)" }}
+            style={{ fontFamily: locale === "ko" ? "var(--font-ko)" : "var(--font-en)" }}
           >
             {t(route.name, locale)}
           </h2>
@@ -107,19 +110,19 @@ export default function RouteCard({
                 style={{ background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }}
               >
                 <Footprints size={12} strokeWidth={2} />
-                {formatTime(route.totalDurationMin - busDurationMin)}
+                {formatTime(route.totalDurationMin - busDurationMin, locale)}
                 <span style={{ opacity: 0.3, margin: "0 1px" }}>|</span>
                 <Icon icon="ph:bus" width={13} height={13} style={{ color: "#0068B7" }} />
                 <span style={{ color: "#0068B7" }}>
                   {busSegmentCount > 1
-                    ? `${Math.round(busDurationMin / busSegmentCount)}m × ${busSegmentCount}`
-                    : formatTime(busDurationMin)}
+                    ? `${Math.round(busDurationMin / busSegmentCount)}${tUI("minute", locale)} × ${busSegmentCount}`
+                    : formatTime(busDurationMin, locale)}
                 </span>
               </span>
             ) : (
               <InfoChip
                 icon={<Footprints size={12} strokeWidth={2} />}
-                label={formatTime(route.totalDurationMin)}
+                label={formatTime(route.totalDurationMin, locale)}
               />
             )
           )}
@@ -176,7 +179,6 @@ export default function RouteCard({
             style={{
               borderColor: "var(--color-primary)",
               color: "var(--color-primary)",
-              fontFamily: "var(--font-en)",
             }}
           >
             <span className="text-sm font-semibold">{tUI("viewRoute", locale)}</span>

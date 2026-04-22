@@ -13,25 +13,25 @@ export default function HomePage() {
       Icon: TrainFront,
       title: tUI("valueStationTitle", locale),
       color: "#4A5D4E",
-      bgColor: "#F3F6F4",
+      bgColor: "rgba(74, 93, 78, 0.1)",
     },
     {
       Icon: Navigation,
       title: tUI("valueGPSAlertsTitle", locale),
       color: "var(--color-secondary)",
-      bgColor: "rgba(200, 54, 42, 0.08)",
+      bgColor: "rgba(200, 54, 42, 0.1)",
     },
     {
       Icon: Sun,
       title: tUI("valueSafetyReturnTitle", locale),
       color: "#4A5D4E",
-      bgColor: "#F3F6F4",
+      bgColor: "rgba(74, 93, 78, 0.1)",
     },
     {
       Icon: Map,
       title: tUI("valueJunctionGuideTitle", locale),
       color: "var(--color-secondary)",
-      bgColor: "rgba(200, 54, 42, 0.08)",
+      bgColor: "rgba(200, 54, 42, 0.1)",
     },
   ];
 

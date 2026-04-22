@@ -1,5 +1,9 @@
+"use client";
+
 import { Icon } from "@iconify/react";
 import { Train, Shield } from "lucide-react";
+import { useLanguage } from "@/lib/useLanguage";
+import { tUI } from "@/lib/i18n";
 
 // ── Shared card wrapper ────────────────────────────────────────────────────
 
@@ -102,6 +106,8 @@ function Item({
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function InfoPage() {
+  const { locale } = useLanguage();
+
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 pb-6">
 
@@ -118,19 +124,18 @@ export default function InfoPage() {
         </div>
         <div>
           <p className="font-bold text-sm" style={{ color: "var(--color-primary)" }}>
-            Essential Hiking Guide for Seoul
+            {tUI("infoHeroTitle", locale)}
           </p>
           <p className="text-xs leading-snug" style={{ color: "var(--color-text-body)" }}>
-            Everything foreign hikers need to know before hitting the trail.
+            {tUI("infoHeroSubtitle", locale)}
           </p>
         </div>
       </div>
 
       {/* 1. Tourism Center */}
-      <Section iconId="ph:map-trifold" title="Seoul Hiking Tourism Center">
+      <Section iconId="ph:map-trifold" title={tUI("infoSectionTourismTitle", locale)}>
         <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-body)" }}>
-          Need gear? Start your journey here. These centers provide everything international hikers
-          need for a perfect day on the mountain.
+          {tUI("infoSectionTourismDesc", locale)}
         </p>
         <a
           href="https://seoulhiking.or.kr"
@@ -147,22 +152,22 @@ export default function InfoPage() {
         <div className="flex flex-col gap-2">
           {[
             {
-              name: "Bukhansan",
-              subway: "Bukhansan Ui Stn · Exit 2 (Ui-Sinseol Line)",
-              hours: "09:00 – 18:00",
-              closed: "Closed Mondays",
+              name: tUI("infoCenterBukhansan", locale),
+              subway: tUI("infoSubwayBukhansan", locale),
+              hours: tUI("infoHours", locale),
+              closed: tUI("infoClosedMon", locale),
             },
             {
-              name: "Bugaksan",
-              subway: "Anguk Stn · Exit 2 (Line 3)",
-              hours: "09:00 – 18:00",
-              closed: "Closed Tuesdays",
+              name: tUI("infoCenterBugaksan", locale),
+              subway: tUI("infoSubwayBugaksan", locale),
+              hours: tUI("infoHours", locale),
+              closed: tUI("infoClosedTue", locale),
             },
             {
-              name: "Gwanaksan",
-              subway: "Gwanaksan Stn · B1 (Sinlim Line)",
-              hours: "09:00 – 18:00",
-              closed: "Closed Wednesdays",
+              name: tUI("infoCenterGwanaksan", locale),
+              subway: tUI("infoSubwayGwanaksan", locale),
+              hours: tUI("infoHours", locale),
+              closed: tUI("infoClosedWed", locale),
             },
           ].map((c) => (
             <div
@@ -194,44 +199,44 @@ export default function InfoPage() {
         <div className="flex flex-col gap-3 pt-1">
           <Item
             iconId="ph:backpack"
-            label="Gear Rental"
-            body="High-quality hiking boots, clothes, and poles at affordable rates."
+            label={tUI("infoGearRentalTitle", locale)}
+            body={tUI("infoGearRentalDesc", locale)}
           />
           <Item
             iconId="ph:lock-key"
-            label="Facilities"
-            body="Luggage storage (lockers), changing rooms, and shower facilities."
+            label={tUI("infoFacilitiesTitle", locale)}
+            body={tUI("infoFacilitiesDesc", locale)}
           />
           <Item
             iconId="ph:book-open"
-            label="Information"
-            body="Multilingual hiking maps and expert trail recommendations."
+            label={tUI("infoInformationTitle", locale)}
+            body={tUI("infoInformationDesc", locale)}
           />
         </div>
       </Section>
 
       {/* 2. Why Seoul */}
-      <Section iconId="ph:mountains" title="Why Seoul is a Hiker's Paradise">
+      <Section iconId="ph:mountains" title={tUI("infoSectionWhySeoulTitle", locale)}>
         <div className="flex flex-col gap-3">
           <Item
             icon={<Train size={14} style={{ color: "var(--color-primary)" }} />}
-            label="The 30-Minute Rule"
-            body="Unlike London, Paris, or NYC, Seoul offers 800 m peaks accessible within 30 minutes via subway — a rare megacity where the National Park begins where the city ends."
+            label={tUI("infoWhyHourRuleTitle", locale)}
+            body={tUI("infoWhyHourRuleDesc", locale)}
           />
           <Item
             iconId="ph:stairs"
-            label="Well-Managed Nature"
-            body="Forget 'wilderness' fear. Trails are meticulously maintained with stairs, mats, and safety rails — secure for all skill levels."
+            label={tUI("infoWhyNatureTitle", locale)}
+            body={tUI("infoWhyNatureDesc", locale)}
           />
           <Item
             iconId="ph:cell-signal-full"
-            label="Hyper-Connected Safety"
-            body="Full 5G/LTE coverage even at the summit. Share your GPS in an emergency instantly. Trails end at subway stations surrounded by K-food spots."
+            label={tUI("infoWhySafetyTitle", locale)}
+            body={tUI("infoWhySafetyDesc", locale)}
           />
           <Item
             iconId="ph:paw-print"
-            label="Low Wildlife Risk"
-            body="No bears or mountain lions. Wild boars exist, but staying on designated well-traveled paths makes your hike exceptionally safe."
+            label={tUI("infoWhyWildlifeTitle", locale)}
+            body={tUI("infoWhyWildlifeDesc", locale)}
           />
         </div>
       </Section>
@@ -239,43 +244,43 @@ export default function InfoPage() {
       {/* 3. Safety & Rules */}
       <Section
         icon={<Shield size={18} style={{ color: "#C8362A" }} />}
-        title="Important Safety & Rules"
+        title={tUI("infoSectionSafetyTitle", locale)}
         accent
       >
         <div className="flex flex-col gap-3">
           <Item
             iconId="ph:boot"
-            label="Gear Up for Granite"
-            body="Most Seoul mountains (Bukhansan, Gwanaksan) are granite-based. Standard sneakers are slippery on these rocks — hiking boots with good grip are mandatory. Rent at the Tourism Center if needed."
+            label={tUI("infoSafetyGearTitle", locale)}
+            body={tUI("infoSafetyGearDesc", locale)}
             accent
           />
           <Item
             iconId="ph:prohibit"
-            label="No Alcohol"
-            body="Drinking on the mountain is strictly prohibited by law and is dangerous on rocky terrain."
+            label={tUI("infoSafetyAlcoholTitle", locale)}
+            body={tUI("infoSafetyAlcoholDesc", locale)}
             accent
           />
           <Item
             iconId="ph:paw-print"
-            label="Wildlife Etiquette"
-            body="You may encounter friendly mountain cats or dogs. They are not a threat, but please do not feed them to preserve their natural instincts."
+            label={tUI("infoSafetyWildlifeTitle", locale)}
+            body={tUI("infoSafetyWildlifeDesc", locale)}
             accent
           />
         </div>
       </Section>
 
       {/* 4. Zero-Waste */}
-      <Section iconId="ph:leaf" title='The "Zero-Waste" Policy — BYOB'>
+      <Section iconId="ph:leaf" title={tUI("infoSectionZeroWasteTitle", locale)}>
         <div className="flex flex-col gap-3">
           <Item
             iconId="ph:trash"
-            label="No Trash Cans"
-            body='International visitors are often surprised to find no trash cans on Korean trails.'
+            label={tUI("infoZeroWasteNoCansTitle", locale)}
+            body={tUI("infoZeroWasteNoCansDesc", locale)}
           />
           <Item
             iconId="ph:bag"
-            label="Bring Your Own Bag (BYOB)"
-            body='We follow the "Leave No Trace" principle. Everything you bring up, you must carry down.'
+            label={tUI("infoZeroWasteBYOBTitle", locale)}
+            body={tUI("infoZeroWasteBYOBDesc", locale)}
           />
         </div>
       </Section>

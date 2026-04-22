@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getDistance } from "geolib";
-import type { ResolvedSegment, Waypoint } from "@/types/trail";
+import type { ResolvedSegment, Waypoint, HikingPhase } from "@/types/trail";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-export type HikingPhase = "ascent" | "descent";
 
 export interface HikingGPSState {
   currentPos: { lat: number; lon: number } | null;

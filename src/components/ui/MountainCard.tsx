@@ -65,11 +65,17 @@ export default function MountainCard({ mountain, locale }: Props) {
 
         {/* Bottom Info */}
         <h3 className="text-base font-bold leading-tight mb-2 drop-shadow-md">
-          {mountain.name.en}
-          {mountain.name.ko && (
-            <span className="text-[0.7em] font-medium ml-1.5 opacity-90">
-              {mountain.name.ko}
-            </span>
+          {locale === "ko" ? (
+            mountain.name.ko || mountain.name.en
+          ) : (
+            <>
+              {mountain.name.en}
+              {mountain.name.ko && (
+                <span className="text-[0.7em] font-medium ml-1.5 opacity-90">
+                  {mountain.name.ko}
+                </span>
+              )}
+            </>
           )}
         </h3>
         
