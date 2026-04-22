@@ -16,11 +16,6 @@ const nextConfig: NextConfig = {
   },
   // Allow development access from local IP (mobile)
   allowedDevOrigins: ["192.168.0.8", "localhost:3000"],
-  async rewrites() {
-    return [
-      { source: "/", destination: "/hiking" },
-    ];
-  },
   async headers() {
     return [
       {
