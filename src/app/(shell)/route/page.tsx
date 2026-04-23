@@ -1,9 +1,8 @@
 import { fetchRouteList } from "@/lib/trails";
 
 export const dynamic = "force-dynamic";
-import { cookies, headers } from "next/headers";
-import { t, tUI } from "@/lib/i18n";
-import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/useLanguage";
+import { cookies } from "next/headers";
+import { tDB, tUI, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import type { SupportedLocale } from "@/lib/i18n";
 import { fetchSunsetMin } from "@/lib/sunset";
 import { calcLatestStartFromDuration } from "@/lib/safetyEngine";
@@ -58,17 +57,9 @@ export default async function RouteListPage({
   searchParams: Promise<{ mountain?: string }>;
 }) {
   const cookieStore = await cookies();
-  const headersList = await headers();
-  const acceptLanguage = headersList.get("accept-language");
-  
-  // Try to find 'ko' in accept-language if cookie is missing
-  const hasKoInHeaders = acceptLanguage?.toLowerCase().includes("ko");
-  
-  const locale = (cookieStore.get(LANGUAGE_STORAGE_KEY)?.value as SupportedLocale) 
-    || (hasKoInHeaders ? "ko" : null)
+
+  const locale = (cookieStore.get(LANGUAGE_STORAGE_KEY)?.value as SupportedLocale)
     || DEFAULT_LANGUAGE;
-  
-  console.log(`[Server] Detected Locale: ${locale} (Cookie: ${cookieStore.get(LANGUAGE_STORAGE_KEY)?.value}, Headers: ${acceptLanguage})`);
   
   const { mountain: mountainIdParam } = await searchParams;
 
@@ -101,8 +92,8 @@ export default async function RouteListPage({
   return (
     <div className="flex flex-col gap-8 pb-8">
       {groups.map(({ mountain, routes }) => {
-        const nameEn = t(mountain.name, "en");
-        const nameKo = mountain.name.ko ?? null;
+        const mountainName = tDB(mountain.name, locale);
+        const nameKo = mountain.name.ko;
         const terrainTags = mountain.terrainTags ?? [];
 
         return (
@@ -114,7 +105,7 @@ export default async function RouteListPage({
                 {mountain.imageUrl ? (
                   <img
                     src={mountain.imageUrl}
-                    alt={nameEn}
+                    alt={mountainName}
                     className="absolute inset-0 w-full h-full object-cover"
                   />
                 ) : (
@@ -140,30 +131,19 @@ export default async function RouteListPage({
                 <div className="absolute bottom-4 left-4 right-4">
                   {/* Mountain name */}
                   <div className="flex items-end gap-2.5">
-                    {locale === "ko" ? (
-                      <h1
-                        className="text-[2rem] font-bold leading-none tracking-tight text-white"
+                    <h1
+                      className="text-[2rem] font-bold leading-none tracking-tight text-white"
+                      style={{ fontFamily: locale === "ko" ? "var(--font-ko)" : "var(--font-en)" }}
+                    >
+                      {mountainName}
+                    </h1>
+                    {locale !== "ko" && nameKo && (
+                      <span
+                        className="text-base leading-none mb-[3px] text-white/70"
                         style={{ fontFamily: "var(--font-ko)" }}
                       >
-                        {nameKo || nameEn}
-                      </h1>
-                    ) : (
-                      <>
-                        <h1
-                          className="text-[2rem] font-bold leading-none tracking-tight text-white"
-                          style={{ fontFamily: "var(--font-en)" }}
-                        >
-                          {nameEn}
-                        </h1>
-                        {nameKo && (
-                          <span
-                            className="text-base leading-none mb-[3px] text-white/70"
-                            style={{ fontFamily: "var(--font-ko)" }}
-                          >
-                            {nameKo}
-                          </span>
-                        )}
-                      </>
+                        {nameKo}
+                      </span>
                     )}
                   </div>
 
@@ -214,7 +194,7 @@ export default async function RouteListPage({
                         }}
                       >
                         {TagIcon && <TagIcon size={13} strokeWidth={2} />}
-                        {tUI(tagKey as any, locale) || t(tag, locale)}
+                        {tUI(tagKey as any, locale) || tDB(tag, locale)}
                       </span>
                     );
                   })}

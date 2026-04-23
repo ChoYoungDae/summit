@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { LANGUAGE_STORAGE_KEY } from "@/lib/useLanguage";
+import { LANGUAGE_STORAGE_KEY } from "@/lib/i18n";
 
 /**
  * Syncs the locale from localStorage to a cookie on the first load.

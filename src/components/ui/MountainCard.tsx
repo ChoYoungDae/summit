@@ -3,12 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { TrendingUp, Ruler, Map as MapIcon } from "lucide-react";
-import { tUI } from "@/lib/i18n";
+import { tDB, tUI } from "@/lib/i18n";
 import type { MountainSummary } from "@/lib/trails";
 
 interface Props {
   mountain: MountainSummary;
   locale: string;
+  priority?: boolean;
 }
 
 const LEVEL_LABELS: Record<string, { label: string; color: string }> = {
@@ -18,12 +19,9 @@ const LEVEL_LABELS: Record<string, { label: string; color: string }> = {
   bukhansan: { label: "Level 4", color: "#F87171" }, // Red
 };
 
-export default function MountainCard({ mountain, locale }: Props) {
+export default function MountainCard({ mountain, locale, priority = false }: Props) {
   const levelInfo = LEVEL_LABELS[mountain.slug] || { label: "Level ?", color: "#9CA3AF" };
   
-  // joint notation as requested: "Bukhansan 북한산"
-  const jointName = `${mountain.name.en} ${mountain.name.ko || ""}`.trim();
-
   return (
     <Link
       href={`/route?mountain=${mountain.id}`}
@@ -36,6 +34,8 @@ export default function MountainCard({ mountain, locale }: Props) {
             src={mountain.imageUrl}
             alt={mountain.name.en}
             fill
+            sizes="(max-width: 768px) 50vw, 33vw"
+            priority={priority}
             className="object-cover transition-transform duration-500 group-hover:scale-110"
           />
           {/* Gradients */}
@@ -65,17 +65,11 @@ export default function MountainCard({ mountain, locale }: Props) {
 
         {/* Bottom Info */}
         <h3 className="text-base font-bold leading-tight mb-2 drop-shadow-md">
-          {locale === "ko" ? (
-            mountain.name.ko || mountain.name.en
-          ) : (
-            <>
-              {mountain.name.en}
-              {mountain.name.ko && (
-                <span className="text-[0.7em] font-medium ml-1.5 opacity-90">
-                  {mountain.name.ko}
-                </span>
-              )}
-            </>
+          <span className="font-en">{tDB(mountain.name, locale)}</span>
+          {locale !== "ko" && mountain.name.ko && (
+            <span className="text-[0.7em] font-ko font-medium ml-1.5 opacity-90">
+              {mountain.name.ko}
+            </span>
           )}
         </h3>
         
@@ -88,11 +82,7 @@ export default function MountainCard({ mountain, locale }: Props) {
             <MapIcon size={12} />
             <span>
               {mountain.routeCount}{" "}
-              {locale === "en"
-                ? mountain.routeCount === 1
-                  ? "Route"
-                  : "Routes"
-                : tUI("routesCount", locale)}
+              {mountain.routeCount === 1 ? tUI("routesCount", locale).replace(/s$/, "") : tUI("routesCount", locale)}
             </span>
           </div>
         </div>

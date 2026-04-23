@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
-import { t, tUI } from "@/lib/i18n";
+import { tDB, tUI } from "@/lib/i18n";
 import { formatMinutesAsTime, nowKSTMin } from "@/lib/safetyEngine";
 import type { Route } from "@/types/trail";
 
@@ -50,7 +50,7 @@ export default function RouteCard({
   const isPastLatestStart =
     latestStartMin != null && nowKSTMin() > latestStartMin;
 
-  const description = route.description ? t(route.description, locale) : null;
+  const description = route.description ? tDB(route.description, locale) : null;
 
   return (
     <div
@@ -82,14 +82,14 @@ export default function RouteCard({
             className="text-base font-bold leading-snug text-center flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1"
             style={{ fontFamily: locale === "ko" ? "var(--font-ko)" : "var(--font-en)" }}
           >
-            {t(route.name, locale)}
+            {tDB(route.name, locale)}
           </h2>
           {route.isOneway && (
             <span
               className="px-2 py-0.5 rounded-full border border-primary/30 text-[10px] font-bold text-primary uppercase tracking-tight"
               style={{ background: "rgba(46,94,74,0.05)" }}
             >
-              {locale === "ko" ? "상행 전용" : "One-Way Ascent"}
+              {tUI("oneWayAscent", locale)}
             </span>
           )}
         </div>
@@ -164,7 +164,7 @@ export default function RouteCard({
                 className="text-sm font-semibold mt-0.5"
                 style={{ color: "var(--color-primary)" }}
               >
-                {locale === "ko" ? "...더보기" : "...more"}
+                {tUI("readMore", locale)}
               </button>
             )}
           </div>
@@ -216,25 +216,10 @@ function InfoChip({
   );
 }
 
-const DIFFICULTY_LABELS: Record<string, Record<number, string>> = {
-  en: {
-    1: "Easy",
-    2: "Novice",
-    3: "Intermediate",
-    4: "Advanced",
-    5: "Expert",
-  },
-  ko: {
-    1: "매우 쉬움",
-    2: "쉬움",
-    3: "보통",
-    4: "약간 어려움",
-    5: "매우 어려움",
-  },
-};
+
 
 function DifficultyChip({ difficulty, locale = "en" }: { difficulty: number; locale?: string }) {
-  const label = DIFFICULTY_LABELS[locale]?.[difficulty] || DIFFICULTY_LABELS.en[difficulty] || "Unknown";
+  const label = tUI(`diff_${difficulty}` as any, locale);
   const isHard = difficulty >= 4;
   return (
     <span

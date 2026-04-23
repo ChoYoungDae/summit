@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { SupportedLocale } from "./i18n";
 
-export const LANGUAGE_STORAGE_KEY = "app-language";
-export const DEFAULT_LANGUAGE: SupportedLocale = "en";
+import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "./i18n";
 const CHANGE_EVENT = "language-change";
 
 export const LANGUAGES: { locale: SupportedLocale; label: string }[] = [
@@ -22,6 +21,8 @@ export function useLanguage() {
     const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored && LANGUAGES.some((l) => l.locale === stored)) {
       setLocale(stored as SupportedLocale);
+      // Sync to cookie so server components pick up the right locale
+      document.cookie = `${LANGUAGE_STORAGE_KEY}=${stored}; path=/; max-age=31536000; SameSite=Lax`;
     }
 
     function handler(e: Event) {

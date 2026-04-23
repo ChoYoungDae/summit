@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft, AlertTriangle, Mountain, Flag, Train } from "lucide-react";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
-import { t, tUI } from "@/lib/i18n";
+import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
 import { useLanguage } from "@/lib/useLanguage";
 
@@ -106,8 +106,8 @@ export default function FloatingTrailHeader({
           <div className="flex flex-col gap-1 min-w-0">
             <span className="font-black text-[1.15rem] leading-tight tracking-tight">
               {locale === "ko"
-                ? `${t(stationInfo.name, "ko")}${stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}`
-                : `${stationInfo.exit ? `Exit ${stationInfo.exit}, ` : ""}${t(stationInfo.name, "en")}`}
+                ? `${tDB(stationInfo.name, locale)}${stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}`
+                : `${stationInfo.exit ? `${tUI("exit", locale)} ${stationInfo.exit}, ` : ""}${tDB(stationInfo.name, locale)}`}
             </span>
             {locale !== "ko" && stationInfo.name.ko && (
               <span

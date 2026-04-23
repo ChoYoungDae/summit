@@ -1,8 +1,7 @@
 import { fetchRoute } from "@/lib/trails";
 import { fetchSunsetMin } from "@/lib/sunset";
-import { t } from "@/lib/i18n";
+import { tDB, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import { cookies, headers } from "next/headers";
-import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/useLanguage";
 import type { SupportedLocale } from "@/lib/i18n";
 import TrailSection from "./TrailSection";
 import type { ResolvedRoute, Waypoint } from "@/types/trail";
@@ -154,7 +153,7 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
       ascentMin={ascentSeg?.estimatedTimeMin}
       descentMin={descentSeg?.estimatedTimeMin}
       returnTimeMin={returnSeg?.estimatedTimeMin}
-      routeName={t(route.mountain.name, locale)}
+      routeName={tDB(route.mountain.name, locale)}
       locale={locale}
     />
   );

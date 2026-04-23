@@ -13,7 +13,7 @@
  */
 
 import { useEffect } from "react";
-import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/useLanguage";
+import { LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import type { SupportedLocale } from "@/lib/i18n";
 
 const LINK_ID = "dynamic-cjk-font";

@@ -41,6 +41,27 @@ const LEVEL_DESC: Record<string, Record<number, string>> = {
     3: "숙련된 등산객 — 가파른 오르막길도 익숙하게 오릅니다.",
     4: "트레일 러너 수준 — 휴식을 최소화하며 매우 빠르게 이동합니다.",
   },
+  zh: {
+    0: "徒步新手 — 走得慢，偏好平缓地形。",
+    1: "偶尔徒步者 — 对清晰的步道感到舒适。",
+    2: "常规徒步者 — 在大多数地形上保持稳定步速。",
+    3: "身体强健且经验丰富 — 对陡峭的上坡感到舒适。",
+    4: "越野跑速度 — 尽量减少休息停顿。",
+  },
+  ja: {
+    0: "登山初心者 — ゆっくり歩き、緩やかな地形を好みます。",
+    1: "時々登山をする人 — 整備された登山道を無理なく歩けます。",
+    2: "一般的な登山客 — ほとんどの地形で一定の速度で歩きます。",
+    3: "熟練した登山客 — 急な登り坂も慣れた様子で登ります。",
+    4: "トレイルランナー級 — 休憩を最小限に抑え、非常に速く移動します。",
+  },
+  es: {
+    0: "Nuevo en el senderismo: va despacio, prefiere terrenos suaves.",
+    1: "Excursionista ocasional: se siente cómodo en senderos claros.",
+    2: "Excursionista regular: ritmo constante en la mayoría de los terrenos.",
+    3: "En forma y experimentado: cómodo con ascensos empinados.",
+    4: "Ritmo de trail-runner: minimiza las paradas de descanso.",
+  },
 };
 
 // ── Settings page ─────────────────────────────────────────────────────────────
@@ -66,7 +87,7 @@ export default function SettingsPage() {
       >
         {LANGUAGES.map(({ locale: l, label }, i) => {
           const active = locale === l;
-          const disabled = l !== "en" && l !== "ko";
+          const disabled = false; // All languages are now enabled
           return (
             <button
               key={l}
@@ -102,14 +123,7 @@ export default function SettingsPage() {
                   </svg>
                 </div>
               )}
-              {disabled && (
-                <span
-                  className="text-[11px] font-medium px-1.5 py-0.5 rounded-full"
-                  style={{ background: "rgba(0,0,0,0.06)", color: "var(--color-text-muted)" }}
-                >
-                  {tUI("comingSoon", locale)}
-                </span>
-              )}
+
             </button>
           );
         })}
@@ -259,9 +273,7 @@ export default function SettingsPage() {
           <span>{OFF_ROUTE_THRESHOLD_MAX} m</span>
         </div>
         <p className="text-[11px] mt-2" style={{ color: "var(--color-text-muted)" }}>
-          {locale === "ko" 
-            ? "GPS를 3번 연속 잘못 읽거나 5초 이상 경로를 벗어나면 알림이 울립니다."
-            : "Alert fires after 3 consecutive GPS readings or 5 s off the trail."}
+          {tUI("gpsAlertNote", locale)}
         </p>
       </div>
 
@@ -276,7 +288,8 @@ export default function SettingsPage() {
         className="rounded-2xl overflow-hidden shadow-sm border border-black/[0.04]"
         style={{ background: "var(--color-card)" }}
       >
-        <div className="px-4 py-3.5 flex items-center justify-between">
+        {/* Version */}
+        <div className="px-4 py-3.5 flex items-center justify-between border-bottom border-black/[0.04]" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
           <span className="text-sm font-medium">{tUI("version", locale)}</span>
           <span
             className="text-sm font-bold tabular-nums"
@@ -285,6 +298,19 @@ export default function SettingsPage() {
             0.1.0
           </span>
         </div>
+
+        {/* Feedback */}
+        <Link
+          href="https://docs.google.com/forms/d/e/1FAIpQLSfuIAIdYil3vwRWOWBzrnxexNv_wcdvC24yN2-EhfPZM9JplQ/viewform?usp=sf_link" 
+          target="_blank"
+          className="px-4 py-3.5 flex items-center justify-between hover:bg-[var(--color-bg-light)] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Icon icon="ph:chat-circle-dots" width={18} height={18} style={{ color: "var(--color-primary)" }} />
+            <span className="text-sm font-medium">{tUI("sendFeedback", locale)}</span>
+          </div>
+          <Icon icon="ph:caret-right" width={16} height={16} style={{ color: "var(--color-text-muted)" }} />
+        </Link>
       </div>
     </div>
   );

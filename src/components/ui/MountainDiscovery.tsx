@@ -48,8 +48,8 @@ export default function MountainDiscovery() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {mountains.map((mt) => (
-          <MountainCard key={mt.id} mountain={mt} locale={locale} />
+        {mountains.map((mt, i) => (
+          <MountainCard key={mt.id} mountain={mt} locale={locale} priority={i === 0} />
         ))}
       </div>
 

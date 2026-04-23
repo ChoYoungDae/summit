@@ -36,8 +36,8 @@ export default function HomePage() {
   ];
 
   const title = tUI("homeTitle", locale);
-  const highlightedTitle = title.split(/(Seoul|Subway Exit|서울|지하철)/g).map((part, i) => {
-    if (["Seoul", "Subway Exit", "서울", "지하철"].includes(part)) {
+  const highlightedTitle = title.split(/(Seoul|Subway|서울|지하철)/g).map((part, i) => {
+    if (["Seoul", "Subway", "서울", "지하철"].includes(part)) {
       return (
         <span key={i} style={{ color: "var(--color-secondary)" }}>
           {part}
@@ -58,9 +58,14 @@ export default function HomePage() {
           >
             {highlightedTitle}
           </h1>
-          <p className="mt-2 text-[0.875rem] text-[#3A3A45] leading-relaxed">
-            {tUI("homeSubtitle", locale)}
-          </p>
+          <div className="mt-2 flex flex-col gap-1">
+            <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed">
+              {tUI("homeSubtitle", locale)}
+            </p>
+            <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed">
+              {tUI("homeDescription", locale)}
+            </p>
+          </div>
         </div>
 
         {/* ── 1x4 Card Row ── */}

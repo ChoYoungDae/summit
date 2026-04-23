@@ -216,10 +216,10 @@ export function SOSPanel() {
             <Icon icon="ph:warning" width={22} height={22} style={{ color: "#C8362A" }} />
           </div>
           <div>
-            <p className="font-bold text-sm" style={{ color: "#C8362A" }}>
+            <p className="font-bold text-base" style={{ color: "#C8362A" }}>
               {tUI("sosHeroTitle", locale)}
             </p>
-            <p className="text-xs leading-snug" style={{ color: "var(--color-text-body)" }}>
+            <p className="text-sm leading-snug" style={{ color: "var(--color-text-body)" }}>
               {tUI("sosHeroSubtitle", locale)}
             </p>
           </div>
@@ -232,7 +232,7 @@ export function SOSPanel() {
         >
           <div className="flex items-center gap-2 mb-2">
             <MapPin size={15} style={{ color: "var(--color-primary)" }} />
-            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
+            <span className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
               {tUI("sosGPSLabel", locale)}
             </span>
           </div>
@@ -244,7 +244,7 @@ export function SOSPanel() {
                 Lat: {coords.lat.toFixed(4)} &nbsp; Lon: {coords.lon.toFixed(4)}
               </p>
               {coords.accuracy && (
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                   {tUI("sosGPSAccuracy", locale)
                     .replace("{accuracy}", String(coords.accuracy))
                     .replace("{readings}", String(Math.min(8, Math.ceil((coords.accuracy || 0) / 10 + 1))))}
@@ -272,8 +272,8 @@ export function SOSPanel() {
             <Phone size={24} className="text-white" />
           </div>
           <div className="flex-1">
-            <p className="text-white font-bold text-base">{tUI("sosCall119Title", locale)}</p>
-            <p className="text-white/75 text-xs mt-0.5">{tUI("sosCall119Desc", locale)}</p>
+            <p className="text-white font-bold text-lg">{tUI("sosCall119Title", locale)}</p>
+            <p className="text-white/75 text-sm mt-0.5">{tUI("sosCall119Desc", locale)}</p>
           </div>
           <Icon icon="ph:caret-right" width={18} height={18} className="text-white/60" />
         </button>
@@ -291,8 +291,8 @@ export function SOSPanel() {
             <Phone size={24} className="text-white" />
           </div>
           <div className="flex-1">
-            <p className="text-white font-bold text-base">{tUI("sosCall1330Title", locale)}</p>
-            <p className="text-white/75 text-xs mt-0.5">{tUI("sosCall1330Desc", locale)}</p>
+            <p className="text-white font-bold text-lg">{tUI("sosCall1330Title", locale)}</p>
+            <p className="text-white/75 text-sm mt-0.5">{tUI("sosCall1330Desc", locale)}</p>
           </div>
           <Icon icon="ph:caret-right" width={18} height={18} className="text-white/60" />
         </button>
@@ -304,14 +304,14 @@ export function SOSPanel() {
         >
           <div className="flex items-center gap-2 mb-3">
             <Icon icon="ph:chat-text" width={15} height={15} style={{ color: "var(--color-primary)" }} />
-            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
+            <span className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-primary)" }}>
               {tUI("sosScriptTitle", locale)}
             </span>
           </div>
-          <p className="text-sm leading-relaxed font-medium mb-2" style={{ color: "var(--color-text-body)" }}>
+          <p className="text-[15px] leading-relaxed font-medium mb-2" style={{ color: "var(--color-text-body)" }}>
             {script.en}
           </p>
-          <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
             {script.ko}
           </p>
         </div>
@@ -330,7 +330,7 @@ export function SOSPanel() {
             <p className="text-sm font-semibold" style={{ color: "#C8362A" }}>
               {tUI("sosSMS119Title", locale)}
             </p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               {tUI("sosSMS119Desc", locale)}
             </p>
           </div>
@@ -343,7 +343,7 @@ export function SOSPanel() {
           style={{ background: "rgba(46,94,74,0.06)" }}
         >
           <Icon icon="ph:headset" width={16} height={16} style={{ color: "var(--color-primary)", marginTop: 1 }} />
-          <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-body)" }}>
+          <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-body)" }}>
             {tUI("sosInterpreterNotice", locale)}
           </p>
         </div>

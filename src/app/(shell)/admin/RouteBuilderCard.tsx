@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BookOpen, CheckCircle, AlertCircle, Plus, Trash2, ChevronUp, ChevronDown, Pencil, X } from "lucide-react";
-import { t, type SupportedLocale } from "@/lib/i18n";
+import { tDB, type SupportedLocale } from "@/lib/i18n";
 
 const CARD  = "rounded-2xl bg-card border border-[var(--color-border)] p-5 flex flex-col gap-4";
 const INPUT = "rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-bg-light)] focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -204,12 +204,12 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
 
   function waypointName(id: number) {
     const w = waypoints.find(w => w.id === id);
-    return w ? (t(w.name, locale) || `WP#${id}`) : `WP#${id}`;
+    return w ? (tDB(w.name, locale) || `WP#${id}`) : `WP#${id}`;
   }
 
   function segmentName(s: Segment): string | null {
     if (!s.name) return null;
-    return t(s.name as { en: string }, locale) || null;
+    return tDB(s.name as { en: string }, locale) || null;
   }
 
   async function handleSave() {

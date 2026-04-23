@@ -46,7 +46,7 @@ function Section({
           )}
         </div>
         <h2
-          className="font-bold text-sm"
+          className="font-bold text-base"
           style={{ color: accent ? "#C8362A" : "var(--color-primary)" }}
         >
           {title}
@@ -92,10 +92,10 @@ function Item({
         )}
       </div>
       <div className="flex flex-col gap-0.5 flex-1">
-        <p className="text-sm font-semibold" style={{ color: "var(--color-text-body)" }}>
+        <p className="text-[15px] font-semibold" style={{ color: "var(--color-text-body)" }}>
           {label}
         </p>
-        <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
           {body}
         </p>
       </div>
@@ -123,10 +123,10 @@ export default function InfoPage() {
           <Icon icon="ph:mountains" width={22} height={22} style={{ color: "var(--color-primary)" }} />
         </div>
         <div>
-          <p className="font-bold text-sm" style={{ color: "var(--color-primary)" }}>
+          <p className="font-bold text-base" style={{ color: "var(--color-primary)" }}>
             {tUI("infoHeroTitle", locale)}
           </p>
-          <p className="text-xs leading-snug" style={{ color: "var(--color-text-body)" }}>
+          <p className="text-sm leading-snug" style={{ color: "var(--color-text-body)" }}>
             {tUI("infoHeroSubtitle", locale)}
           </p>
         </div>
@@ -134,7 +134,7 @@ export default function InfoPage() {
 
       {/* 1. Tourism Center */}
       <Section iconId="ph:map-trifold" title={tUI("infoSectionTourismTitle", locale)}>
-        <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-body)" }}>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-body)" }}>
           {tUI("infoSectionTourismDesc", locale)}
         </p>
         <a
@@ -144,8 +144,8 @@ export default function InfoPage() {
           className="flex items-center gap-1.5 self-start"
           style={{ color: "var(--color-primary)" }}
         >
-          <Icon icon="ph:arrow-square-out" width={13} height={13} />
-          <span className="text-xs font-medium underline underline-offset-2">seoulhiking.or.kr</span>
+          <Icon icon="ph:arrow-square-out" width={14} height={14} />
+          <span className="text-sm font-medium underline underline-offset-2">seoulhiking.or.kr</span>
         </a>
 
         {/* Center locations */}
@@ -182,13 +182,13 @@ export default function InfoPage() {
                 style={{ color: "var(--color-primary)", marginTop: 2, flexShrink: 0 }}
               />
               <div className="flex flex-col gap-0.5">
-                <p className="text-xs font-semibold" style={{ color: "var(--color-text-body)" }}>
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text-body)" }}>
                   {c.name}
                 </p>
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                   {c.subway}
                 </p>
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                   {c.hours} · {c.closed}
                 </p>
               </div>

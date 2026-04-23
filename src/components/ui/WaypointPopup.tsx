@@ -2,7 +2,7 @@
 
 import { X, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react";
 import { type Waypoint } from "@/types/trail";
-import { t } from "@/lib/i18n";
+import { tDB } from "@/lib/i18n";
 import { DualText } from "./DualText";
 
 interface Props {
@@ -20,10 +20,11 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 export default function WaypointPopup({ waypoint, onClose, locale = "en" }: Props) {
-  const primaryName = t(waypoint.name, locale);
+  const primaryName = tDB(waypoint.name, locale);
+  const nameKo = waypoint.name.ko;
   // Korean sub-label always shown when present — hikers need to match physical signs
-  const koName = locale !== "ko" ? waypoint.name.ko : undefined;
-  const desc = t(waypoint.description, locale);
+  const koName = locale !== "ko" ? nameKo : undefined;
+  const desc = tDB(waypoint.description, locale);
   const koDesc = locale !== "ko" ? waypoint.description?.ko : undefined;
 
   return (

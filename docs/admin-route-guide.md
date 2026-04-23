@@ -1,128 +1,223 @@
 # 관리자 경로 설정 가이드 (Admin Route Configuration Guide)
 
-이 문서는 Summit 애플리케이션의 관리자 화면에서 등산로 및 교통 거점을 등록하고 관리하는 방법을 설명합니다. 특히 최근 업데이트된 **버스+도보 복합 경로** 설정법을 중점적으로 다룹니다.
-
-## 📌 전체 프로세스 요약
-전체 데이터 구축은 다음의 4단계로 이루어집니다.
-
-1.  **거점(Waypoints) 등록**: 산의 핵심 지점(지하철역, 버스정류장, 입구, 정상 등)을 생성합니다.
-2.  **구간(Segments) 업로드**: 두 거점 사이의 실제 GPS 경로(GPX/GeoJSON)를 업로드합니다.
-3.  **루트(Routes) 구성**: 업로드된 구간들을 순서대로 조합하여 최종 등산 코스를 완성합니다.
-4.  **사진(Photos) 업로드**: 루트에 풍경 사진을 추가하여 지도와 고도 그래프에 카메라 마커로 표시합니다.
+이 문서는 Summit 애플리케이션의 관리자 화면에서 등산 코스를 등록하고 관리하는 방법을 설명합니다.
 
 ---
 
-## 🏗️ 1단계: 거점 관리 (Manage Waypoints)
+## ✨ 신규: Guided Wizard (`/admin/new-route`)
 
-등산로의 시작, 경유, 끝이 되는 지점들을 정의합니다.
+기존 4단계 수동 작업 대신, **가이드 위저드**에서 한 번에 루트를 완성할 수 있습니다.
+Admin 홈(`/admin`) 상단의 **"Create New Route (Guided Wizard)"** 버튼으로 진입합니다.
 
-### 지원 타입
--   **Station**: 지하철역. (출구 번호 입력 가능)
--   **Bus Stop (신규)**: 버스 정류장. (ARS ID 고유번호 입력 가능)
--   **Trailhead**: 등산로 입구.
--   **Summit**: 산 정상.
--   **Junction**: 갈림길.
--   **Shelter**: 대피소.
+### 전체 흐름 (6단계)
 
-### 주요 입력 사항
--   **Name (EN/KO)**: 영문명과 국문명.
--   **Slug**: 시스템 내부 식별자 (영문명 기반 자동 생성 권장).
--   **Photo**: 해당 지점의 대표 이미지. (EXIF 정보가 있는 사진 업로드 시 위도/경도가 자동 입력됩니다.)
--   **GPS Info**: 위도(Lat), 경도(Lon), 고도(Elevation).
+```
+1. Mountain  →  2. GPS  →  3. Photos  →  4. Waypoints  →  5. Captions  →  6. Save
+```
 
 ---
 
-## 🛤️ 2단계: 구간 업로드 (Upload Segment)
-
-두 거점을 잇는 물리적 이동 경로를 설정합니다.
-
-### 구간 타입 (Segment Type)
--   **Approach**: 역/정류장에서 등산로 입구까지의 접근로.
--   **Ascent**: 입구에서 정상까지의 등라로.
--   **Descent**: 정상에서 하산 지점까지의 하산로.
--   **Return**: 하산 지점에서 다시 역/정류장으로 돌아가는 길.
-
-### 🚌 버스+도보 복합 경로 (Bus + Walk Hybrid)
-`Approach` 또는 `Return` 타입에서 버스 환승이 필요한 경우 사용합니다.
-
-1.  **Add Bus Route 체크**: 복합 경로 입력 폼이 활성화됩니다.
-2.  **3점 연결 구조**:
-    -   **Start**: 출발 지점 (예: 지하철역)
-    -   **Transit**: 경유 지점 (예: 버스 정류장)
-    -   **End**: 도착 지점 (예: 등산로 입구)
-3.  **버스 정보 입력**:
-    -   **Bus Type**: 간선(Blue), 지선/마을(Green), 광역(Red), 순환(Yellow) 선택. 지도의 실선 색상에 반영됩니다.
-    -   **Bus Number**: 버스 번호 직접 입력 (예: 704, 서대문03).
-4.  **GPS 파일 분리 업로드**:
-    -   **Bus GPS**: 버스가 이동하는 구간의 GPX 파일.
-    -   **Walk GPS**: 정류장에서 내려서 걷는 구간의 GPX 파일.
-    -   *시스템이 두 파일을 합쳐서 `bus_details` 데이터로 저장합니다.*
+### 1단계: 산 선택
+드롭다운에서 산을 선택합니다. (변경 없음)
 
 ---
 
-## 🗺️ 3단계: 루트 빌더 (Build Route)
+### 2단계: GPS 파일 업로드
 
-최종적으로 사용자에게 노출될 등산 코스를 조립합니다.
-
-1.  **이름 설정**: 루트의 제목 (예: "북한산 백운대 초보 코스").
-2.  **구간 선택**: 해당 산에 등록된 구간들을 순서대로 추가합니다.
-3.  **순서 조정**: 리스트의 화살표 버튼을 이용해 `Approach -> Ascent -> Descent -> Return` 순서를 맞춥니다.
-4.  **자동 계산**: 선택된 구간들의 거리, 소요 시간, 난이도가 합산되어 루트 정보로 저장됩니다.
+**구간별 분리 없이**, 전체 등산 코스 하나의 GPX 또는 GeoJSON 파일을 올립니다.
+- 역 출발 → 정상 → 역 도착까지 전체를 하나로 기록한 파일이어야 합니다.
+- 업로드 시 포인트 수와 총 거리가 미리 표시됩니다.
 
 ---
 
-## 📸 4단계: 사진 업로드 (Photo Upload)
+### 3단계: 사진 업로드
 
-루트의 풍경 사진을 업로드하면 지도와 고도 그래프에 카메라 아이콘으로 표시되며, 하이커가 탭하면 사진과 설명 팝업이 열립니다.
+등산 중 찍은 사진을 한 번에 모두 업로드합니다.
+- 클라이언트에서 자동으로 EXIF GPS 추출 + WebP 변환 + 가로 최대 1200px 리사이즈
+- GPS 좌표가 있는 사진에는 "GPS" 뱃지 표시
+- 사진은 나중에 Step 5에서 설명을 입력하거나 삭제할 수 있습니다.
 
-### 업로드 프로세스
+---
 
-1.  **루트 선택**: 산 → 루트를 순서대로 선택합니다. 기존에 등록된 사진 목록이 자동으로 로드됩니다.
-2.  **사진 선택**: 업로드 영역을 탭하거나 파일을 드래그&드롭합니다. 여러 장 동시 선택 가능.
-3.  **자동 처리 (클라이언트 사이드)**:
-    -   EXIF GPS 추출 — WebP 변환 **전에** 원본에서 좌표를 읽습니다.
-    -   Canvas API로 가로 최대 1200px 리사이징 + WebP 80% 품질 변환.
-    -   처리된 파일을 서버로 전송합니다.
-4.  **서버 처리**:
-    -   Supabase Storage에 WebP 저장 (`waypoints` 버킷 / `photos/{routeId}/` 경로).
-    -   GPS 좌표가 있으면 루트의 모든 구간 트랙과 Haversine 거리 비교 → 100m 이내 가장 가까운 구간에 자동 매핑.
-5.  **설명 입력**: 업로드 완료 후 각 사진 카드에서 영문/국문 설명 입력 후 **Save Description** 클릭.
+### 4단계: Waypoint 지정
 
-### GPS 매핑 규칙
+GPS 트랙의 자동 분리 기준점이 되는 Waypoint를 **순서대로** 추가합니다.
 
-| 조건 | 처리 |
+#### 추가 순서 (일반적인 경우)
+```
+출발역 → [버스 정류장] → 상행 트레일헤드 → 정상 → 하행 트레일헤드 → [버스 정류장] → 도착역
+```
+버스가 없는 경우 버스 정류장은 생략합니다.
+
+#### Waypoint 등록 방법 — 2가지
+
+**① 이 산에 기존 등록된 Waypoint 선택**
+- "Existing" 탭 선택 후 드롭다운에서 고릅니다.
+- 해당 산에 등록된 Waypoint 목록이 자동으로 표시됩니다.
+
+**② 새로 등록**
+- "New waypoint" 탭 선택
+- **사진에서 GPS 좌표 추출**: "Pick a photo" 버튼으로 Step 3에서 올린 사진 중 해당 지점에서 찍은 사진을 선택하면 EXIF GPS가 좌표 필드에 자동 입력됩니다.
+- EXIF GPS가 없는 경우 좌표를 직접 입력합니다.
+- 타입, 이름(EN/KO), 고도를 입력합니다.
+
+#### 타입별 추가 입력 항목
+
+| 타입 | 추가 항목 |
 |---|---|
-| GPS 있음 + 경로 100m 이내 | 해당 구간에 자동 매핑 (초록색 "auto-mapped" 표시) |
-| GPS 있음 + 경로 100m 초과 | 구간 미지정 — 드롭다운으로 수동 선택 |
-| GPS 없음 | 구간 미지정 — 드롭다운으로 수동 선택 |
+| Station | 지하철 노선, 역 이름, 출구 번호 |
+| Bus Stop | ARS ID, 버스 번호, 버스 색상(간선/지선/광역/순환), 탑승 소요시간(분) |
+| Trailhead / Summit / Junction / Shelter | 없음 (기본 정보만) |
 
-> **팁**: EXIF GPS가 없는 사진(스크린샷, 편집본 등)도 업로드 후 구간을 수동으로 지정하면 지도에 표시됩니다.
+#### 저장 시 자동 처리
+- GPS 트랙이 각 Waypoint 좌표를 기준으로 **자동 분리**됩니다.
+- 출발역·도착역 바깥 구간은 자동으로 제거됩니다.
+- Segment 타입이 자동 추론됩니다:
 
-### 하이커 뷰에서의 표시
+| Waypoint 연결 패턴 | Segment 타입 |
+|---|---|
+| Station → Trailhead | APPROACH |
+| Station → **Bus Stop** → Trailhead | APPROACH (is_bus_combined = true) |
+| Trailhead → Summit | ASCENT |
+| Summit → Trailhead | DESCENT |
+| Trailhead → Station | RETURN |
+| Trailhead → **Bus Stop** → Station | RETURN (is_bus_combined = true) |
 
--   **지도(MapView)**: 앰버(황금색) 원형 카메라 마커. 탭하면 사진 팝업 오픈.
--   **고도 그래프(ElevationChart)**: 해당 거리 지점에 카메라 dot + 세로 점선. 탭하면 동일 팝업 오픈.
--   **팝업**: 사진 전체 표시 + 영문/국문 설명.
+버스 복합 Segment의 경우:
+- **bus_track_data** = Station→Bus Stop 구간 (버스 이동)
+- **track_data** = Bus Stop→Trailhead 구간 (도보 이동)
+
+---
+
+### 5단계: 사진 캡션 (선택)
+
+업로드된 사진 각각에 EN/KO 설명을 입력합니다.
+- 이 단계는 건너뛰어도 됩니다. 저장 후 기존 Photo Upload 카드에서 편집 가능합니다.
+
+---
+
+### 6단계: 루트 저장
+
+- **Route 이름 (EN/KO)**
+- **난이도 (1–5)** 선택
+- "Create Route" 버튼 클릭
+
+저장 순서:
+1. 신규 Waypoint 생성 → Segment 분리 생성 → Route 생성 (`POST /api/admin/create-route`)
+2. 사진 업로드 + GPS 기반 Segment 자동 매핑 (`POST /api/admin/route-photos`)
+
+---
+
+## 🛠 기존 방식: 수동 4단계 (`/admin`)
+
+개별 Waypoint / Segment / Route 를 직접 편집하거나 기존 루트를 수정할 때 사용합니다.
+
+### Step 1: 거점 관리 (Manage Waypoints)
+- 타입: STATION, BUS_STOP, TRAILHEAD, SUMMIT, JUNCTION, SHELTER
+- EXIF가 있는 사진 업로드 시 위도/경도 자동 입력
+
+### Step 2: 구간 업로드 (Upload Segment)
+- GPX / GeoJSON 파일을 구간별로 업로드
+- 버스+도보 복합 경로: "Add Bus Route" 체크 → 버스 GPS / 도보 GPS 각각 업로드
+
+### Step 3: 루트 빌더 (Build Route)
+- 구간들을 순서대로 조합 (`Approach → Ascent → Descent → Return`)
+- 거리·시간·난이도 자동 합산
+
+### Step 4: 사진 업로드 (Photo Upload)
+- EXIF GPS 기반 100m 이내 Segment 자동 매핑
+- 설명 입력, 순서 조정, 삭제
 
 ---
 
 ## 💾 기술 참조 (Technical Reference)
 
 ### 데이터베이스 테이블 (Supabase)
--   `mountains`: 산의 기본 정보.
--   `waypoints`: 7개의 타입을 가진 지점 정보. `ars_id`는 버스 정류장용 필드.
--   `segments`: 최신 `is_bus_combined` 필드가 `true`이면 `bus_details` JSON 내에 경유지 ID와 버스 전용 GPS가 보관됩니다.
--   `routes`: `segment_ids` 배열을 통해 구간을 순서대로 참조합니다.
--   `route_photos`: 루트에 연결된 풍경 사진. `route_id` (필수), `segment_id` (선택), `lat/lon`, `url`, `description_en`, `description_ko`, `order_index` 컬럼. Migration: `supabase/migrations/20260414_add_route_photos.sql`.
 
-### 사진 API 엔드포인트
+| 테이블 | 설명 |
+|---|---|
+| `mountains` | 산의 기본 정보 |
+| `waypoints` | 7종 타입 지점 정보. `ars_id`는 버스 정류장용 |
+| `segments` | `is_bus_combined = true`이면 `bus_details.bus_track_data`에 버스 GPS 보관 |
+| `routes` | `segment_ids` 배열로 구간 순서 참조 |
+| `route_photos` | `route_id`(필수), `segment_id`(선택), GPS, URL, 설명, `order_index` |
+
+### API 엔드포인트
+
+#### 신규 위저드용
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| `GET` | `/api/admin/route-photos?routeId=X` | 루트의 사진 목록 조회 |
-| `POST` | `/api/admin/route-photos` | 사진 업로드 (multipart/form-data) |
-| `PATCH` | `/api/admin/route-photos` | description / segment_id 수정 |
-| `DELETE` | `/api/admin/route-photos?id=X` | 사진 삭제 (Storage + DB 동시 삭제) |
+| `POST` | `/api/admin/create-route` | Waypoint 생성 + GPS 자동 분리 + Segment + Route 원자적 생성 |
 
-### 슬러그(Slug) 규칙
-세그먼트 슬러그는 `[산-슬러그]-[타입]-[시작점-슬러그]-to-[도착점-슬러그]` 형태로 자동 생성되어 데이터 일관성을 유지합니다.
+**Request body (JSON):**
+```json
+{
+  "mountainId": 1,
+  "routeNameEn": "Bukhansan Baegundae Beginner",
+  "routeNameKo": "북한산 백운대 초보 코스",
+  "routeDifficulty": 3,
+  "trackPoints": [[lon, lat, ele], ...],
+  "waypointSpecs": [
+    { "existingId": 42 },
+    {
+      "nameEn": "Dobong Bus Stop",
+      "nameKo": "도봉 버스정류장",
+      "type": "BUS_STOP",
+      "lat": 37.689,
+      "lon": 127.047,
+      "arsId": "22194",
+      "busNumbers": "704",
+      "busColor": "#0068B7",
+      "busDurationMin": 20
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{ "routeId": 7, "segmentIds": [12, 13, 14, 15] }
+```
+
+#### 기존 CRUD
+
+| Method | Endpoint | 설명 |
+|---|---|---|
+| `GET/POST/PATCH/DELETE` | `/api/admin/waypoints` | Waypoint CRUD |
+| `GET/POST/PATCH/DELETE` | `/api/admin/segments` | Segment CRUD + GPX 파싱 |
+| `GET/POST/PATCH/DELETE` | `/api/admin/routes` | Route CRUD |
+| `GET/POST/PATCH/DELETE` | `/api/admin/route-photos` | 사진 업로드 / 설명 수정 / 삭제 |
+
+### bus_details JSONB 구조
+
+```json
+{
+  "bus_stop_id_key": "42",
+  "bus_numbers":     ["704", "34"],
+  "route_color":     "#0068B7",
+  "bus_track_data":  { "type": "LineString", "coordinates": [[lon, lat, ele], ...] },
+  "bus_duration_min": 20
+}
+```
+
+### Segment 슬러그 규칙
+
+`{mountain}-{direction}-{type}-{start}-{end}`
+
+예: `bukhansan-go-apr-dobongsan-station-dobong-trailhead`
+
+### 사진 GPS 매핑 규칙
+
+| 조건 | 처리 |
+|---|---|
+| GPS 있음 + 경로 100m 이내 | 해당 Segment에 자동 매핑 (green "auto-mapped") |
+| GPS 있음 + 경로 100m 초과 | Segment 미지정 — 드롭다운으로 수동 선택 |
+| GPS 없음 | Segment 미지정 — 드롭다운으로 수동 선택 |
+
+### 마이그레이션 파일 위치
+
+`supabase/migrations/` 아래 날짜순 정렬. 주요 파일:
+- `20260402_redesign_schema.sql` — 4-테이블 구조
+- `20260411_bus_tracking.sql` — is_bus_combined, bus_details
+- `20260414_add_route_photos.sql` — route_photos 테이블

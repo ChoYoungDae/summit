@@ -1,7 +1,7 @@
 "use client";
 
 import { type Waypoint } from "@/types/trail";
-import { t } from "@/lib/i18n";
+import { tDB } from "@/lib/i18n";
 import { DualText } from "./DualText";
 
 interface Props {
@@ -15,9 +15,9 @@ export default function GuideCard({ waypoint, locale = "en" }: Props) {
     ? "var(--color-primary)"    // urgent at junctions
     : "var(--color-secondary)"; // informational
 
-  const primaryName = t(waypoint.name, locale);
+  const primaryName = tDB(waypoint.name, locale);
   const koName = locale !== "ko" ? waypoint.name.ko : undefined;
-  const desc = waypoint.description ? t(waypoint.description, locale) : undefined;
+  const desc = waypoint.description ? tDB(waypoint.description, locale) : undefined;
 
   return (
     <div className="mx-3 mt-0 mb-2 rounded-xl bg-[var(--color-card)] border border-[var(--color-border)] overflow-hidden shadow-sm">

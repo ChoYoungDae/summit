@@ -1,3 +1,4 @@
+import Link from "next/link";
 import WaypointManagerCard from "./WaypointManagerCard";
 import SegmentUploadCard from "./SegmentUploadCard";
 import RouteBuilderCard from "./RouteBuilderCard";
@@ -14,6 +15,13 @@ export default function AdminPage() {
           Build routes: add waypoints → upload GPX segments → compose routes.
         </p>
       </section>
+
+      <Link
+        href="/admin/new-route"
+        className="flex items-center justify-center gap-2 rounded-2xl border-2 border-primary text-primary py-3 text-sm font-semibold hover:bg-primary/5 transition-colors"
+      >
+        + Create New Route (Guided Wizard)
+      </Link>
 
       {/* Step 1: Waypoints */}
       <WaypointManagerCard />

@@ -12,7 +12,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Waypoint, RoutePhoto } from "@/types/trail";
 import { Footprints, GitFork, Camera, Flag, TrainFront, Bus } from "lucide-react";
 import { Icon } from "@iconify/react";
-import { t } from "@/lib/i18n";
+import { tDB, tUI } from "@/lib/i18n";
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
 const COLOR_BUS          = "#FF7A00"; // Bright Orange
@@ -95,7 +95,7 @@ const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Re
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const OFF_ROUTE_M      = 50;
-const GPS_POLL_MS      = 6_000;
+const GPS_ACCURACY_M   = 150; // ignore fixes worse than this
 const WAYPOINT_ALERT_M = 40;
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ function StationMarker({
 
   return (
     <div
-      title={t(wpt.name, locale)}
+      title={tDB(wpt.name, locale)}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -221,7 +221,7 @@ function WaypointDot({
   const Icon = s.IconComponent;
   return (
     <div
-      title={t(wpt.name, locale)}
+      title={tDB(wpt.name, locale)}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       style={{
         background: s.bg,
@@ -250,12 +250,12 @@ function WaypointDot({
 
 function waypointAlertMessage(wpt: Waypoint, locale: string): string {
   const ui = UI_STRINGS[locale] ?? UI_STRINGS.en;
-  const wptName = t(wpt.name, locale);
+  const primaryName = tDB(wpt.name, locale);
   switch (wpt.type) {
     case "JUNCTION":  return ui.alert.JUNCTION;
-    case "SUMMIT":    return `${ui.alert.SUMMIT} — ${wptName}`;
-    case "TRAILHEAD": return `${ui.alert.TRAILHEAD} — ${wptName}`;
-    default:          return wptName;
+    case "SUMMIT":    return `${ui.alert.SUMMIT} — ${primaryName}`;
+    case "TRAILHEAD": return `${ui.alert.TRAILHEAD} — ${primaryName}`;
+    default:          return primaryName;
   }
 }
 
@@ -348,30 +348,42 @@ function GpsArrow({
   isOffRoute: boolean;
 }) {
   return (
-    <div
-      style={{
-        width: 28,
-        height: 28,
-        pointerEvents: "none",
-        transform: `rotate(${rotation}deg)`,
-        transformOrigin: "50% 50%",
-        transition: "transform 0.2s linear",
-      }}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        width="28"
-        height="28"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M12 2 L20 20 L12 15 L4 20 Z"
-          fill={isOffRoute ? COLOR_GPS_OFF : COLOR_GPS}
-          stroke="white"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
+    <div className="relative flex items-center justify-center">
+      {/* Pulse background */}
+      {!isOffRoute && (
+        <div
+          className="absolute w-6 h-6 rounded-full"
+          style={{
+            background: COLOR_GPS,
+            animation: "gpsPulse 2s ease-out infinite",
+          }}
         />
-      </svg>
+      )}
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          pointerEvents: "none",
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: "50% 50%",
+          transition: "transform 0.2s linear",
+        }}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="28"
+          height="28"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M12 2 L20 20 L12 15 L4 20 Z"
+            fill={isOffRoute ? COLOR_GPS_OFF : COLOR_GPS}
+            stroke="white"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
     </div>
   );
 }
@@ -469,11 +481,12 @@ export default function MapView({
   const [mapBearing, setMapBearing] = useState(0);
   const [mapError,   setMapError]   = useState<string | null>(null);
   const [gpsError,   setGpsError]   = useState<string | null>(null);
+  const [hasCenteredOnStart, setHasCenteredOnStart] = useState(false);
 
   // Refs for stable interval/closure access
   const isTrackingRef   = useRef(false);
   const isHikingRef     = useRef(isHiking);
-  const gpsIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gpsWatchRef     = useRef<number | null>(null);
   const trackRef        = useRef(track); // stable reference for interval closure
 
   // Keep isHikingRef in sync with prop; reset off-route when hiking stops
@@ -481,6 +494,7 @@ export default function MapView({
     isHikingRef.current = isHiking;
     if (!isHiking) {
       setIsOffRoute(false);
+      setHasCenteredOnStart(false);
       // Finish — return to full-route overview
       if (isMapLoaded && mapRef.current) {
         setIsTracking(false);
@@ -498,12 +512,19 @@ export default function MapView({
     // Hiking just started — center map on user's GPS position if available
     if (gpsPos && isMapLoaded && mapRef.current) {
       mapRef.current.easeTo({ center: gpsPos, zoom: 16, duration: 700 });
-    } else {
-      // No GPS fix yet — trigger an immediate poll so we get one quickly
-      pollGps();
+      setHasCenteredOnStart(true);
     }
+    // watchPosition is always running — no manual poll needed
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking]);
+  }, [isHiking, isMapLoaded]);
+
+  // Handle delayed GPS centering after hike starts
+  useEffect(() => {
+    if (isHiking && !hasCenteredOnStart && gpsPos && isMapLoaded && mapRef.current) {
+      mapRef.current.easeTo({ center: gpsPos, zoom: 16, duration: 700 });
+      setHasCenteredOnStart(true);
+    }
+  }, [isHiking, hasCenteredOnStart, gpsPos, isMapLoaded]);
 
   // ── Derived: bounds + center + GeoJSON ─────────────────────────────────────
   const { bounds } = useMemo(() => {
@@ -609,31 +630,20 @@ export default function MapView({
     };
   }, [track, summitTrackIndex]);
 
-  // ── GPS polling ─────────────────────────────────────────────────────────────
-  const pollGps = useCallback(() => {
-    if (!("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude: lat, longitude: lon, heading, speed } = pos.coords;
-        setGpsPos([lon, lat]);
-        if (isHikingRef.current) {
-          setIsOffRoute(checkOffRoute(lat, lon, trackRef.current));
-        }
-        if (heading !== null && speed !== null && speed > 0.5) {
-          setGpsHeading(heading);
-          if (isTrackingRef.current) {
-            mapRef.current?.easeTo({ bearing: heading });
-          }
-        }
-      },
-      (err) => {
-        console.warn("[GPS]", err.message);
-        if (err.message.includes("secure origins") || err.code === 1) {
-          setGpsError((UI_STRINGS[locale] ?? UI_STRINGS.en).gpsHttps);
-        }
-      },
-      { enableHighAccuracy: true, maximumAge: GPS_POLL_MS, timeout: 20_000 },
-    );
+  // ── GPS watch ────────────────────────────────────────────────────────────────
+  const handleGpsPos = useCallback((pos: GeolocationPosition) => {
+    const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
+    if (accuracy > GPS_ACCURACY_M) return; // skip imprecise fixes
+    setGpsPos([lon, lat]);
+    if (isHikingRef.current) {
+      setIsOffRoute(checkOffRoute(lat, lon, trackRef.current));
+    }
+    if (heading !== null && speed !== null && speed > 0.5) {
+      setGpsHeading(heading);
+      if (isTrackingRef.current) {
+        mapRef.current?.easeTo({ bearing: heading });
+      }
+    }
   }, []); // stable — only touches refs and state setters
 
   const handleMapLoad = useCallback(() => {
@@ -649,11 +659,22 @@ export default function MapView({
       padding: { top: 100, left: 40, right: 40, bottom: bottomPadding + 40 },
       maxZoom: 15,
     });
-    pollGps();
-    gpsIntervalRef.current = setInterval(pollGps, GPS_POLL_MS);
+
+    if ("geolocation" in navigator) {
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        handleGpsPos,
+        (err) => {
+          console.warn("[GPS]", err.message);
+          if (err.message.includes("secure origins") || err.code === 1) {
+            setGpsError((UI_STRINGS[locale] ?? UI_STRINGS.en).gpsHttps);
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 3_000, timeout: 20_000 },
+      );
+    }
   // bottomPadding is intentionally excluded — only matters at load time
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bounds, pollGps]);
+  }, [bounds, handleGpsPos]);
 
   // Animate map camera padding as the bottom sheet rises / falls
   useEffect(() => {
@@ -664,12 +685,12 @@ export default function MapView({
     });
   }, [bottomPadding, isMapLoaded]);
 
-  // Cleanup GPS interval on unmount
+  // Cleanup GPS watch on unmount
   useEffect(() => {
     return () => {
-      if (gpsIntervalRef.current !== null) {
-        clearInterval(gpsIntervalRef.current);
-        gpsIntervalRef.current = null;
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+        gpsWatchRef.current = null;
       }
     };
   }, []);
@@ -732,6 +753,7 @@ export default function MapView({
     if (!isMapLoaded || !mapRef.current || selectedWaypointIndex == null) return;
     const wpt = waypoints[selectedWaypointIndex];
     if (!wpt) return;
+    const desc = wpt.description ? tDB(wpt.description, locale) : undefined;
     mapRef.current.easeTo({ center: [wpt.lon, wpt.lat], zoom: 15, duration: 600 });
   }, [selectedWaypointIndex, waypoints, isMapLoaded]);
 

@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { X } from "lucide-react";
 import type { Waypoint } from "@/types/trail";
-import { t } from "@/lib/i18n";
+import { tDB, tUI } from "@/lib/i18n";
 
 interface Props {
   waypoints: Waypoint[];
@@ -42,14 +42,15 @@ export default function WaypointSheet({
   const wpt = waypoints[selectedIndex];
   if (!wpt) return null;
 
-  const name    = t(wpt.name, locale);
+  const name    = tDB(wpt.name, locale);
+  const typeKey = `wpt_${wpt.type.toLowerCase()}`;
   const koName  = locale !== "ko" ? wpt.name.ko : undefined;
-  const desc    = t(wpt.description, locale);
+  const desc    = tDB(wpt.description, locale);
   const hasPhoto = !!wpt.imageUrl;
 
   const canPrev = selectedIndex > 0;
   const canNext = selectedIndex < waypoints.length - 1;
-  const typeLbl = TYPE_LABEL[wpt.type] ?? wpt.type;
+  const typeLbl = tUI(typeKey as any, locale) ?? TYPE_LABEL[wpt.type] ?? wpt.type;
   const typeClr = TYPE_COLOR[wpt.type] ?? "#2E5E4A";
 
   function handleSwipeStart(e: React.TouchEvent) {
