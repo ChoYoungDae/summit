@@ -295,13 +295,13 @@ export default function SettingsPage() {
             className="text-sm font-bold tabular-nums"
             style={{ color: "var(--color-text-muted)" }}
           >
-            0.1.0
+            1.0.0
           </span>
         </div>
 
         {/* Feedback */}
         <Link
-          href="https://docs.google.com/forms/d/e/1FAIpQLSfuIAIdYil3vwRWOWBzrnxexNv_wcdvC24yN2-EhfPZM9JplQ/viewform?usp=sf_link" 
+          href="https://docs.google.com/forms/d/e/1FAIpQLSfuIAIdYil3vwRWOWBzrnxexNv_wcdvC24yN2-EhfPZM9JplQ/viewform?usp=sf_link&embedded=true"
           target="_blank"
           className="px-4 py-3.5 flex items-center justify-between hover:bg-[var(--color-bg-light)] transition-colors"
         >
