@@ -8,10 +8,10 @@ const CHANGE_EVENT = "language-change";
 
 export const LANGUAGES: { locale: SupportedLocale; label: string }[] = [
   { locale: "en", label: "English" },
-  { locale: "ko", label: "한국어" },
   { locale: "zh", label: "中文" },
   { locale: "ja", label: "日本語" },
   { locale: "es", label: "Español" },
+  { locale: "ko", label: "한국어" },
 ];
 
 export function useLanguage() {
