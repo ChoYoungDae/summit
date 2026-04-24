@@ -18,7 +18,7 @@ import { Icon } from "@iconify/react";
 const COLOR_ASCENT   = "#10B981"; // Emerald green — climbing
 const COLOR_DESCENT  = "#8B5CF6"; // Purple — descending
 const COLOR_BUS       = "#FF7A00"; // Bright Orange
-const COLOR_WALK     = "#94A3B8"; // Slate gray — non-bus approach/return
+// COLOR_WALK reserved for future use
 const COLOR_ACTIVE   = "#C8362A"; // Dancheong Red — hover / GPS cursor
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -138,12 +138,10 @@ function NodeIconLabel({
   viewBox,
   segType,
   isBus,
-  busColor,
 }: {
   viewBox?: { x: number; y: number; width: number; height: number };
   segType: SegmentType;
   isBus: boolean;
-  busColor?: string;
 }) {
   if (!viewBox) return null;
   const { x } = viewBox;
@@ -290,17 +288,18 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ElevationChart({ segments, onHover, highlightTrackIndex, photos = [], onPhotoClick }: Props) {
+  const nonBusSegments = useMemo(() => segments.filter((s) => !s.isBus), [segments]);
   const { data, trackIndexMap, boundaries } = useMemo(
-    () => buildData(segments),
-    [segments]
+    () => buildData(nonBusSegments),
+    [nonBusSegments]
   );
   const rafRef = useRef<number | null>(null);
 
-  const approachSeg = segments.find((s) => s.type === "APPROACH");
-  const returnSeg   = segments.find((s) => s.type === "RETURN");
+  const approachSeg = nonBusSegments.find((s) => s.type === "APPROACH");
+  const returnSeg   = nonBusSegments.find((s) => s.type === "RETURN");
 
-  const approachColor = approachSeg?.isBus ? COLOR_BUS : COLOR_ASCENT;
-  const returnColor   = returnSeg?.isBus   ? COLOR_BUS : COLOR_DESCENT;
+  const approachColor = COLOR_ASCENT;
+  const returnColor   = COLOR_DESCENT;
 
   useEffect(
     () => () => {
@@ -367,33 +366,12 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
       style={{ minHeight: "140px", background: "#F2F2F5" }}
       onTouchEnd={handleLeave}
     >
-      {/* Header row */}
-      <div className="flex items-center justify-between px-2 mb-1">
-        <p
-          className="text-[0.7rem] leading-none"
-          style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-en)" }}
-        >
-          Elevation Profile
-        </p>
-        {/* Inline legend */}
-        <div className="flex items-center gap-2.5">
-          {hasApproach && (
-            <LegendDash
-              color={approachColor}
-              dashed={approachSeg?.isBus}
-              label={approachSeg?.isBus ? "Bus" : "Walk"}
-            />
-          )}
-          {hasAscent  && <LegendDash color={COLOR_ASCENT}  label="Ascent"  />}
-          {hasDescent && <LegendDash color={COLOR_DESCENT} label="Descent" />}
-          {hasReturn  && (
-            <LegendDash
-              color={returnColor}
-              dashed={returnSeg?.isBus}
-              label={returnSeg?.isBus ? "Bus" : "Walk"}
-            />
-          )}
-        </div>
+      {/* Inline legend */}
+      <div className="flex items-center justify-end gap-2.5 px-2 mb-1">
+        {hasApproach && <LegendDash color={approachColor} dashed label="Walk" />}
+        {hasAscent   && <LegendDash color={COLOR_ASCENT}  label="Ascent"  />}
+        {hasDescent  && <LegendDash color={COLOR_DESCENT} label="Descent" />}
+        {hasReturn   && <LegendDash color={returnColor}   dashed label="Walk" />}
       </div>
 
       {data.length > 0 ? (
@@ -460,13 +438,13 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                 />
               )}
 
-              {/* ── Approach segment ── */}
+              {/* ── Approach segment (walk — dashed) ── */}
               <Area
                 type="monotone"
                 dataKey="eleApproach"
                 stroke={approachColor}
-                strokeWidth={approachSeg?.isBus ? 2.5 : 1.5}
-                strokeDasharray={approachSeg?.isBus ? "8 5" : undefined}
+                strokeWidth={1.5}
+                strokeDasharray="8 5"
                 strokeLinecap="round"
                 fill="none"
                 dot={false}
@@ -503,13 +481,13 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                 connectNulls={false}
               />
 
-              {/* ── Return segment ── */}
+              {/* ── Return segment (walk — dashed) ── */}
               <Area
                 type="monotone"
                 dataKey="eleReturn"
                 stroke={returnColor}
-                strokeWidth={returnSeg?.isBus ? 2.5 : 1.5}
-                strokeDasharray={returnSeg?.isBus ? "8 5" : undefined}
+                strokeWidth={1.5}
+                strokeDasharray="8 5"
                 strokeLinecap="round"
                 fill="none"
                 dot={false}
@@ -531,7 +509,6 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                     <NodeIconLabel
                       segType={b.segType}
                       isBus={b.isBus}
-                      busColor={b.busColor}
                     />
                   }
                 />

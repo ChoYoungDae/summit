@@ -3,6 +3,7 @@ import WaypointManagerCard from "./WaypointManagerCard";
 import SegmentUploadCard from "./SegmentUploadCard";
 import RouteBuilderCard from "./RouteBuilderCard";
 import PhotoUploadCard from "./PhotoUploadCard";
+import RouteEditCard from "./RouteEditCard";
 
 export default function AdminPage() {
   return (
@@ -34,6 +35,9 @@ export default function AdminPage() {
 
       {/* Step 4: Photo upload */}
       <PhotoUploadCard />
+
+      {/* Route content editing */}
+      <RouteEditCard />
     </div>
   );
 }

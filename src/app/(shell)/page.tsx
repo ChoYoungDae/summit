@@ -35,36 +35,30 @@ export default function HomePage() {
     },
   ];
 
-  const title = tUI("homeTitle", locale);
-  const highlightedTitle = title.split(/(Seoul|Subway|서울|지하철)/g).map((part, i) => {
-    if (["Seoul", "Subway", "서울", "지하철"].includes(part)) {
-      return (
-        <span key={i} style={{ color: "var(--color-secondary)" }}>
-          {part}
-        </span>
-      );
-    }
-    return part;
-  });
-
   return (
     <div className="flex flex-col gap-6 p-4 pb-8">
       {/* ── Intro ─────────────────────────────────────────────── */}
       <section className="pt-2 flex flex-col gap-6">
-        <div>
-          <h1
-            className="text-[1.125rem] font-bold leading-snug text-[var(--color-text-primary)]"
-            style={{ fontFamily: "var(--font-en)" }}
-          >
-            {highlightedTitle}
-          </h1>
-          <div className="mt-2 flex flex-col gap-1">
-            <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed">
-              {tUI("homeSubtitle", locale)}
-            </p>
-            <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed">
-              {tUI("homeDescription", locale)}
-            </p>
+        <div className="flex flex-col gap-3">
+          <div>
+            <h1
+              className="text-[1.625rem] font-bold leading-tight text-[var(--color-text-primary)] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-en)" }}
+            >
+              {locale === "en" ? (
+                <>Start Your <em style={{ color: "var(--color-primary)" }}>Hike</em> from the{" "}<span style={{ color: "var(--color-secondary)" }}>Subway</span>.</>
+              ) : (
+                tUI("homeTitle", locale)
+              )}
+            </h1>
+            <div className="mt-2 flex flex-col gap-0.5">
+              <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed whitespace-nowrap">
+                {tUI("homeSubtitle", locale)}
+              </p>
+              <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed whitespace-nowrap">
+                {tUI("homeDescription", locale)}
+              </p>
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { fetchRoute } from "@/lib/trails";
+import { getCachedRoute } from "@/lib/trails";
 import { fetchSunsetMin } from "@/lib/sunset";
 import { tDB, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import { cookies, headers } from "next/headers";
@@ -89,9 +89,9 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
     || DEFAULT_LANGUAGE;
 
   const [route, sunsetMin] = await Promise.all([
-    fetchRoute(routeId),
+    getCachedRoute(routeId),
     fetchSunsetMin(),
-  ]);
+  ]) as [ResolvedRoute | null, number | null];
   if (!route) return null;
 
   const track = buildHikingTrack(route);

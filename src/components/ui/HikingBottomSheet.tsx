@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import ElevationChart from "./ElevationChart";
 import type { SegmentElevationInfo } from "./ElevationChart";
@@ -23,12 +24,12 @@ export const MIN_H = 88; // px — visible height at min snap
 
 function snapTranslateY(snap: Snap, vh: number): number {
   if (snap === "min") return vh - MIN_H;
-  return Math.min(vh * 0.75, vh - MIN_H); // mid: 25% visible height, map stays dominant
+  return Math.min(vh * 0.60, vh - MIN_H); // mid: 40% visible height
 }
 
 function snapVisibleH(snap: Snap, vh: number): number {
   if (snap === "min") return MIN_H;
-  return Math.max(vh * 0.25, MIN_H);
+  return Math.max(vh * 0.40, MIN_H);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -56,6 +57,11 @@ interface Props {
   onSheetHeightChange?: (heightPx: number) => void;
   photos?: RoutePhoto[];
   onPhotoClick?: (photo: RoutePhoto) => void;
+  showOffRoutePrompt?: boolean;
+  offRouteEnabled?: boolean;
+  onToggleOffRoute?: () => void;
+  onConfirmStart?: () => void;
+  onCancelPrompt?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -71,6 +77,11 @@ export default function HikingBottomSheet({
   onSheetHeightChange,
   photos = [],
   onPhotoClick,
+  showOffRoutePrompt = false,
+  offRouteEnabled = true,
+  onToggleOffRoute,
+  onConfirmStart,
+  onCancelPrompt,
 }: Props) {
   const [snap, setSnap] = useState<Snap>("min");
   const [liveY, setLiveY] = useState<number | null>(null);
@@ -79,6 +90,7 @@ export default function HikingBottomSheet({
   const baseY       = useRef(0);
   const isDragging  = useRef(false);
 
+  const pathname = usePathname();
   const { skill } = useHikingLevel();
   const { locale } = useLanguage();
 
@@ -156,7 +168,7 @@ export default function HikingBottomSheet({
       ? `translateY(${liveY}px)`
       : snap === "min"
       ? `translateY(calc(100vh - ${MIN_H}px))`
-      : `translateY(75vh)`;
+      : `translateY(60vh)`;
 
   const transition =
     liveY !== null ? "none" : "transform 0.32s cubic-bezier(0.32,0.72,0,1)";
@@ -238,12 +250,48 @@ export default function HikingBottomSheet({
                 {tUI("endHike", locale)}
               </button>
             </div>
+          ) : showOffRoutePrompt ? (
+            /* Case 2: off-route alert confirmation before starting */
+            <div className="flex flex-col gap-3 w-full">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold" style={{ color: "var(--color-text-body)" }}>
+                  {tUI("offRouteAlertLabel", locale)}
+                </span>
+                <button
+                  onClick={onToggleOffRoute}
+                  className="relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200"
+                  style={{ background: offRouteEnabled ? "var(--color-primary)" : "#D1D5DB" }}
+                  aria-label="Toggle off-route alert"
+                >
+                  <span
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+                    style={{ transform: offRouteEnabled ? "translateX(26px)" : "translateX(2px)" }}
+                  />
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={onCancelPrompt}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold"
+                  style={{ background: "var(--color-bg-light)", color: "var(--color-text-muted)" }}
+                >
+                  {tUI("cancel", locale)}
+                </button>
+                <button
+                  onClick={onConfirmStart}
+                  className="flex-1 py-2 rounded-xl text-sm font-bold text-white active:scale-95 transition-transform"
+                  style={{ background: "var(--color-primary)" }}
+                >
+                  {tUI("startHiking", locale)}
+                </button>
+              </div>
+            </div>
           ) : (
             /* Pre-hike: Start button + level badge */
             <div className="flex items-center justify-between gap-4">
               {/* Current level chip — taps through to Settings */}
               <Link
-                href="/settings"
+                href={`/settings?returnUrl=${encodeURIComponent(pathname)}`}
                 className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 active:opacity-70 transition-opacity"
                 style={{ background: "var(--color-bg-light)" }}
               >

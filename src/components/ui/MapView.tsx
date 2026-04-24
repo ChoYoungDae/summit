@@ -443,6 +443,10 @@ export interface MapViewProps {
   controlsBottomOffset?: number;
   /** Active locale — drives waypoint labels and alert messages. Defaults to "en". */
   locale?: string;
+  /** Whether off-route alerts are enabled. Defaults to true. */
+  offRouteEnabled?: boolean;
+  /** Called when the user taps the off-route toggle button on the map. */
+  onToggleOffRoute?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -467,6 +471,8 @@ export default function MapView({
   bottomPadding = 0,
   controlsBottomOffset = 88,
   locale = "en",
+  offRouteEnabled = true,
+  onToggleOffRoute,
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -484,10 +490,17 @@ export default function MapView({
   const [hasCenteredOnStart, setHasCenteredOnStart] = useState(false);
 
   // Refs for stable interval/closure access
-  const isTrackingRef   = useRef(false);
-  const isHikingRef     = useRef(isHiking);
-  const gpsWatchRef     = useRef<number | null>(null);
+  const isTrackingRef      = useRef(false);
+  const isHikingRef        = useRef(isHiking);
+  const offRouteEnabledRef = useRef(offRouteEnabled);
+  const gpsWatchRef        = useRef<number | null>(null);
   const trackRef        = useRef(track); // stable reference for interval closure
+
+  // Keep offRouteEnabledRef in sync; clear banner when alert is disabled
+  useEffect(() => {
+    offRouteEnabledRef.current = offRouteEnabled;
+    if (!offRouteEnabled) setIsOffRoute(false);
+  }, [offRouteEnabled]);
 
   // Keep isHikingRef in sync with prop; reset off-route when hiking stops
   useEffect(() => {
@@ -636,7 +649,7 @@ export default function MapView({
     if (accuracy > GPS_ACCURACY_M) return; // skip imprecise fixes
     setGpsPos([lon, lat]);
     if (isHikingRef.current) {
-      setIsOffRoute(checkOffRoute(lat, lon, trackRef.current));
+      setIsOffRoute(offRouteEnabledRef.current && checkOffRoute(lat, lon, trackRef.current));
     }
     if (heading !== null && speed !== null && speed > 0.5) {
       setGpsHeading(heading);
@@ -650,9 +663,18 @@ export default function MapView({
     setIsMapLoaded(true);
     const map = mapRef.current?.getMap();
     if (map) {
-      map.loadImage("/footprint.svg", (error, image) => {
-        if (!error && image) map.addImage("footprint", image);
-      });
+      const svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M9,13.25C9.21,11.23,10.61,9.75,12,8c1.39,1.75,2.79,3.23,3,5.25c0.16,1.46-0.67,2.75-2,2.75S9.84,14.71,9,13.25z M12,2C10.9,2,10,2.9,10,4s0.9,2,2,2s2-0.9,2-2S13.1,2,12,2z M12,18c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,18,12,18z"/></svg>`;
+      const img = new Image(24, 24);
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 24;
+        canvas.height = 24;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0);
+        const imageData = ctx?.getImageData(0, 0, 24, 24);
+        if (imageData && !map.hasImage("footprint")) map.addImage("footprint", imageData);
+      };
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`;
     }
 
     mapRef.current?.fitBounds(bounds, {
@@ -1179,6 +1201,28 @@ export default function MapView({
           </div>
         );
       })()}
+
+      {/* Off-route alert toggle — only visible while hiking */}
+      {isHiking && (
+        <button
+          onClick={onToggleOffRoute}
+          aria-label={offRouteEnabled ? "Off-route alert on — tap to disable" : "Off-route alert off — tap to enable"}
+          className="absolute right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
+          style={{
+            bottom: controlsBottomOffset + 52,
+            transition: controlsTransition,
+            background: offRouteEnabled ? "var(--color-primary)" : "rgba(255,255,255,0.92)",
+            border: offRouteEnabled ? "none" : "1px solid rgba(0,0,0,0.1)",
+          }}
+        >
+          <Icon
+            icon={offRouteEnabled ? "ph:bell-ringing" : "ph:bell-slash"}
+            width={18}
+            height={18}
+            color={offRouteEnabled ? "#fff" : "#6B7280"}
+          />
+        </button>
+      )}
 
       {/* Compass / auto-rotate button — floats just above the bottom sheet */}
       <button

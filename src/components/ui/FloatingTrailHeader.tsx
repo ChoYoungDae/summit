@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, AlertTriangle, Mountain, Flag, Train } from "lucide-react";
+import { ChevronLeft, AlertTriangle, Flag, Train } from "lucide-react";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
 import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
@@ -131,7 +131,7 @@ export default function FloatingTrailHeader({
           {!isHiking ? (
             /* PRE-HIKE MODE */
             <>
-              {renderETALine(
+              {latestStartMin != null && renderETALine(
                 tUI("lastSafeStart", locale),
                 latestStartMin,
                 AlertTriangle,

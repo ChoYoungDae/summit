@@ -4,9 +4,12 @@ import Link from "next/link";
 import { Mountain, ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+const KHAKI = "#4A6352";
+const currentMonth = new Date().toLocaleString("en-US", { month: "long" }).toUpperCase();
+
 export function Header() {
   const pathname = usePathname();
-  const isRouteContext = pathname.startsWith("/route");
+  const isRouteContext = pathname.startsWith("/route/");
 
   if (isRouteContext) {
     return (
@@ -20,7 +23,7 @@ export function Header() {
             className="text-[0.9375rem] font-semibold"
             style={{ fontFamily: "var(--font-en)" }}
           >
-            Mountains
+            Home
           </span>
         </Link>
       </header>
@@ -38,6 +41,21 @@ export function Header() {
         style={{ fontFamily: "var(--font-en)" }}
       >
         Seoul Subway to Summit
+      </span>
+      <span
+        className="ml-auto inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em] border"
+        style={{
+          color: "#fff",
+          borderColor: KHAKI,
+          backgroundColor: KHAKI,
+          fontFamily: "var(--font-en)",
+        }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full animate-pulse inline-block shrink-0"
+          style={{ backgroundColor: "#fff" }}
+        />
+        SEOUL, {currentMonth}
       </span>
     </header>
   );

@@ -49,7 +49,51 @@
 
 ---
 
-## 4. 관련 코드 위치
+---
+
+## 4. Start Hiking 플로우
+
+"Start Hiking" 버튼을 눌렀을 때 현재 위치와 등산로 입구(trailhead)까지의 거리를 먼저 확인합니다.
+
+### 거리 기준
+- **경계**: `TRAILHEAD_ACTIVE_M = 500 m`
+
+### Case 1 — 입구에서 500 m 초과 (멀리 있음)
+확인 팝업을 표시합니다.
+- "Start Anyway": 바로 산행 시작 (GPS 추적 활성화)
+- "Cancel": 팝업 닫기
+
+### Case 2 — 입구에서 500 m 이내 (가까이 있음)
+Bottom sheet 안에 **경로 이탈 알림 토글**을 inline으로 표시합니다.
+- 토글 상태를 확인하고 "Start Hiking"을 눌러 산행을 시작합니다.
+- 설정은 `localStorage`(`off-route-alert-enabled` 키)에 저장되어 다음 실행에도 유지됩니다.
+
+### GPS 위치를 얻지 못한 경우
+`navigator.geolocation.getCurrentPosition` 오류 또는 권한 거부 시 거리 체크 없이 바로 산행을 시작합니다.
+
+---
+
+## 5. 경로 이탈 알림 (Off-route Alert)
+
+### 설정
+- **임계 거리**: `useOffRouteSettings`의 `threshold` (기본 30 m, 범위 20–100 m)
+- **활성화 여부**: `useOffRouteSettings`의 `enabled` (기본 `true`)
+  - `localStorage` 키: `off-route-alert-enabled`
+
+### 활성 조건
+`isHiking === true && hikingMode === "active" && offRouteEnabled === true`
+
+### 지도 토글 버튼
+산행 중 지도 우측 나침반 버튼 위에 벨 아이콘 버튼이 표시됩니다.
+- 활성: `ph:bell-ringing` (primary 색)
+- 비활성: `ph:bell-slash` (회색)
+
+---
+
+## 6. 관련 코드 위치
 - 시간 계산 엔진: `src/lib/safetyEngine.ts`
-- 실시간 계산 로직: `src/components/ui/TrailSection.tsx`
-- UI 표시: `src/components/ui/FloatingTrailHeader.tsx`
+- Start Hiking 플로우 · 실시간 계산: `src/components/ui/TrailSection.tsx`
+- Off-route 설정: `src/lib/useOffRouteSettings.ts`
+- UI 표시 (ETA): `src/components/ui/FloatingTrailHeader.tsx`
+- Bottom sheet (Start 플로우 UI): `src/components/ui/HikingBottomSheet.tsx`
+- 지도 토글 버튼: `src/components/ui/MapView.tsx`

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("routes")
-    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start")
+    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, tags, highlights")
     .eq("mountain_id", mountainId)
     .order("id");
 
@@ -68,9 +68,11 @@ export async function PATCH(req: NextRequest) {
     totalDifficulty?: number | null;
     isOneway?: boolean;
     hideSafeStart?: boolean;
+    tags?: { en: string; ko: string }[];
+    highlights?: { type: "highlight" | "pro_tip" | "warning"; text: { en: string; ko: string } }[];
   };
 
-  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart } = body;
+  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, tags, highlights } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
@@ -79,6 +81,8 @@ export async function PATCH(req: NextRequest) {
   if (totalDurationMin != null) updates.total_duration_min = totalDurationMin;
   if (totalDistanceM   != null) updates.total_distance_m   = totalDistanceM;
   if (totalDifficulty  != null) updates.total_difficulty    = totalDifficulty;
+  if (tags !== undefined)       updates.tags              = tags;
+  if (highlights !== undefined) updates.highlights        = highlights;
   // if (isOneway         != null) updates.is_oneway          = isOneway;
   // if (hideSafeStart    != null) updates.hide_safe_start    = hideSafeStart;
 

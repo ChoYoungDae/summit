@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import { SKILL_LEVELS } from "@/lib/hikingLevel";
@@ -64,6 +66,24 @@ const LEVEL_DESC: Record<string, Record<number, string>> = {
   },
 };
 
+// ── Return button (isolated for Suspense boundary) ───────────────────────────
+
+function ReturnButton() {
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl");
+  if (!returnUrl) return null;
+  return (
+    <Link
+      href={returnUrl}
+      className="inline-flex items-center gap-1.5 mb-5 text-sm font-semibold active:opacity-70 transition-opacity"
+      style={{ color: "var(--color-primary)" }}
+    >
+      <Icon icon="ph:check-circle" width={18} height={18} />
+      Done
+    </Link>
+  );
+}
+
 // ── Settings page ─────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -73,6 +93,11 @@ export default function SettingsPage() {
 
   return (
     <div className="px-4 pt-5 pb-8">
+
+      {/* ── Return button ─────────────────────────────────── */}
+      <Suspense>
+        <ReturnButton />
+      </Suspense>
 
       {/* ── Language section ─────────────────────────────────── */}
       <h2

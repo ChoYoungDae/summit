@@ -111,6 +111,8 @@ export interface Route {
   /** Up to 3 hero images shown in the card carousel */
   heroImages?: string[];
   description?: LocalizedText;
+  tags?: { en: string; ko?: string }[];
+  highlights?: { type: "highlight" | "pro_tip" | "warning"; text: LocalizedText }[];
   isOneway?: boolean;
   hideSafeStart?: boolean;
 }

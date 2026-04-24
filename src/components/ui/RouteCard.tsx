@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -10,8 +9,34 @@ import {
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { tDB, tUI } from "@/lib/i18n";
+import type { LocalizedText } from "@/lib/i18n";
 import { formatMinutesAsTime, nowKSTMin } from "@/lib/safetyEngine";
 import type { Route } from "@/types/trail";
+
+const HIGHLIGHT_COLOR = {
+  highlight: "var(--color-primary)",
+  pro_tip:   "#0068B7",
+  warning:   "#C8362A",
+} as const;
+
+const HIGHLIGHT_ICON = {
+  highlight: "●",
+  pro_tip:   "★",
+  warning:   "⚠",
+} as const;
+
+const METRO_COLOR: Record<number | string, string> = {
+  1: "#0052A4",
+  2: "#00A84D",
+  3: "#EF7C1C",
+  4: "#3A8DDE",
+  5: "#8B50A4",
+  6: "#B05B25",
+  7: "#707B03",
+  8: "#E6186C",
+  9: "#BB8C00",
+  "신림": "#3D85C8",
+};
 
 function formatTime(minutes: number, locale: string = "en"): string {
   const h = Math.floor(minutes / 60);
@@ -29,12 +54,10 @@ function formatDistanceKm(metres: number): string {
 
 interface RouteCardProps {
   route: Route;
-  /** Total bus riding time in minutes (sum across all bus-combined segments). */
   busDurationMin?: number;
-  /** Number of segments that involve a bus. */
   busSegmentCount?: number;
-  /** Latest departure time in minutes from midnight (KST). Null = no data. */
   latestStartMin?: number | null;
+  stationInfo?: { name: LocalizedText; lines: (number | string)[] };
   locale?: string;
 }
 
@@ -43,14 +66,11 @@ export default function RouteCard({
   busDurationMin = 0,
   busSegmentCount = 0,
   latestStartMin,
+  stationInfo,
   locale = "en",
 }: RouteCardProps) {
-  const [descExpanded, setDescExpanded] = useState(false);
-
   const isPastLatestStart =
     latestStartMin != null && nowKSTMin() > latestStartMin;
-
-  const description = route.description ? tDB(route.description, locale) : null;
 
   return (
     <div
@@ -60,17 +80,59 @@ export default function RouteCard({
         boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
       }}
     >
-      {/* ── Safety banner ── */}
-      {!route.hideSafeStart && isPastLatestStart && latestStartMin != null && (
+      {/* ── Station + safety banner ── */}
+      {!route.hideSafeStart && latestStartMin != null && (
         <div
-          className="flex items-center gap-2 px-4 py-1.5"
-          style={{ background: "#EF4444" }}
+          className="flex items-center justify-between gap-2 px-3 py-2"
+          style={{ background: "#FFFFFF", borderBottom: "1px solid rgba(0,0,0,0.10)" }}
         >
-          <Icon icon="ph:warning-circle" width={13} height={13} style={{ color: "white" }} />
-          <span className="text-[11px] font-semibold text-white uppercase tracking-wide">
-            {tUI("lastSafeStart", locale)}&nbsp;
-            <span className="font-num">{formatMinutesAsTime(latestStartMin)}</span>
-          </span>
+          {/* Left: subway line circles + station name + shoe icon */}
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            {stationInfo?.lines.map((line) =>
+              typeof line === "string" ? (
+                <span
+                  key={line}
+                  className="inline-flex items-center justify-center rounded-full px-1.5 h-[18px] text-white shrink-0"
+                  style={{ fontSize: "9px", fontWeight: 700, background: METRO_COLOR[line] ?? "#888", fontFamily: "var(--font-ko)" }}
+                >
+                  {line}
+                </span>
+              ) : (
+                <span
+                  key={line}
+                  className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full text-white shrink-0"
+                  style={{ fontSize: "10px", fontWeight: 700, background: METRO_COLOR[line] ?? "#888" }}
+                >
+                  {line}
+                </span>
+              )
+            )}
+            {stationInfo && (
+              <span
+                className="text-[12px] font-semibold truncate"
+                style={{ color: "var(--color-text-body)" }}
+              >
+                {tDB(stationInfo.name, locale)}
+              </span>
+            )}
+            <Icon icon="ph:sneaker" width={14} height={14} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
+          </div>
+          {/* Right: last safe start */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Icon icon="ph:warning-circle" width={12} height={12} style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)" }} />
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              {tUI("lastSafeStart", locale)}
+            </span>
+            <span
+              className="font-num text-[11px] font-bold"
+              style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-body)" }}
+            >
+              {formatMinutesAsTime(latestStartMin)}
+            </span>
+          </div>
         </div>
       )}
 
@@ -131,42 +193,35 @@ export default function RouteCard({
           )}
         </div>
 
-        {/* Safety: last safe start when NOT past deadline */}
-        {!route.hideSafeStart && !isPastLatestStart && latestStartMin != null && (
-          <div className="flex items-center gap-1.5">
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              {tUI("lastSafeStart", locale)}:
-            </span>
-            <span
-              className="font-num text-[11px] font-medium"
-              style={{ color: "var(--color-text-body)" }}
-            >
-              {formatMinutesAsTime(latestStartMin)}
-            </span>
+
+        {/* Tags */}
+        {route.tags && route.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-center">
+            {route.tags.map((tag, i) => (
+              <span
+                key={i}
+                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(46,94,74,0.07)", color: "var(--color-primary)" }}
+              >
+                #{tDB(tag, locale)}
+              </span>
+            ))}
           </div>
         )}
 
-        {/* Description with read-more */}
-        {description && (
-          <div>
-            <p
-              className={`text-sm leading-relaxed ${descExpanded ? "" : "line-clamp-3"}`}
-              style={{ color: "var(--color-text-body)" }}
-            >
-              {description}
-            </p>
-            {!descExpanded && description.length > 120 && (
-              <button
-                onClick={() => setDescExpanded(true)}
-                className="text-sm font-semibold mt-0.5"
-                style={{ color: "var(--color-primary)" }}
-              >
-                {tUI("readMore", locale)}
-              </button>
-            )}
+        {/* Highlights */}
+        {route.highlights && route.highlights.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {route.highlights.map((h, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                <span className="mt-0.5 shrink-0" style={{ color: HIGHLIGHT_COLOR[h.type] }}>
+                  {HIGHLIGHT_ICON[h.type]}
+                </span>
+                <p className="text-sm leading-snug" style={{ color: "var(--color-text-body)" }}>
+                  {tDB(h.text, locale)}
+                </p>
+              </div>
+            ))}
           </div>
         )}
 

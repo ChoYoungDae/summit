@@ -13,6 +13,7 @@ import { useHikingLevel } from "@/lib/useHikingLevel";
 import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
 import { useOffRouteAlert } from "@/lib/useOffRouteAlert";
 import { calcLatestStartMin, nowKSTMin } from "@/lib/safetyEngine";
+import { tUI } from "@/lib/i18n";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Icon } from "@iconify/react";
 import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto } from "@/types/trail";
@@ -115,6 +116,8 @@ export default function TrailSection({
   const [isHiking,              setIsHiking]              = useState(false);
   const [startedAtMin,          setStartedAtMin]          = useState<number | null>(null);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
+  const [showFarConfirm,        setShowFarConfirm]        = useState(false);
+  const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
 
   // ── Route photos ──────────────────────────────────────────────────────────
   const [photos,        setPhotos]        = useState<RoutePhoto[]>([]);
@@ -136,7 +139,7 @@ export default function TrailSection({
   const skillMultiplier = skill.multiplier;
 
   const gps = useHikingGPS({ segments: route.segments, enabled: isHiking });
-  const { threshold: offRouteThreshold } = useOffRouteSettings();
+  const { threshold: offRouteThreshold, enabled: offRouteEnabled, setEnabled: setOffRouteEnabled } = useOffRouteSettings();
 
   // ── Auto-detect Active Mode once near the trailhead ──────────────────────
   useEffect(() => {
@@ -159,11 +162,11 @@ export default function TrailSection({
     }
   }, [isHiking, gps.currentPos, track]);
 
-  // ── Off-route alert (Active Mode only) ────────────────────────────────────
+  // ── Off-route alert (Active Mode only, gated by user toggle) ─────────────
   const offRoute = useOffRouteAlert({
     distanceToPathM: gps.distanceToPathM,
     threshold: offRouteThreshold,
-    enabled: isHiking && hikingMode === "active",
+    enabled: isHiking && hikingMode === "active" && offRouteEnabled,
     nearestTrackIndex: gps.nearestTrackIndex,
   });
 
@@ -306,12 +309,39 @@ export default function TrailSection({
     if (idx !== -1) handleWaypointSelect(idx);
   }, [waypoints, handleWaypointSelect]);
 
+  function startHiking() {
+    setIsHiking(true);
+    setStartedAtMin(nowKSTMin());
+    setShowFarConfirm(false);
+    setShowOffRoutePrompt(false);
+  }
+
   function handleToggleHiking() {
-    setIsHiking((h) => {
-      if (!h) setStartedAtMin(nowKSTMin());
-      else setStartedAtMin(null);
-      return !h;
-    });
+    if (isHiking) {
+      setIsHiking(false);
+      setStartedAtMin(null);
+      return;
+    }
+    if (!navigator.geolocation || track.length === 0) {
+      startHiking();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const trailhead = track[0]!;
+        const dist = getDistance(
+          { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+          { latitude: trailhead[1], longitude: trailhead[0] },
+        );
+        if (dist > TRAILHEAD_ACTIVE_M) {
+          setShowFarConfirm(true);
+        } else {
+          setShowOffRoutePrompt(true);
+        }
+      },
+      () => startHiking(),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 30_000 },
+    );
   }
 
   const nearestWaypoint = hoveredPoint
@@ -344,6 +374,8 @@ export default function TrailSection({
         locale={locale}
         photos={photos}
         onPhotoClick={setActivePhoto}
+        offRouteEnabled={offRouteEnabled}
+        onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
       />
 
       <div
@@ -432,6 +464,52 @@ export default function TrailSection({
         </div>
       )}
 
+      {/* ── Case 1: Far-from-trailhead confirmation popup ─────────────────── */}
+      {showFarConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-4"
+          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}
+          onClick={() => setShowFarConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl p-6"
+            style={{ background: "var(--color-card)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="shrink-0 flex items-center justify-center rounded-full"
+                style={{ width: 36, height: 36, background: "rgba(200,54,42,0.10)" }}
+              >
+                <Icon icon="ph:map-pin-simple-slash" width={20} height={20} style={{ color: "var(--color-secondary)" }} />
+              </div>
+              <p className="text-sm font-bold" style={{ color: "var(--color-secondary)" }}>
+                Not near the trailhead
+              </p>
+            </div>
+            <p className="text-sm mb-5" style={{ color: "var(--color-text-muted)" }}>
+              {tUI("notNearTrail", locale)}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFarConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: "var(--color-bg-light)", color: "var(--color-text-muted)" }}
+              >
+                {tUI("cancel", locale)}
+              </button>
+              <button
+                onClick={startHiking}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white"
+                style={{ background: "var(--color-primary)" }}
+              >
+                {tUI("startAnyway", locale)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <HikingBottomSheet
         isHiking={isHiking}
         onToggleHiking={handleToggleHiking}
@@ -443,6 +521,11 @@ export default function TrailSection({
         onSheetHeightChange={setSheetHeightPx}
         photos={photos}
         onPhotoClick={setActivePhoto}
+        showOffRoutePrompt={showOffRoutePrompt}
+        offRouteEnabled={offRouteEnabled}
+        onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
+        onConfirmStart={startHiking}
+        onCancelPrompt={() => setShowOffRoutePrompt(false)}
       />
 
       {selectedWaypointIndex !== null && waypoints.length > 0 && (

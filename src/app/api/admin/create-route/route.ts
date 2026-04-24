@@ -109,9 +109,11 @@ export async function POST(req: NextRequest) {
       routeDifficulty?: number;
       trackPoints:     TrackPoint[];
       waypointSpecs:   WaypointSpec[];
+      tags?:       { en: string; ko: string }[];
+      highlights?: { type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[];
     };
 
-    const { mountainId, routeNameEn, routeNameKo, routeDifficulty, trackPoints, waypointSpecs } = body;
+    const { mountainId, routeNameEn, routeNameKo, routeDifficulty, trackPoints, waypointSpecs, tags, highlights } = body;
 
     if (!mountainId || !routeNameEn || !trackPoints?.length || !waypointSpecs?.length) {
       return NextResponse.json(
@@ -370,6 +372,8 @@ export async function POST(req: NextRequest) {
         total_duration_min: totalDurationMin,
         total_distance_m:   totalDistanceM,
         ...(routeDifficulty ? { total_difficulty: routeDifficulty } : {}),
+        ...(tags?.length      ? { tags: tags.map((t) => ({ en: t.en, ko: t.ko })) } : {}),
+        ...(highlights?.length ? { highlights: highlights.map((h) => ({ type: h.type, text: { en: h.en, ko: h.ko } })) } : {}),
       })
       .select("id")
       .single();

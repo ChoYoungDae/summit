@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 
 export const OFF_ROUTE_THRESHOLD_KEY = "off-route-alert-threshold";
+export const OFF_ROUTE_ENABLED_KEY   = "off-route-alert-enabled";
 export const OFF_ROUTE_THRESHOLD_DEFAULT = 30;
 export const OFF_ROUTE_THRESHOLD_MIN = 20;
 export const OFF_ROUTE_THRESHOLD_MAX = 100;
@@ -17,6 +18,7 @@ function clamp(v: number): number {
 
 export function useOffRouteSettings() {
   const [threshold, setThresholdState] = useState(OFF_ROUTE_THRESHOLD_DEFAULT);
+  const [enabled,   setEnabledState]   = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem(OFF_ROUTE_THRESHOLD_KEY);
@@ -24,6 +26,8 @@ export function useOffRouteSettings() {
       const n = parseInt(stored, 10);
       if (!isNaN(n)) setThresholdState(clamp(n));
     }
+    const storedEnabled = localStorage.getItem(OFF_ROUTE_ENABLED_KEY);
+    if (storedEnabled !== null) setEnabledState(storedEnabled !== "false");
   }, []);
 
   function setThreshold(m: number) {
@@ -32,5 +36,10 @@ export function useOffRouteSettings() {
     localStorage.setItem(OFF_ROUTE_THRESHOLD_KEY, String(value));
   }
 
-  return { threshold, setThreshold };
+  function setEnabled(v: boolean) {
+    setEnabledState(v);
+    localStorage.setItem(OFF_ROUTE_ENABLED_KEY, String(v));
+  }
+
+  return { threshold, setThreshold, enabled, setEnabled };
 }

@@ -1,9 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import TrailDataLoader from "@/components/ui/TrailDataLoader";
-import { fetchRoute } from "@/lib/trails";
-
-export const dynamic = "force-dynamic";
+import { getCachedRoute } from "@/lib/trails";
 
 export default async function RouteDetailPage({
   params,
@@ -14,7 +12,7 @@ export default async function RouteDetailPage({
   const routeId = parseInt(slug, 10);
   if (isNaN(routeId)) notFound();
 
-  const route = await fetchRoute(routeId);
+  const route = await getCachedRoute(routeId);
   if (!route) notFound();
 
   return (

@@ -118,6 +118,8 @@ export default function NewRoutePage() {
   const [routeNameEn,   setRouteNameEn]   = useState("");
   const [routeNameKo,   setRouteNameKo]   = useState("");
   const [routeDifficulty, setRouteDifficulty] = useState<number>(3);
+  const [tags,       setTags]       = useState<{ en: string; ko: string }[]>([{ en: "", ko: "" }]);
+  const [highlights, setHighlights] = useState<{ type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[]>([{ type: "highlight", en: "", ko: "" }]);
 
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
@@ -251,6 +253,8 @@ export default function NewRoutePage() {
           routeDifficulty: routeDifficulty || undefined,
           trackPoints,
           waypointSpecs,
+          tags:       tags.filter((t) => t.en || t.ko),
+          highlights: highlights.filter((h) => h.en || h.ko),
         }),
       });
       const createData = await createRes.json();
@@ -614,6 +618,113 @@ export default function NewRoutePage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Tags */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className={LABEL}>Hashtags (optional)</p>
+              {tags.length < 3 && (
+                <button
+                  onClick={() => setTags((prev) => [...prev, { en: "", ko: "" }])}
+                  className="text-[11px] text-primary font-semibold"
+                >
+                  + Add
+                </button>
+              )}
+            </div>
+            {tags.map((tag, i) => (
+              <div key={i} className="flex gap-1.5 items-center">
+                <input
+                  className={INPUT}
+                  placeholder="Subway Access"
+                  value={tag.en}
+                  onChange={(e) => {
+                    const next = [...tags];
+                    next[i] = { ...next[i], en: e.target.value };
+                    setTags(next);
+                  }}
+                />
+                <input
+                  className={INPUT}
+                  placeholder="지하철 접근"
+                  value={tag.ko}
+                  onChange={(e) => {
+                    const next = [...tags];
+                    next[i] = { ...next[i], ko: e.target.value };
+                    setTags(next);
+                  }}
+                />
+                {tags.length > 1 && (
+                  <button
+                    onClick={() => setTags((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-[var(--color-text-muted)] hover:text-red-500 flex-none"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Highlights */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className={LABEL}>Highlights (optional)</p>
+              <button
+                onClick={() => setHighlights((prev) => [...prev, { type: "highlight", en: "", ko: "" }])}
+                className="text-[11px] text-primary font-semibold"
+              >
+                + Add
+              </button>
+            </div>
+            {highlights.map((h, i) => (
+              <div key={i} className="flex flex-col gap-1.5 rounded-xl border border-[var(--color-border)] p-3">
+                <div className="flex items-center gap-2">
+                  <select
+                    className="rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs bg-[var(--color-bg-light)] focus:outline-none flex-none"
+                    value={h.type}
+                    onChange={(e) => {
+                      const next = [...highlights];
+                      next[i] = { ...next[i], type: e.target.value as "highlight" | "pro_tip" | "warning" };
+                      setHighlights(next);
+                    }}
+                  >
+                    <option value="highlight">Highlight</option>
+                    <option value="pro_tip">Pro Tip</option>
+                    <option value="warning">Warning</option>
+                  </select>
+                  {highlights.length > 1 && (
+                    <button
+                      onClick={() => setHighlights((prev) => prev.filter((_, j) => j !== i))}
+                      className="ml-auto text-[var(--color-text-muted)] hover:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+                <input
+                  className={INPUT}
+                  placeholder="Best subway access on this mountain."
+                  value={h.en}
+                  onChange={(e) => {
+                    const next = [...highlights];
+                    next[i] = { ...next[i], en: e.target.value };
+                    setHighlights(next);
+                  }}
+                />
+                <input
+                  className={INPUT}
+                  placeholder="이 산에서 지하철 접근성이 가장 좋습니다."
+                  value={h.ko}
+                  onChange={(e) => {
+                    const next = [...highlights];
+                    next[i] = { ...next[i], ko: e.target.value };
+                    setHighlights(next);
+                  }}
+                />
+              </div>
+            ))}
           </div>
 
           {/* Summary */}

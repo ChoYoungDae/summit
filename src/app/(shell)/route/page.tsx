@@ -1,7 +1,10 @@
+import { unstable_cache } from "next/cache";
 import { fetchRouteList } from "@/lib/trails";
-
-export const dynamic = "force-dynamic";
 import { cookies } from "next/headers";
+
+const getCachedRouteList = unstable_cache(fetchRouteList, ["route-list"], {
+  revalidate: 60 * 60, // 1 hour
+});
 import { tDB, tUI, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import type { SupportedLocale } from "@/lib/i18n";
 import { fetchSunsetMin } from "@/lib/sunset";
@@ -64,7 +67,7 @@ export default async function RouteListPage({
   const { mountain: mountainIdParam } = await searchParams;
 
   const [allGroups, sunsetMin] = await Promise.all([
-    fetchRouteList(),
+    getCachedRouteList(),
     fetchSunsetMin(),
   ]);
 
@@ -204,11 +207,25 @@ export default async function RouteListPage({
 
             {/* Route cards */}
             <div className="flex flex-col gap-3 px-4 pt-3">
-              {routes.map(({ route, busDurationMin, busSegmentCount }) => {
+              {routes.map(({ route, busDurationMin, busSegmentCount, waypoints }) => {
                 const latestStartMin =
                   sunsetMin !== null && route.totalDurationMin != null
                     ? calcLatestStartFromDuration(route.totalDurationMin, sunsetMin)
                     : null;
+                const stationWp = waypoints.find((w) => w.type === "STATION");
+                const stationInfo = stationWp
+                  ? {
+                      name: stationWp.name,
+                      lines: (stationWp.subwayLine ?? "")
+                        .split(",")
+                        .map((l) => {
+                          const t = l.trim();
+                          const n = parseInt(t, 10);
+                          return !isNaN(n) && n > 0 ? n : t;
+                        })
+                        .filter((l) => l !== ""),
+                    }
+                  : undefined;
                 return (
                   <RouteCard
                     key={route.id}
@@ -216,6 +233,7 @@ export default async function RouteListPage({
                     busDurationMin={busDurationMin}
                     busSegmentCount={busSegmentCount}
                     latestStartMin={latestStartMin}
+                    stationInfo={stationInfo}
                     locale={locale}
                   />
                 );

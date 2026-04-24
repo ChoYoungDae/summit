@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { supabase } from "./supabase";
 import type {
   Mountain,
@@ -79,6 +80,8 @@ interface RouteRow {
   route_preview_img?: string;
   hero_images?: string[];
   description?: LocalizedText;
+  tags?: { en: string; ko?: string }[];
+  highlights?: { type: "highlight" | "pro_tip" | "warning"; text: LocalizedText }[];
   is_oneway?: boolean;
   hide_safe_start?: boolean;
 }
@@ -145,6 +148,8 @@ function rowToRoute(row: RouteRow): Route {
     routePreviewImg: row.route_preview_img,
     heroImages: row.hero_images ?? [],
     description: row.description,
+    tags: row.tags,
+    highlights: row.highlights,
     isOneway: row.is_oneway ?? false,
     hideSafeStart: row.hide_safe_start ?? false,
   };
@@ -209,23 +214,13 @@ export interface MountainGroup {
 export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
   const { data: routeRows, error } = await supabase
     .from("routes")
-    .select("id, mountain_id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, route_preview_img, hero_images, description")
+    .select("id, mountain_id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, route_preview_img, hero_images, description, tags, highlights")
     .order("id");
 
   if (error || !routeRows) return [];
 
-  // Collect unique mountain IDs
+  // Collect unique mountain IDs and segment IDs from routes
   const mountainIds = [...new Set((routeRows as RouteRow[]).map((r) => r.mountain_id))];
-  const { data: mtRows } = await supabase
-    .from("mountains")
-    .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
-    .in("id", mountainIds);
-
-  const mountainMap = new Map<number, Mountain>(
-    ((mtRows ?? []) as MountainRow[]).map((m) => [m.id, rowToMountain(m)])
-  );
-
-  // Fetch track_data + waypoint IDs for all segments referenced by listed routes
   const allSegmentIds = [
     ...new Set((routeRows as RouteRow[]).flatMap((r) => r.segment_ids ?? [])),
   ];
@@ -239,18 +234,29 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
     bus_details?: { bus_numbers?: string[]; route_color?: string; bus_duration_min?: number; bus_stop_id_key?: string };
   }
 
+  // Fetch mountains and segments in parallel — both only need routeRows
+  const [{ data: mtRows }, { data: segRows }] = await Promise.all([
+    supabase
+      .from("mountains")
+      .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
+      .in("id", mountainIds),
+    allSegmentIds.length > 0
+      ? supabase
+          .from("segments")
+          .select("id, track_data, start_waypoint_id, end_waypoint_id, is_bus_combined, bus_details")
+          .in("id", allSegmentIds)
+      : Promise.resolve({ data: [] as SegmentSummary[] }),
+  ]);
+
+  const mountainMap = new Map<number, Mountain>(
+    ((mtRows ?? []) as MountainRow[]).map((m) => [m.id, rowToMountain(m)])
+  );
+
   const trackMap = new Map<number, GeoJsonLineString>();
   const segSummaryMap = new Map<number, SegmentSummary>();
-
-  if (allSegmentIds.length > 0) {
-    const { data: segRows } = await supabase
-      .from("segments")
-      .select("id, track_data, start_waypoint_id, end_waypoint_id, is_bus_combined, bus_details")
-      .in("id", allSegmentIds);
-    for (const s of (segRows ?? []) as SegmentSummary[]) {
-      trackMap.set(s.id, s.track_data);
-      segSummaryMap.set(s.id, s);
-    }
+  for (const s of (segRows ?? []) as SegmentSummary[]) {
+    trackMap.set(s.id, s.track_data);
+    segSummaryMap.set(s.id, s);
   }
 
   // Fetch all waypoints needed for route titles
@@ -361,15 +367,18 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
 
   const route = rowToRoute(routeRow as RouteRow);
 
-  // Fetch ordered segments
-  const { data: segRows, error: segErr } = await supabase
-    .from("segments")
-    .select("*")
-    .in("id", route.segmentIds);
+  // Fetch segments and mountain in parallel — both only need route data
+  const [{ data: segRows, error: segErr }, { data: mtRow }] = await Promise.all([
+    supabase.from("segments").select("*").in("id", route.segmentIds),
+    supabase
+      .from("mountains")
+      .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
+      .eq("id", route.mountainId)
+      .single(),
+  ]);
 
   if (segErr || !segRows) return null;
 
-  // Sort segments to match segmentIds order
   const segMap = new Map(
     (segRows as SegmentRow[]).map((s) => [s.id, rowToSegment(s)])
   );
@@ -377,7 +386,6 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     .map((sid) => segMap.get(sid))
     .filter(Boolean) as Segment[];
 
-  // Collect all waypoint IDs referenced by segments
   const waypointIds = [
     ...new Set(segments.flatMap((s) => [s.startWaypointId, s.endWaypointId])),
   ];
@@ -396,13 +404,6 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     endWaypoint: waypointMap.get(seg.endWaypointId)!,
   }));
 
-  // Fetch mountain
-  const { data: mtRow } = await supabase
-    .from("mountains")
-    .select("id, slug, name, image_url, region, max_elevation_m, terrain_tags")
-    .eq("id", route.mountainId)
-    .single();
-
   const mountain: Mountain = mtRow
     ? rowToMountain(mtRow as MountainRow)
     : { id: route.mountainId, slug: "", name: { en: "Unknown" } };
@@ -413,6 +414,12 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     segments: resolvedSegments,
   };
 });
+
+export const getCachedRoute = unstable_cache(
+  (id: number) => fetchRoute(id),
+  ["route-detail"],
+  { revalidate: 60 * 60 }
+);
 
 // ── Home map data ─────────────────────────────────────────────────────────────
 
