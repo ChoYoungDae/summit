@@ -1,6 +1,6 @@
 /**
  * uploadWaypointPhoto
- * 1. Canvas API로 이미지 압축 (최대 1280px, JPEG quality 0.82)
+ * 1. Canvas API로 이미지 압축 (최대 800px, WebP quality 0.80)
  * 2. Supabase Storage `waypoints` 버킷에 업로드
  * 3. Public URL 반환
  *
@@ -10,9 +10,9 @@
 import { supabase } from "./supabase";
 
 export interface UploadOptions {
-  /** 긴 변 최대 픽셀 수. 기본 1280 */
+  /** 긴 변 최대 픽셀 수. 기본 800 */
   maxPx?: number;
-  /** JPEG 품질 0~1. 기본 0.82 */
+  /** WebP 품질 0~1. 기본 0.80 */
   quality?: number;
   /** 버킷 내 폴더 접두사. 기본 "photos" */
   folder?: string;
@@ -48,7 +48,7 @@ async function compressImage(
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close();
 
-  return canvas.convertToBlob({ type: "image/jpeg", quality });
+  return canvas.convertToBlob({ type: "image/webp", quality });
 }
 
 // ── 2. 고유 파일명 생성 ───────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ function buildStoragePath(originalName: string, folder: string): string {
     .slice(0, 60);                     // 경로 길이 제한
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 7);
-  return `${folder}/${base}_${ts}_${rand}.jpg`;
+  return `${folder}/${base}_${ts}_${rand}.webp`;
 }
 
 // ── 3. 업로드 + Public URL ────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export async function uploadWaypointPhoto(
   file: File,
   options: UploadOptions = {},
 ): Promise<UploadResult> {
-  const { maxPx = 1280, quality = 0.82, folder = "photos" } = options;
+  const { maxPx = 800, quality = 0.80, folder = "photos" } = options;
 
   if (!file.type.startsWith("image/")) {
     throw new Error(`이미지 파일만 업로드할 수 있습니다. (받은 타입: ${file.type})`);
@@ -85,7 +85,7 @@ export async function uploadWaypointPhoto(
   const { error } = await supabase.storage
     .from("waypoints")
     .upload(storagePath, blob, {
-      contentType: "image/jpeg",
+      contentType: "image/webp",
       upsert: false,
     });
 

@@ -480,7 +480,8 @@ export default function MapView({
   const [gpsPos,       setGpsPos]       = useState<[number, number] | null>(null);
   const [gpsHeading,   setGpsHeading]   = useState(0);
   const [isOffRoute,   setIsOffRoute]   = useState(false);
-  const [isMapLoaded,  setIsMapLoaded]  = useState(false);
+  const [isMapLoaded,       setIsMapLoaded]       = useState(false);
+  const [isFootprintReady,  setIsFootprintReady]  = useState(false);
 
   // Map / compass state
   const [isTracking, setIsTracking] = useState(false);
@@ -672,7 +673,10 @@ export default function MapView({
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0);
         const imageData = ctx?.getImageData(0, 0, 24, 24);
-        if (imageData && !map.hasImage("footprint")) map.addImage("footprint", imageData);
+        if (imageData && !map.hasImage("footprint")) {
+          map.addImage("footprint", imageData);
+          setIsFootprintReady(true);
+        }
       };
       img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`;
     }
@@ -989,19 +993,21 @@ export default function MapView({
             paint={{ "line-color": COLOR_ASCENT, "line-width": 5 }}
           />
           {/* Footprints */}
-          <Layer
-            id="trail-ascend-footprints"
-            type="symbol"
-            minzoom={14}
-            layout={{
-              "icon-image": "footprint",
-              "icon-size": 0.45,
-              "symbol-placement": "line",
-              "symbol-spacing": 60,
-              "icon-rotate": 90,
-              "icon-allow-overlap": true
-            }}
-          />
+          {isFootprintReady && (
+            <Layer
+              id="trail-ascend-footprints"
+              type="symbol"
+              minzoom={14}
+              layout={{
+                "icon-image": "footprint",
+                "icon-size": 0.45,
+                "symbol-placement": "line",
+                "symbol-spacing": 60,
+                "icon-rotate": 90,
+                "icon-allow-overlap": true
+              }}
+            />
+          )}
         </Source>
 
         {/* Descending trail — summit → end (Purple Indigo) */}
@@ -1022,19 +1028,21 @@ export default function MapView({
               paint={{ "line-color": COLOR_DESCENT, "line-width": 5 }}
             />
             {/* Footprints */}
-            <Layer
-              id="trail-descend-footprints"
-              type="symbol"
-              minzoom={14}
-              layout={{
-                "icon-image": "footprint",
-                "icon-size": 0.45,
-                "symbol-placement": "line",
-                "symbol-spacing": 60,
-                "icon-rotate": 90,
-                "icon-allow-overlap": true
-              }}
-            />
+            {isFootprintReady && (
+              <Layer
+                id="trail-descend-footprints"
+                type="symbol"
+                minzoom={14}
+                layout={{
+                  "icon-image": "footprint",
+                  "icon-size": 0.45,
+                  "symbol-placement": "line",
+                  "symbol-spacing": 60,
+                  "icon-rotate": 90,
+                  "icon-allow-overlap": true
+                }}
+              />
+            )}
           </Source>
         )}
 

@@ -181,8 +181,8 @@ export default function HikingBottomSheet({
     liveY !== null
       ? `translateY(${liveY}px)`
       : snap === "min"
-      ? `translateY(calc(100vh - ${MIN_H}px))`
-      : `translateY(calc(100vh - min(45vh, ${MID_MAX_H}px)))`;
+      ? `translateY(calc(100dvh - ${MIN_H}px))`
+      : `translateY(calc(100dvh - min(45dvh, ${MID_MAX_H}px)))`;
 
   const transition =
     liveY !== null ? "none" : "transform 0.32s cubic-bezier(0.32,0.72,0,1)";
@@ -197,7 +197,7 @@ export default function HikingBottomSheet({
           background: "rgba(255,255,255,0.97)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          height: "100vh",
+          height: "100dvh",
           transform,
           transition,
           pointerEvents: "auto",

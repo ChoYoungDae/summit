@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { getDistance } from "geolib";
 import MapViewLoader from "./MapViewLoader";
 import WaypointSheet from "./WaypointSheet";
-import GuideCard from "./GuideCard";
 import FloatingTrailHeader from "./FloatingTrailHeader";
 import HikingBottomSheet from "./HikingBottomSheet";
 import type { SegmentElevationInfo } from "./ElevationChart";
@@ -20,7 +19,6 @@ import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto } from "@/types/t
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GUIDE_RADIUS_KM = 0.35;
 const TRAILHEAD_ACTIVE_M = 500;         // within 500 m → Active Mode
 const ASCENT_SPEED_M_PER_MIN  = 2000 / 60; // 2.0 km/h
 const DESCENT_SPEED_M_PER_MIN = 3200 / 60; // 3.2 km/h
@@ -47,16 +45,6 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function findNearestWaypoint(pt: [number, number], waypoints: Waypoint[]): Waypoint | null {
-  let nearest: Waypoint | null = null;
-  let minDist = Infinity;
-  for (const wpt of waypoints) {
-    const d = haversineKm(pt[1], pt[0], wpt.lat, wpt.lon);
-    if (d < minDist) { minDist = d; nearest = wpt; }
-  }
-  return minDist <= GUIDE_RADIUS_KM ? nearest : null;
 }
 
 // ── Supabase Image Transformation ────────────────────────────────────────────
@@ -358,10 +346,6 @@ export default function TrailSection({
     );
   }
 
-  const nearestWaypoint = hoveredPoint
-    ? findNearestWaypoint([hoveredPoint[0], hoveredPoint[1]], waypoints)
-    : null;
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -414,15 +398,6 @@ export default function TrailSection({
         locale={locale}
         hikingPhase={gps.phase}
       />
-
-      {nearestWaypoint && (
-        <div
-          className="fixed left-4 right-4 z-20 transition-all duration-300"
-          style={{ bottom: sheetHeightPx + 8 }}
-        >
-          <GuideCard waypoint={nearestWaypoint} locale={locale} />
-        </div>
-      )}
 
       {/* ── Off-route alert overlay ──────────────────────────────────────── */}
       {offRoute.isAlertVisible && (
