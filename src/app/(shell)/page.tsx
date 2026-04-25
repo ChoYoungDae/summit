@@ -42,7 +42,7 @@ export default function HomePage() {
         <div className="flex flex-col gap-3">
           <div>
             <h1
-              className="text-[1.625rem] font-bold leading-tight text-[var(--color-text-primary)] whitespace-nowrap"
+              className="text-[1.625rem] font-bold leading-tight text-[var(--color-text-primary)]"
               style={{ fontFamily: "var(--font-en)" }}
             >
               {locale === "en" ? (
@@ -52,10 +52,10 @@ export default function HomePage() {
               )}
             </h1>
             <div className="mt-2 flex flex-col gap-0.5">
-              <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed whitespace-nowrap">
+              <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed">
                 {tUI("homeSubtitle", locale)}
               </p>
-              <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed whitespace-nowrap">
+              <p className="text-[0.875rem] text-[#3A3A45] leading-relaxed">
                 {tUI("homeDescription", locale)}
               </p>
             </div>

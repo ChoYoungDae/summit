@@ -6,6 +6,7 @@ import {
   Ruler,
   Footprints,
   TrendingUp,
+  Bus,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { tDB, tUI } from "@/lib/i18n";
@@ -20,9 +21,9 @@ const HIGHLIGHT_COLOR = {
 } as const;
 
 const HIGHLIGHT_ICON = {
-  highlight: "●",
-  pro_tip:   "★",
-  warning:   "⚠",
+  highlight: "ph:check-circle",
+  pro_tip:   "ph:star",
+  warning:   "ph:warning",
 } as const;
 
 const METRO_COLOR: Record<number | string, string> = {
@@ -137,7 +138,7 @@ export default function RouteCard({
       )}
 
       {/* ── Card body ── */}
-      <div className="flex flex-col gap-2.5 px-4 pt-4 pb-3">
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-4">
         {/* Title */}
         <div className="flex flex-col items-center gap-1">
           <h2
@@ -156,52 +157,60 @@ export default function RouteCard({
           )}
         </div>
 
-        {/* Info chips */}
-
-        <div className="flex flex-wrap gap-1.5 justify-center">
+        {/* Stats — AllTrails style */}
+        <div className="flex justify-evenly">
           {route.totalDistanceM != null && (
-            <InfoChip
-              icon={<Ruler size={12} strokeWidth={2} />}
-              label={`${formatDistanceKm(route.totalDistanceM)} km`}
+            <StatItem
+              icon={<Ruler size={14} strokeWidth={2} />}
+              value={`${formatDistanceKm(route.totalDistanceM)} km`}
+              label={tUI("statDistance", locale)}
             />
           )}
           {route.totalDurationMin != null && (
-            busDurationMin > 0 ? (
-              <span
-                className="font-num inline-flex items-center rounded-full px-2.5 py-1 text-sm font-medium gap-1.5"
-                style={{ background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }}
-              >
-                <Footprints size={12} strokeWidth={2} />
-                {formatTime(route.totalDurationMin - busDurationMin, locale)}
-                <span style={{ opacity: 0.3, margin: "0 1px" }}>|</span>
-                <Icon icon="ph:bus" width={13} height={13} style={{ color: "#0068B7" }} />
-                <span style={{ color: "#0068B7" }}>
-                  {busSegmentCount > 1
-                    ? `${Math.round(busDurationMin / busSegmentCount)}${tUI("minute", locale)} × ${busSegmentCount}`
-                    : formatTime(busDurationMin, locale)}
-                </span>
-              </span>
-            ) : (
-              <InfoChip
-                icon={<Footprints size={12} strokeWidth={2} />}
-                label={formatTime(route.totalDurationMin, locale)}
-              />
-            )
+            <StatItem
+              icon={<Footprints size={14} strokeWidth={2} />}
+              value={formatTime(
+                busDurationMin > 0 ? route.totalDurationMin - busDurationMin : route.totalDurationMin,
+                locale
+              )}
+              label={tUI("statWalking", locale)}
+            />
+          )}
+          {busDurationMin > 0 && (
+            <StatItem
+              icon={<Bus size={14} strokeWidth={2} />}
+              value={
+                busSegmentCount > 1
+                  ? `${Math.round(busDurationMin / busSegmentCount)}${tUI("minute", locale)} ×${busSegmentCount}`
+                  : formatTime(busDurationMin, locale)
+              }
+              label={tUI("statBus", locale)}
+              color="#0068B7"
+            />
           )}
           {route.totalDifficulty != null && (
-            <DifficultyChip difficulty={route.totalDifficulty} locale={locale} />
+            <StatItem
+              icon={<TrendingUp size={14} strokeWidth={2} />}
+              value={tUI(`diff_${route.totalDifficulty}` as Parameters<typeof tUI>[0], locale)}
+              label={tUI("statDifficulty", locale)}
+              color={route.totalDifficulty >= 4 ? "#C8362A" : "var(--color-primary)"}
+            />
           )}
         </div>
 
 
         {/* Tags */}
         {route.tags && route.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 justify-center">
+          <div className="flex flex-wrap justify-evenly gap-y-1.5">
             {route.tags.map((tag, i) => (
               <span
                 key={i}
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(46,94,74,0.07)", color: "var(--color-primary)" }}
+                className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+                style={{
+                  background: "rgba(0,0,0,0.04)",
+                  color: "var(--color-text-muted)",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                }}
               >
                 #{tDB(tag, locale)}
               </span>
@@ -214,9 +223,13 @@ export default function RouteCard({
           <div className="flex flex-col gap-1">
             {route.highlights.map((h, i) => (
               <div key={i} className="flex items-start gap-1.5">
-                <span className="mt-0.5 shrink-0" style={{ color: HIGHLIGHT_COLOR[h.type] }}>
-                  {HIGHLIGHT_ICON[h.type]}
-                </span>
+                <Icon
+                  icon={HIGHLIGHT_ICON[h.type]}
+                  width={15}
+                  height={15}
+                  className="mt-[3px] shrink-0"
+                  style={{ color: HIGHLIGHT_COLOR[h.type] }}
+                />
                 <p className="text-sm leading-snug" style={{ color: "var(--color-text-body)" }}>
                   {tDB(h.text, locale)}
                 </p>
@@ -247,45 +260,26 @@ export default function RouteCard({
 
 // ── Small sub-components ──────────────────────────────────────────────────────
 
-function InfoChip({
+function StatItem({
   icon,
+  value,
   label,
-  variant = "default",
+  color = "var(--color-primary)",
 }: {
   icon: React.ReactNode;
+  value: string;
   label: string;
-  variant?: "default" | "bus";
+  color?: string;
 }) {
   return (
-    <span
-      className="font-num inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium"
-      style={
-        variant === "bus"
-          ? { background: "rgba(0,104,183,0.08)", color: "#0068B7" }
-          : { background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }
-      }
-    >
-      {icon}
-      {label}
-    </span>
-  );
-}
-
-
-
-function DifficultyChip({ difficulty, locale = "en" }: { difficulty: number; locale?: string }) {
-  const label = tUI(`diff_${difficulty}` as any, locale);
-  const isHard = difficulty >= 4;
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium"
-      style={{
-        background: isHard ? "rgba(200,54,42,0.08)" : "rgba(46,94,74,0.08)",
-        color: isHard ? "#C8362A" : "var(--color-primary)",
-      }}
-    >
-      <TrendingUp size={13} strokeWidth={2} />
-      {label}
-    </span>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1" style={{ color }}>
+        {icon}
+        <span className="font-num text-sm font-bold">{value}</span>
+      </div>
+      <span className="text-[11px] font-medium" style={{ color: "var(--color-text-muted)" }}>
+        {label}
+      </span>
+    </div>
   );
 }
