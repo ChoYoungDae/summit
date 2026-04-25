@@ -22,14 +22,17 @@ type Snap = "min" | "mid";
 
 export const MIN_H = 88; // px — visible height at min snap
 
+// mid snap: show at most MID_MAX_H px — prevents large blank space on tall screens
+const MID_MAX_H = 280;
+
 function snapTranslateY(snap: Snap, vh: number): number {
   if (snap === "min") return vh - MIN_H;
-  return Math.min(vh * 0.60, vh - MIN_H); // mid: 40% visible height
+  return vh - Math.min(Math.round(vh * 0.45), MID_MAX_H);
 }
 
 function snapVisibleH(snap: Snap, vh: number): number {
   if (snap === "min") return MIN_H;
-  return Math.max(vh * 0.40, MIN_H);
+  return Math.min(Math.round(vh * 0.45), MID_MAX_H);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,6 +104,17 @@ export default function HikingBottomSheet({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-expand to mid when hiking starts so the user sees clear feedback
+  useEffect(() => {
+    if (isHiking) {
+      const vh = window.innerHeight;
+      setSnap("mid");
+      setLiveY(null);
+      onSheetHeightChange?.(snapVisibleH("mid", vh));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHiking]);
+
   // Auto-expand to mid when a trail point is selected (pre-hike only)
   useEffect(() => {
     if (!isHiking && highlightIndex != null) {
@@ -168,7 +182,7 @@ export default function HikingBottomSheet({
       ? `translateY(${liveY}px)`
       : snap === "min"
       ? `translateY(calc(100vh - ${MIN_H}px))`
-      : `translateY(60vh)`;
+      : `translateY(calc(100vh - min(45vh, ${MID_MAX_H}px)))`;
 
   const transition =
     liveY !== null ? "none" : "transform 0.32s cubic-bezier(0.32,0.72,0,1)";

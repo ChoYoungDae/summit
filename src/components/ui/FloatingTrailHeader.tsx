@@ -7,6 +7,18 @@ import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
 import { useLanguage } from "@/lib/useLanguage";
 
+const SUBWAY_LINE_COLORS: Record<number, string> = {
+  1: "#0052A4",
+  2: "#00A84D",
+  3: "#EF7C1C",
+  4: "#00A5DE",
+  5: "#996CAC",
+  6: "#CD7C2F",
+  7: "#747F00",
+  8: "#E6186C",
+  9: "#BDB092",
+};
+
 interface Props {
   isHiking: boolean;
   stationInfo?: StationInfo;
@@ -104,11 +116,26 @@ export default function FloatingTrailHeader({
         {/* Left: Station info section */}
         {stationInfo ? (
           <div className="flex flex-col gap-1 min-w-0">
-            <span className="font-black text-[1.15rem] leading-tight tracking-tight">
-              {locale === "ko"
-                ? `${tDB(stationInfo.name, locale)}${stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}`
-                : `${stationInfo.exit ? `${tUI("exit", locale)} ${stationInfo.exit}, ` : ""}${tDB(stationInfo.name, locale)}`}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-black text-[1.15rem] leading-tight tracking-tight">
+                {locale === "ko"
+                  ? `${tDB(stationInfo.name, locale)}${stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}`
+                  : `${stationInfo.exit ? `${tUI("exit", locale)} ${stationInfo.exit}, ` : ""}${tDB(stationInfo.name, locale)}`}
+              </span>
+              {stationInfo.line && SUBWAY_LINE_COLORS[stationInfo.line] && (
+                <span
+                  className="inline-flex items-center justify-center text-white font-black text-[11px] leading-none shrink-0"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: SUBWAY_LINE_COLORS[stationInfo.line],
+                  }}
+                >
+                  {stationInfo.line}
+                </span>
+              )}
+            </div>
             {locale !== "ko" && stationInfo.name.ko && (
               <span
                 className="text-[11px] font-semibold"

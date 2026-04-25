@@ -9,6 +9,7 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
+  ReferenceDot,
 } from "recharts";
 import { Bus, Footprints, Flag } from "lucide-react";
 import type { SegmentType, RoutePhoto } from "@/types/trail";
@@ -354,6 +355,31 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
     );
   }, [highlightGlobalIndex]);
 
+  // Summit point: boundary where DESCENT starts (= peak reached)
+  const summitPt = useMemo(() => {
+    if (data.length === 0) return null;
+    const summitBoundary = boundaries.find((b) => b.segType === "DESCENT" && !b.isBus);
+    if (summitBoundary) {
+      return data.reduce((best, pt) =>
+        Math.abs(pt.dist - summitBoundary.dist) < Math.abs(best.dist - summitBoundary.dist) ? pt : best
+      );
+    }
+    // Fallback: max elevation point
+    return data.reduce((best, pt) => (pt.ele > best.ele ? pt : best));
+  }, [data, boundaries]);
+
+  // X axis ticks: start, summit, end
+  const xTicks = useMemo(() => {
+    if (data.length === 0) return [];
+    const endDist = data[data.length - 1].dist;
+    const ticks: number[] = [0];
+    if (summitPt && summitPt.dist > 0.05 && summitPt.dist < endDist - 0.05) {
+      ticks.push(summitPt.dist);
+    }
+    ticks.push(endDist);
+    return ticks;
+  }, [data, summitPt]);
+
   // Build legend entries only for segments that actually have points
   const hasApproach = !!approachSeg && approachSeg.points.length > 0;
   const hasReturn   = !!returnSeg   && returnSeg.points.length > 0;
@@ -378,10 +404,10 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
         // drop-shadow gives the strokes a subtle white glow — improves legibility
         // over complex map backgrounds when the sheet is partially transparent
         <div style={{ filter: "drop-shadow(0 0 1px rgba(255,255,255,0.7)) drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
-          <ResponsiveContainer width="100%" height={118}>
+          <ResponsiveContainer width="100%" height={132}>
             <AreaChart
               data={data}
-              margin={{ top: 24, right: 8, bottom: 0, left: 4 }}
+              margin={{ top: 28, right: 8, bottom: 4, left: 4 }}
               onMouseMove={handlePointSelect}
               onClick={handlePointSelect}
               onMouseLeave={handleLeave}
@@ -394,7 +420,14 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                 </linearGradient>
               </defs>
 
-              <XAxis dataKey="dist" hide />
+              <XAxis
+                dataKey="dist"
+                ticks={xTicks}
+                tick={{ fontSize: 9, fill: "#9CA3AF", fontFamily: "var(--font-num)" }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: number) => (v === 0 ? "0" : `${v.toFixed(1)} km`)}
+              />
               <YAxis hide width={0} domain={["auto", "dataMax + 20"]} />
 
               {/* Horizontal baseline */}
@@ -513,6 +546,26 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                   }
                 />
               ))}
+
+              {/* ── Summit elevation dot ── */}
+              {summitPt && (
+                <ReferenceDot
+                  x={summitPt.dist}
+                  y={summitPt.ele}
+                  r={5}
+                  fill={COLOR_ASCENT}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `${summitPt.ele}m`,
+                    position: "top",
+                    fill: COLOR_ASCENT,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-num)",
+                  }}
+                />
+              )}
 
               {/* ── Photo camera markers ── */}
               {photos
