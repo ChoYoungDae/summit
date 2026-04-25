@@ -256,7 +256,7 @@ export default function PhotoUploadCard() {
         const existing: PhotoEntry[] = data.map((p: {
           id: number; url: string; lat: number | null; lon: number | null;
           segmentId: number | null; orderIndex: number | null;
-          descriptionEn: string | null; descriptionKo: string | null;
+          description: Record<string, string> | null;
         }) => ({
           key:           `existing-${p.id}`,
           file:          new File([], ""),
@@ -269,8 +269,8 @@ export default function PhotoUploadCard() {
           segmentId:     p.segmentId,
           autoMapped:    false,
           orderIndex:    p.orderIndex ?? 999_999,
-          descriptionEn: p.descriptionEn ?? "",
-          descriptionKo: p.descriptionKo ?? "",
+          descriptionEn: p.description?.en ?? "",
+          descriptionKo: p.description?.ko ?? "",
           state:         "saved" as const,
         }));
         setPhotos(existing); // API already returns them ordered by order_index
@@ -371,10 +371,12 @@ export default function PhotoUploadCard() {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id:             entry.id,
-          description_en: entry.descriptionEn || null,
-          description_ko: entry.descriptionKo || null,
-          segment_id:     entry.segmentId,
+          id:          entry.id,
+          description: (entry.descriptionEn || entry.descriptionKo) ? {
+            ...(entry.descriptionEn ? { en: entry.descriptionEn } : {}),
+            ...(entry.descriptionKo ? { ko: entry.descriptionKo } : {}),
+          } : null,
+          segment_id: entry.segmentId,
         }),
       });
       if (!res.ok) {

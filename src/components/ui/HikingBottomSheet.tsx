@@ -190,7 +190,7 @@ export default function HikingBottomSheet({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-20" style={{ pointerEvents: "none" }}>
+    <div className="absolute bottom-0 inset-x-0 z-20" style={{ pointerEvents: "none" }}>
       <div
         className="rounded-t-2xl shadow-2xl overflow-hidden"
         style={{

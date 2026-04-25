@@ -30,11 +30,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${nunito.variable} h-full`}>
-      <body className="flex flex-col h-full bg-[var(--bg)] text-[var(--fg)]">
+      <body className="flex flex-col h-full bg-zinc-100 dark:bg-zinc-950 text-[var(--fg)]">
         <LocaleSync />
         <ServiceWorkerRegister />
         <FontLoader />
-        {children}
+        <div className="relative flex flex-col w-full max-w-[480px] mx-auto min-h-screen bg-[var(--bg)] shadow-2xl overflow-x-hidden">
+          {children}
+        </div>
       </body>
     </html>
   );

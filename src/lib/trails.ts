@@ -555,24 +555,22 @@ interface RoutePhotoRow {
   lat?: number | null;
   lon?: number | null;
   url: string;
-  description_en?: string | null;
-  description_ko?: string | null;
+  description?: Record<string, string> | null;
   order_index: number;
   created_at?: string;
 }
 
 function rowToRoutePhoto(row: RoutePhotoRow): RoutePhoto {
   return {
-    id:            row.id,
-    routeId:       row.route_id,
-    segmentId:     row.segment_id ?? null,
-    lat:           row.lat ?? null,
-    lon:           row.lon ?? null,
-    url:           row.url,
-    descriptionEn: row.description_en ?? null,
-    descriptionKo: row.description_ko ?? null,
-    orderIndex:    row.order_index ?? 0,
-    createdAt:     row.created_at,
+    id:          row.id,
+    routeId:     row.route_id,
+    segmentId:   row.segment_id ?? null,
+    lat:         row.lat ?? null,
+    lon:         row.lon ?? null,
+    url:         row.url,
+    description: row.description ?? null,
+    orderIndex:  row.order_index ?? 0,
+    createdAt:   row.created_at,
   };
 }
 

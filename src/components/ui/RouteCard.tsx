@@ -272,12 +272,12 @@ function StatItem({
   color?: string;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col items-end gap-0.5">
       <div className="flex items-center gap-1" style={{ color }}>
         {icon}
         <span className="font-num text-sm font-bold">{value}</span>
       </div>
-      <span className="text-[11px] font-medium" style={{ color: "var(--color-text-muted)" }}>
+      <span className="text-right text-[11px] font-medium" style={{ color: "var(--color-text-muted)" }}>
         {label}
       </span>
     </div>

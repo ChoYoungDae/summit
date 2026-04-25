@@ -36,6 +36,7 @@ interface Props {
   backHref?: string;
   locale?: string;
   hikingPhase?: HikingPhase;
+  hikingMode?: "preview" | "active";
 }
 
 export default function FloatingTrailHeader({
@@ -50,6 +51,7 @@ export default function FloatingTrailHeader({
   backHref = "/route",
   locale: propLocale,
   hikingPhase,
+  hikingMode,
 }: Props) {
   const { locale: hookLocale } = useLanguage();
   const locale = propLocale || hookLocale;
@@ -155,7 +157,7 @@ export default function FloatingTrailHeader({
 
         {/* Right: Triple ETA Stack */}
         <div className="flex flex-col items-end gap-1 shrink-0">
-          {!isHiking ? (
+          {(!isHiking || hikingMode !== "active") ? (
             /* PRE-HIKE MODE */
             <>
               {latestStartMin != null && renderETALine(

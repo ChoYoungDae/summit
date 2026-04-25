@@ -128,8 +128,7 @@ export interface RoutePhoto {
   lat?: number | null;
   lon?: number | null;
   url: string;
-  descriptionEn?: string | null;
-  descriptionKo?: string | null;
+  description?: Record<string, string> | null;
   orderIndex: number;
   createdAt?: string;
 }

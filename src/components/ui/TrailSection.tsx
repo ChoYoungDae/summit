@@ -12,7 +12,7 @@ import { useHikingLevel } from "@/lib/useHikingLevel";
 import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
 import { useOffRouteAlert } from "@/lib/useOffRouteAlert";
 import { calcLatestStartMin, nowKSTMin } from "@/lib/safetyEngine";
-import { tUI } from "@/lib/i18n";
+import { tUI, tDB } from "@/lib/i18n";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Icon } from "@iconify/react";
 import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto } from "@/types/trail";
@@ -111,7 +111,6 @@ export default function TrailSection({
   const [chartHighlightIndex,   setChartHighlightIndex]   = useState<number | null>(null);
   const [selectedWaypointIndex, setSelectedWaypointIndex] = useState<number | null>(null);
   const [isHiking,              setIsHiking]              = useState(false);
-  const [startedAtMin,          setStartedAtMin]          = useState<number | null>(null);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
   const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
@@ -226,26 +225,24 @@ export default function TrailSection({
   //   Summit rest: +30 min added between peak and final ETA
   // Preview mode: static offset from segment estimates.
   const peakETAMin = useMemo(() => {
-    // Before hiking, show ETA as if starting at the Last Safe Start time.
-    // During hiking, show ETA based on current real time.
-    const baseMin = isHiking ? (startedAtMin ?? nowKSTMin()) : (latestStartMin ?? nowKSTMin());
-
-    if (hikingMode === "active" && gps.currentPos) {
+    // GPS real-time mode: only when actively hiking near the trailhead.
+    if (isHiking && hikingMode === "active" && gps.currentPos) {
       if (gps.phase === "descent") return null;
       const mins = naismithMinutes(gps.remainingM, gps.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
       return nowKSTMin() + Math.round(mins);
     }
+    // Pre-hike or started-but-far: show ETA relative to Last Safe Start.
+    if (latestStartMin == null) return null;
     if (ascentMin != null) {
-      return baseMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier);
+      return latestStartMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier);
     }
     return null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, startedAtMin, latestStartMin, ascentMin, approachTimeMin, skillMultiplier]);
+  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, latestStartMin, ascentMin, approachTimeMin, skillMultiplier]);
 
   const trailheadETAMin = useMemo(() => {
-    const baseMin = isHiking ? (startedAtMin ?? nowKSTMin()) : (latestStartMin ?? nowKSTMin());
-
-    if (hikingMode === "active" && gps.currentPos) {
+    // GPS real-time mode: only when actively hiking near the trailhead.
+    if (isHiking && hikingMode === "active" && gps.currentPos) {
       if (gps.phase === "ascent") {
         const toSummitMins = naismithMinutes(gps.remainingM, gps.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
         const descentMins  = naismithMinutes(gps.totalDescentM, 0, DESCENT_SPEED_M_PER_MIN);
@@ -253,9 +250,11 @@ export default function TrailSection({
       }
       return nowKSTMin() + Math.round(naismithMinutes(gps.remainingM, 0, DESCENT_SPEED_M_PER_MIN));
     }
+    // Pre-hike or started-but-far: show ETA relative to Last Safe Start.
+    if (latestStartMin == null) return null;
     if (ascentMin != null && descentMin != null) {
       return (
-        baseMin +
+        latestStartMin +
         (approachTimeMin ?? 0) +
         Math.round(ascentMin * skillMultiplier) +
         SUMMIT_REST_MIN +
@@ -264,7 +263,7 @@ export default function TrailSection({
     }
     return null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, gps.totalDescentM, startedAtMin, latestStartMin, ascentMin, descentMin, approachTimeMin, skillMultiplier]);
+  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, gps.totalDescentM, latestStartMin, ascentMin, descentMin, approachTimeMin, skillMultiplier]);
 
   const finalETAMin = useMemo(() => {
     const thETA = trailheadETAMin;
@@ -313,7 +312,6 @@ export default function TrailSection({
 
   function startHiking() {
     setIsHiking(true);
-    setStartedAtMin(nowKSTMin());
     setShowFarConfirm(false);
     setShowOffRoutePrompt(false);
   }
@@ -321,7 +319,6 @@ export default function TrailSection({
   function handleToggleHiking() {
     if (isHiking) {
       setIsHiking(false);
-      setStartedAtMin(null);
       return;
     }
     if (!navigator.geolocation || track.length === 0) {
@@ -349,7 +346,7 @@ export default function TrailSection({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 z-0">
+    <div className="fixed inset-0 z-0 overflow-hidden bg-[var(--bg)]">
 
       <MapViewLoader
         track={track}
@@ -370,14 +367,20 @@ export default function TrailSection({
         bottomPadding={sheetHeightPx}
         controlsBottomOffset={sheetHeightPx}
         locale={locale}
-        photos={photos}
+        // Unified Logic: Filter out photos that are already represented as Waypoints
+        photos={photos.filter(p => {
+          if (p.lat == null || p.lon == null) return true;
+          // If a waypoint is within 20m of this photo, don't show it as a separate camera icon
+          const isAtWaypoint = waypoints.some(wpt => haversineKm(p.lat!, p.lon!, wpt.lat, wpt.lon) < 0.02);
+          return !isAtWaypoint;
+        })}
         onPhotoClick={setActivePhoto}
         offRouteEnabled={offRouteEnabled}
         onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
       />
 
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none z-10"
         style={{
           background:
             "linear-gradient(to bottom, rgba(0,0,0,0.22) 0%, transparent 26%), " +
@@ -386,240 +389,263 @@ export default function TrailSection({
         }}
       />
 
-      <FloatingTrailHeader
-        isHiking={isHiking}
-        stationInfo={stationInfo}
-        latestStartMin={latestStartMin}
-        isPastLatestStart={isPastLatestStart}
-        peakETAMin={peakETAMin}
-        trailheadETAMin={trailheadETAMin}
-        finalETAMin={finalETAMin}
-        routeName={routeName}
-        locale={locale}
-        hikingPhase={gps.phase}
-      />
+      {/* ── UI Centering Wrapper ─────────────────────────────────────────── */}
+      <div className="absolute inset-0 pointer-events-none z-20 flex justify-center">
+        <div className="relative w-full max-w-[480px] pointer-events-none">
+          
+          <FloatingTrailHeader
+            isHiking={isHiking}
+            stationInfo={stationInfo}
+            latestStartMin={latestStartMin}
+            isPastLatestStart={isPastLatestStart}
+            peakETAMin={peakETAMin}
+            trailheadETAMin={trailheadETAMin}
+            finalETAMin={finalETAMin}
+            routeName={routeName}
+            locale={locale}
+            hikingPhase={gps.phase}
+            hikingMode={hikingMode}
+          />
 
-      {/* ── Off-route alert overlay ──────────────────────────────────────── */}
-      {offRoute.isAlertVisible && (
-        <div
-          className="fixed left-4 right-4 z-30 rounded-2xl px-4 py-3 shadow-lg"
-          style={{
-            bottom: sheetHeightPx + 12,
-            background: "rgba(255,255,255,0.97)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            boxShadow: "0 4px 20px rgba(200,54,42,0.18)",
-          }}
-        >
-          <div className="flex items-start gap-3">
+          {/* ── Off-route alert overlay ──────────────────────────────────── */}
+          {offRoute.isAlertVisible && (
             <div
-              className="shrink-0 flex items-center justify-center rounded-full mt-0.5"
-              style={{ width: 32, height: 32, background: "rgba(200,54,42,0.10)" }}
+              className="absolute left-4 right-4 pointer-events-auto rounded-2xl px-4 py-3 shadow-lg"
+              style={{
+                bottom: sheetHeightPx + 12,
+                background: "rgba(255,255,255,0.97)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                boxShadow: "0 4px 20px rgba(200,54,42,0.18)",
+              }}
             >
-              <Icon icon="ph:warning" width={18} height={18} style={{ color: "var(--color-secondary)" }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold leading-snug" style={{ color: "var(--color-secondary)" }}>
-                Oops! You seem to be off the path. 😊
-              </p>
-              <p className="text-[12px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-                Check the map and rejoin the trail when safe.
-              </p>
-              <div className="flex gap-2 mt-2.5">
-                <button
-                  onClick={offRoute.handleIgnoreSection}
-                  className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold"
-                  style={{ background: "var(--color-bg-light)", color: "var(--color-primary)" }}
+              <div className="flex items-start gap-3">
+                <div
+                  className="shrink-0 flex items-center justify-center rounded-full mt-0.5"
+                  style={{ width: 32, height: 32, background: "rgba(200,54,42,0.10)" }}
                 >
-                  Ignore this section
-                </button>
-                <button
-                  onClick={offRoute.handleMute5min}
-                  className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold"
-                  style={{ background: "var(--color-bg-light)", color: "var(--color-text-muted)" }}
-                >
-                  Mute 5 min
-                </button>
-                <button
-                  onClick={offRoute.handleDismiss}
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-semibold"
-                  style={{ background: "rgba(200,54,42,0.10)", color: "var(--color-secondary)" }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Case 1: Far-from-trailhead confirmation popup ─────────────────── */}
-      {showFarConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-4"
-          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}
-          onClick={() => setShowFarConfirm(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-3xl p-6"
-            style={{ background: "var(--color-card)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="shrink-0 flex items-center justify-center rounded-full"
-                style={{ width: 36, height: 36, background: "rgba(200,54,42,0.10)" }}
-              >
-                <Icon icon="ph:map-pin-simple-slash" width={20} height={20} style={{ color: "var(--color-secondary)" }} />
-              </div>
-              <p className="text-sm font-bold" style={{ color: "var(--color-secondary)" }}>
-                Not near the trailhead
-              </p>
-            </div>
-            <p className="text-sm mb-5" style={{ color: "var(--color-text-muted)" }}>
-              {tUI("notNearTrail", locale)}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowFarConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: "var(--color-bg-light)", color: "var(--color-text-muted)" }}
-              >
-                {tUI("cancel", locale)}
-              </button>
-              <button
-                onClick={startHiking}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white"
-                style={{ background: "var(--color-primary)" }}
-              >
-                {tUI("startAnyway", locale)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <HikingBottomSheet
-        isHiking={isHiking}
-        onToggleHiking={handleToggleHiking}
-        gps={gps}
-        track={track}
-        elevationSegments={elevationSegments}
-        onHover={handleHover}
-        highlightIndex={elevationHighlightIndex}
-        onSheetHeightChange={setSheetHeightPx}
-        photos={photos}
-        onPhotoClick={setActivePhoto}
-        showOffRoutePrompt={showOffRoutePrompt}
-        offRouteEnabled={offRouteEnabled}
-        onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
-        onConfirmStart={startHiking}
-        onCancelPrompt={() => setShowOffRoutePrompt(false)}
-      />
-
-      {selectedWaypointIndex !== null && waypoints.length > 0 && (
-        <WaypointSheet
-          waypoints={waypoints}
-          selectedIndex={selectedWaypointIndex}
-          onClose={() => setSelectedWaypointIndex(null)}
-          onSelect={handleWaypointSelect}
-          locale={locale}
-        />
-      )}
-
-      {/* ── Photo description popup ──────────────────────────────────────── */}
-      {activePhoto && (() => {
-        const photoIndex = photos.findIndex(p => p.id === activePhoto.id);
-        const canPrev    = photoIndex > 0;
-        const canNext    = photoIndex < photos.length - 1;
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center px-4"
-            style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
-            onClick={() => setActivePhoto(null)}
-          >
-            <div
-              className="w-full max-w-lg rounded-3xl overflow-hidden"
-              style={{ background: "var(--color-card)" }}
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Photo + X button */}
-              <div
-                className="relative w-full"
-                style={{ aspectRatio: "1 / 1" }}
-                onTouchStart={e => { photoTouchStartX.current = e.touches[0].clientX; }}
-                onTouchEnd={e => {
-                  const delta = e.changedTouches[0].clientX - photoTouchStartX.current;
-                  const idx = photos.findIndex(p => p.id === activePhoto.id);
-                  if (delta >  50 && idx > 0)                  setActivePhoto(photos[idx - 1]);
-                  if (delta < -50 && idx < photos.length - 1)  setActivePhoto(photos[idx + 1]);
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={renderUrl(activePhoto.url, 900)}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: "center 65%" }}
-                />
-                {/* X */}
-                <button
-                  onClick={() => setActivePhoto(null)}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center
-                             bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
-                  aria-label="Close"
-                >
-                  <X size={13} strokeWidth={2.5} />
-                </button>
-                {/* Prev arrow */}
-                {canPrev && (
-                  <button
-                    onClick={() => setActivePhoto(photos[photoIndex - 1])}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center
-                               bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
-                    aria-label="Previous photo"
-                  >
-                    <ChevronLeft size={18} strokeWidth={2.5} />
-                  </button>
-                )}
-                {/* Next arrow */}
-                {canNext && (
-                  <button
-                    onClick={() => setActivePhoto(photos[photoIndex + 1])}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center
-                               bg-black/35 backdrop-blur-sm text-white hover:bg-black/55 transition-colors"
-                    aria-label="Next photo"
-                  >
-                    <ChevronRight size={18} strokeWidth={2.5} />
-                  </button>
-                )}
-                {/* Counter */}
-                {photos.length > 1 && (
-                  <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] font-num text-white/70 bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">
-                    {photoIndex + 1} / {photos.length}
+                  <Icon icon="ph:warning" width={18} height={18} style={{ color: "var(--color-secondary)" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold leading-snug" style={{ color: "var(--color-secondary)" }}>
+                    Oops! You seem to be off the path. 😊
                   </p>
-                )}
-              </div>
-
-              {/* Description */}
-              {(() => {
-                const desc = locale === "ko" ? activePhoto.descriptionKo : activePhoto.descriptionEn;
-                if (!desc) return null;
-                return (
-                  <div className="px-5 py-4">
-                    <p
-                      className="text-sm text-[var(--color-text-body)] leading-relaxed text-center"
-                      style={locale === "ko" ? { fontFamily: "var(--font-ko)" } : undefined}
+                  <p className="text-[12px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                    Check the map and rejoin the trail when safe.
+                  </p>
+                  <div className="flex gap-2 mt-2.5">
+                    <button
+                      onClick={offRoute.handleIgnoreSection}
+                      className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold"
+                      style={{ background: "var(--color-bg-light)", color: "var(--color-primary)" }}
                     >
-                      {desc}
-                    </p>
+                      Ignore this section
+                    </button>
+                    <button
+                      onClick={offRoute.handleMute5min}
+                      className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold"
+                      style={{ background: "var(--color-bg-light)", color: "var(--color-text-muted)" }}
+                    >
+                      Mute 5 min
+                    </button>
+                    <button
+                      onClick={offRoute.handleDismiss}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold"
+                      style={{ background: "rgba(200,54,42,0.10)", color: "var(--color-secondary)" }}
+                    >
+                      ✕
+                    </button>
                   </div>
-                );
-              })()}
+                </div>
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          )}
+
+          {/* ── Far-from-trailhead confirmation popup ─────────────────────── */}
+          {showFarConfirm && (
+            <div
+              className="absolute inset-0 z-50 flex items-end justify-center pb-10 px-4 pointer-events-auto"
+              style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}
+              onClick={() => setShowFarConfirm(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-3xl p-6"
+                style={{ background: "var(--color-card)" }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="shrink-0 flex items-center justify-center rounded-full"
+                    style={{ width: 36, height: 36, background: "rgba(200,54,42,0.10)" }}
+                  >
+                    <Icon icon="ph:map-pin-simple-slash" width={20} height={20} style={{ color: "var(--color-secondary)" }} />
+                  </div>
+                  <p className="text-sm font-bold" style={{ color: "var(--color-secondary)" }}>
+                    Not near the trailhead
+                  </p>
+                </div>
+                <p className="text-sm mb-5" style={{ color: "var(--color-text-muted)" }}>
+                  {tUI("notNearTrail", locale)}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowFarConfirm(false)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ background: "var(--color-bg-light)", color: "var(--color-text-muted)" }}
+                  >
+                    {tUI("cancel", locale)}
+                  </button>
+                  <button
+                    onClick={startHiking}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white"
+                    style={{ background: "var(--color-primary)" }}
+                  >
+                    {tUI("startAnyway", locale)}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <HikingBottomSheet
+            isHiking={isHiking}
+            onToggleHiking={handleToggleHiking}
+            gps={gps}
+            track={track}
+            elevationSegments={elevationSegments}
+            onHover={handleHover}
+            highlightIndex={elevationHighlightIndex}
+            onSheetHeightChange={setSheetHeightPx}
+            photos={photos}
+            onPhotoClick={setActivePhoto}
+            showOffRoutePrompt={showOffRoutePrompt}
+            offRouteEnabled={offRouteEnabled}
+            onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
+            onConfirmStart={startHiking}
+            onCancelPrompt={() => setShowOffRoutePrompt(false)}
+          />
+
+          {/* ── Photo description popup (Unified for Photos & Waypoints) ── */}
+          {activePhoto && (() => {
+            const photoIndex = photos.findIndex(p => p.id === activePhoto.id);
+            const canPrev    = photoIndex > 0;
+            const canNext    = photoIndex < photos.length - 1;
+
+            // Find if this photo represents a Waypoint
+            let linkedWpt: Waypoint | null = null;
+            if (activePhoto.lat != null && activePhoto.lon != null) {
+              const minDist = 0.02; // 20 meters
+              linkedWpt = waypoints.find(wpt => haversineKm(activePhoto.lat!, activePhoto.lon!, wpt.lat, wpt.lon) < minDist) || null;
+            }
+
+            const desc = activePhoto.description?.[locale] ?? activePhoto.description?.ko ?? activePhoto.description?.en;
+
+            return (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center px-4 pointer-events-auto"
+                style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+                onClick={() => setActivePhoto(null)}
+              >
+                <div
+                  className="w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl"
+                  style={{ background: "var(--color-card)" }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* Photo Section */}
+                  <div
+                    className="relative w-full"
+                    style={{ aspectRatio: "1 / 1" }}
+                    onTouchStart={e => { photoTouchStartX.current = e.touches[0].clientX; }}
+                    onTouchEnd={e => {
+                      const delta = e.changedTouches[0].clientX - photoTouchStartX.current;
+                      if (delta >  50 && canPrev) setActivePhoto(photos[photoIndex - 1]);
+                      if (delta < -50 && canNext) setActivePhoto(photos[photoIndex + 1]);
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={renderUrl(activePhoto.url, 900)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      style={{ objectPosition: "center 65%" }}
+                    />
+
+                    {/* Waypoint Indicator Overlay (The "Distinguisher") */}
+                    {linkedWpt && (
+                      <div className="absolute top-4 left-4 right-4 flex flex-col items-start gap-1 pointer-events-none">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-md shadow-lg">
+                          <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-[var(--color-primary)] uppercase tracking-tighter">
+                            {tUI(`wpt_${linkedWpt.type.toLowerCase()}` as any, locale) || linkedWpt.type}
+                          </span>
+                          <span className="text-[15px] font-black text-[var(--color-text-primary)] tracking-tight">
+                            {tDB(linkedWpt.name, locale)}
+                          </span>
+                          {linkedWpt.elevationM && (
+                            <span className="text-[12px] font-bold text-[var(--color-text-muted)] ml-0.5">
+                              {linkedWpt.elevationM}m
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setActivePhoto(null)}
+                      className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center
+                                 bg-black/35 backdrop-blur-md text-white hover:bg-black/55 transition-colors z-10"
+                      aria-label="Close"
+                    >
+                      <X size={18} strokeWidth={2.5} />
+                    </button>
+
+                    {/* Navigation Arrows */}
+                    {canPrev && (
+                      <button
+                        onClick={() => setActivePhoto(photos[photoIndex - 1])}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center
+                                   bg-black/25 backdrop-blur-sm text-white hover:bg-black/45 transition-colors"
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft size={22} strokeWidth={2.5} />
+                      </button>
+                    )}
+                    {canNext && (
+                      <button
+                        onClick={() => setActivePhoto(photos[photoIndex + 1])}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center
+                                   bg-black/25 backdrop-blur-sm text-white hover:bg-black/45 transition-colors"
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight size={22} strokeWidth={2.5} />
+                      </button>
+                    )}
+
+                    {/* Counter */}
+                    {photos.length > 1 && (
+                      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[12px] font-num text-white/90 bg-black/35 backdrop-blur-md px-3 py-1 rounded-full">
+                        {photoIndex + 1} / {photos.length}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Caption Section */}
+                  {(desc || linkedWpt?.description) && (
+                    <div className="px-6 py-5">
+                      <p
+                        className="text-[15px] leading-relaxed text-[var(--color-text-body)] text-center"
+                        style={locale === "ko" ? { fontFamily: "var(--font-ko)" } : undefined}
+                      >
+                        {desc || (linkedWpt?.description ? tDB(linkedWpt.description, locale) : "")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
     </div>
   );
 }

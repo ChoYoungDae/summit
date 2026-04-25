@@ -101,8 +101,7 @@ function toPhoto(row: any) {
     lat:           row.lat ?? null,
     lon:           row.lon ?? null,
     url:           row.url,
-    descriptionEn: row.description_en ?? null,
-    descriptionKo: row.description_ko ?? null,
+    description: row.description ?? null,
     orderIndex:    row.order_index ?? 0,
     createdAt:     row.created_at,
   };
@@ -214,7 +213,7 @@ export async function POST(req: NextRequest) {
 }
 
 // ── PATCH /api/admin/route-photos ─────────────────────────────────────────────
-// Body: { id, description_en?, description_ko?, segment_id? }
+// Body: { id, description?, segment_id? }
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
@@ -235,14 +234,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ photos: results });
     }
 
-    const { id, description_en, description_ko, segment_id, order_index, recalculate } = body;
+    const { id, description, segment_id, order_index, recalculate } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     const patch: Record<string, unknown> = {};
-    if (description_en !== undefined) patch.description_en = description_en;
-    if (description_ko !== undefined) patch.description_ko = description_ko;
-    if (segment_id     !== undefined) patch.segment_id     = segment_id;
-    if (order_index    !== undefined) patch.order_index    = order_index;
+    if (description  !== undefined) patch.description  = description;
+    if (segment_id   !== undefined) patch.segment_id   = segment_id;
+    if (order_index  !== undefined) patch.order_index  = order_index;
 
     // Handle recalculation request
     if (recalculate) {

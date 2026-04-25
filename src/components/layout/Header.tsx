@@ -13,7 +13,7 @@ export function Header() {
 
   if (isRouteContext) {
     return (
-      <header className="fixed top-0 inset-x-0 z-50 h-14 bg-white/80 backdrop-blur-sm flex items-center px-4">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-50 h-14 bg-white/80 dark:bg-card-dark/80 backdrop-blur-sm flex items-center px-4 transition-all">
         <Link
           href="/"
           className="inline-flex items-center gap-0.5 text-[var(--color-primary)] active:opacity-70 transition-opacity"
@@ -31,7 +31,7 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 h-14 bg-white border-b border-gray-100 flex items-center px-4 shadow-sm">
+    <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-50 h-14 bg-white dark:bg-card-dark border-b border-gray-100 dark:border-white/[0.06] flex items-center px-4 shadow-sm transition-all">
       <Link
         href="/"
         className="inline-flex items-center gap-2 active:opacity-70 transition-opacity"
