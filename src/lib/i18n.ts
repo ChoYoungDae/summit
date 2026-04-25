@@ -88,7 +88,7 @@ export const UI_STRINGS = {
     valueJunctionGuideTitle: "Junction Guide",
     valueJunctionGuideDesc: "Photo-based guides for every tricky intersection.",
     personalNoteDate: "April 13, 2026",
-    personalNote: "Hi! I’m personally mapping out the Seoul trails I’ve loved and walked for a decade. I’m currently uploading my favorite routes, vivid photos, and hidden tips one by one. Please visit often to see my journey unfold and find your next adventure!",
+    personalNote: "Hi! I’m personally mapping out the Seoul trails I’ve loved and walked for two decades. I’m currently uploading my favorite routes, vivid photos, and hidden tips one by one. Please visit often to see my journey unfold and find your next adventure!",
     chipChallenge: "The Challenge",
     chipCityViews: "City Views",
     chipNatureWalk: "Nature Walk",
@@ -211,6 +211,10 @@ export const UI_STRINGS = {
     diff_5: "Expert",
     exit: "Exit",
     sendFeedback: "Send Feedback",
+    statDistance: "Distance",
+    statWalking: "Walking",
+    statBus: "Bus",
+    statDifficulty: "Difficulty",
   },
   ko: {
     settings: "Settings",
@@ -373,6 +377,10 @@ export const UI_STRINGS = {
     diff_5: "매우 어려움",
     exit: "출구",
     sendFeedback: "의견 보내기",
+    statDistance: "거리",
+    statWalking: "도보",
+    statBus: "버스",
+    statDifficulty: "난이도",
   },
   zh: {
     settings: "Settings",
@@ -535,6 +543,10 @@ export const UI_STRINGS = {
     diff_5: "非常困难",
     exit: "出口",
     sendFeedback: "发送反馈",
+    statDistance: "距离",
+    statWalking: "步行",
+    statBus: "巴士",
+    statDifficulty: "难度",
   },
   ja: {
     settings: "Settings",
@@ -690,6 +702,10 @@ export const UI_STRINGS = {
     gpsAlertNote: "GPSを3回連続で誤読するか、5秒以上ルートを外れるとアラートが鳴ります。",
     exit: "出口",
     sendFeedback: "フィードバックを送信",
+    statDistance: "距離",
+    statWalking: "徒歩",
+    statBus: "バス",
+    statDifficulty: "難易度",
   },
   es: {
     settings: "Settings",
@@ -852,6 +868,10 @@ export const UI_STRINGS = {
     diff_5: "Muy difícil",
     exit: "Salida",
     sendFeedback: "Enviar Comentarios",
+    statDistance: "Distancia",
+    statWalking: "Caminata",
+    statBus: "Bus",
+    statDifficulty: "Dificultad",
   },
 } as const;
 

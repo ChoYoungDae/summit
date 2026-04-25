@@ -32,16 +32,21 @@ export function Header() {
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 h-14 bg-white border-b border-gray-100 flex items-center px-4 shadow-sm">
-      <Mountain
-        className="w-5 h-5 text-[var(--color-primary)] shrink-0"
-        strokeWidth={2}
-      />
-      <span
-        className="ml-2 text-[var(--color-primary)] font-semibold text-[15px] tracking-tight"
-        style={{ fontFamily: "var(--font-en)" }}
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 active:opacity-70 transition-opacity"
       >
-        Seoul Subway to Summit
-      </span>
+        <Mountain
+          className="w-5 h-5 text-[var(--color-primary)] shrink-0"
+          strokeWidth={2}
+        />
+        <span
+          className="text-[var(--color-primary)] font-semibold text-[15px] tracking-tight"
+          style={{ fontFamily: "var(--font-en)" }}
+        >
+          Seoul Subway to Summit
+        </span>
+      </Link>
       <span
         className="ml-auto inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em] border"
         style={{
