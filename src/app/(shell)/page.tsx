@@ -42,11 +42,11 @@ export default function HomePage() {
         <div className="flex flex-col gap-3">
           <div>
             <h1
-              className="text-[1.625rem] font-bold leading-tight text-[var(--color-text-primary)]"
+              className="text-[1.375rem] font-bold leading-tight text-[var(--color-text-primary)]"
               style={{ fontFamily: "var(--font-en)" }}
             >
               {locale === "en" ? (
-                <>Start Your <em style={{ color: "var(--color-primary)" }}>Hike</em> from the{" "}<span style={{ color: "var(--color-secondary)" }}>Subway</span>.</>
+                <>Start Your <span style={{ color: "var(--color-primary)" }}>Hike</span> from the{" "}<span style={{ color: "var(--color-secondary)" }}>Subway</span>.</>
               ) : (
                 tUI("homeTitle", locale)
               )}

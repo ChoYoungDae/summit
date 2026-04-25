@@ -59,6 +59,15 @@ function findNearestWaypoint(pt: [number, number], waypoints: Waypoint[]): Waypo
   return minDist <= GUIDE_RADIUS_KM ? nearest : null;
 }
 
+// ── Supabase Image Transformation ────────────────────────────────────────────
+// Requires "Image Transformations" enabled in Supabase dashboard (Pro plan).
+// Flip to true after confirming your project supports it.
+const USE_IMG_TRANSFORM = false;
+function renderUrl(url: string, width: number): string {
+  if (!USE_IMG_TRANSFORM) return url;
+  return url.replace("/object/public/", "/render/image/public/") + `?width=${width}&quality=80`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface BusInfo {
@@ -123,17 +132,22 @@ export default function TrailSection({
   const [photos,        setPhotos]        = useState<RoutePhoto[]>([]);
   const [activePhoto,   setActivePhoto]   = useState<RoutePhoto | null>(null);
 
-  // Fetch route photos once on mount
+  // Fetch route photos once on mount, then preload all into browser cache
   useEffect(() => {
     fetch(`/api/admin/route-photos?routeId=${route.id}`)
       .then(r => r.ok ? r.json() : [])
-      .then((data: RoutePhoto[]) => { if (Array.isArray(data)) setPhotos(data); })
+      .then((data: RoutePhoto[]) => {
+        if (!Array.isArray(data)) return;
+        setPhotos(data);
+        data.forEach(p => { const img = new window.Image(); img.src = renderUrl(p.url, 900); });
+      })
       .catch(() => {});
   }, [route.id]);
 
   // ── Hiking mode: "preview" (far from trailhead) | "active" (within 500 m) ──
   const [hikingMode, setHikingMode] = useState<"preview" | "active">("preview");
-  const hasEnteredActiveRef = useRef(false);
+  const hasEnteredActiveRef  = useRef(false);
+  const photoTouchStartX     = useRef(0);
 
   const { skill } = useHikingLevel();
   const skillMultiplier = skill.multiplier;
@@ -555,10 +569,20 @@ export default function TrailSection({
               onClick={e => e.stopPropagation()}
             >
               {/* Photo + X button */}
-              <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
+              <div
+                className="relative w-full"
+                style={{ aspectRatio: "1 / 1" }}
+                onTouchStart={e => { photoTouchStartX.current = e.touches[0].clientX; }}
+                onTouchEnd={e => {
+                  const delta = e.changedTouches[0].clientX - photoTouchStartX.current;
+                  const idx = photos.findIndex(p => p.id === activePhoto.id);
+                  if (delta >  50 && idx > 0)                  setActivePhoto(photos[idx - 1]);
+                  if (delta < -50 && idx < photos.length - 1)  setActivePhoto(photos[idx + 1]);
+                }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={activePhoto.url}
+                  src={renderUrl(activePhoto.url, 900)}
                   alt=""
                   className="w-full h-full object-cover"
                   style={{ objectPosition: "center 65%" }}
