@@ -3,7 +3,8 @@ import { fetchRouteList } from "@/lib/trails";
 import { cookies } from "next/headers";
 
 const getCachedRouteList = unstable_cache(fetchRouteList, ["route-list"], {
-  revalidate: 60 * 60, // 1 hour
+  revalidate: 60 * 60,
+  tags: ["route-list"],
 });
 import { tDB, tUI, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import type { SupportedLocale } from "@/lib/i18n";

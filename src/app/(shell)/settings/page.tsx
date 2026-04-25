@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
@@ -66,21 +66,35 @@ const LEVEL_DESC: Record<string, Record<number, string>> = {
   },
 };
 
-// ── Return button (isolated for Suspense boundary) ───────────────────────────
+// ── Sticky Done button (isolated for Suspense boundary) ──────────────────────
 
-function ReturnButton() {
+function StickyDoneButton({ hasChanges }: { hasChanges: boolean }) {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
   if (!returnUrl) return null;
   return (
-    <Link
-      href={returnUrl}
-      className="inline-flex items-center gap-1.5 mb-5 text-sm font-semibold active:opacity-70 transition-opacity"
-      style={{ color: "var(--color-primary)" }}
-    >
-      <Icon icon="ph:check-circle" width={18} height={18} />
-      Done
-    </Link>
+    <div className="fixed bottom-16 left-0 right-0 flex justify-center z-20 px-4 pb-3 pointer-events-none">
+      <Link
+        href={returnUrl}
+        className="pointer-events-auto inline-flex items-center gap-2 px-7 py-3 rounded-full text-sm font-semibold active:scale-95 transition-all duration-200"
+        style={
+          hasChanges
+            ? {
+                background: "var(--color-primary)",
+                color: "#fff",
+                boxShadow: "0 4px 18px rgba(46,94,74,0.38)",
+              }
+            : {
+                background: "rgba(46,94,74,0.09)",
+                color: "var(--color-primary)",
+                boxShadow: "none",
+              }
+        }
+      >
+        <Icon icon="ph:check-circle" width={18} height={18} />
+        Done
+      </Link>
+    </div>
   );
 }
 
@@ -91,12 +105,21 @@ export default function SettingsPage() {
   const { locale, setLanguage } = useLanguage();
   const { threshold, setThreshold } = useOffRouteSettings();
 
+  const initialIndex = useRef(index);
+  const initialLocale = useRef(locale);
+  const initialThreshold = useRef(threshold);
+
+  const hasChanges =
+    index !== initialIndex.current ||
+    locale !== initialLocale.current ||
+    threshold !== initialThreshold.current;
+
   return (
     <div className="px-4 pt-5 pb-8">
 
-      {/* ── Return button ─────────────────────────────────── */}
+      {/* ── Sticky Done button ────────────────────────────── */}
       <Suspense>
-        <ReturnButton />
+        <StickyDoneButton hasChanges={hasChanges} />
       </Suspense>
 
       {/* ── Language section ─────────────────────────────────── */}

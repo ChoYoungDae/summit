@@ -214,7 +214,7 @@ export interface MountainGroup {
 export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
   const { data: routeRows, error } = await supabase
     .from("routes")
-    .select("id, mountain_id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, route_preview_img, hero_images, description, tags, highlights")
+    .select("id, mountain_id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, route_preview_img, hero_images, description, tags, highlights, is_oneway, hide_safe_start")
     .order("id");
 
   if (error || !routeRows) return [];

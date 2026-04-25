@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
@@ -48,11 +49,12 @@ export async function POST(req: NextRequest) {
     total_duration_min: totalDurationMin ?? null,
     total_distance_m:   totalDistanceM   ?? null,
     total_difficulty:   totalDifficulty  ?? null,
-    // is_oneway:          isOneway         ?? false,
-    // hide_safe_start:    hideSafeStart    ?? false,
+    is_oneway:          isOneway         ?? false,
+    hide_safe_start:    hideSafeStart    ?? false,
   }).select("id").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateTag("route-list", "max");
   return NextResponse.json({ id: data.id });
 }
 
@@ -72,7 +74,7 @@ export async function PATCH(req: NextRequest) {
     highlights?: { type: "highlight" | "pro_tip" | "warning"; text: { en: string; ko: string } }[];
   };
 
-  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, tags, highlights } = body;
+  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart, tags, highlights } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
@@ -83,11 +85,12 @@ export async function PATCH(req: NextRequest) {
   if (totalDifficulty  != null) updates.total_difficulty    = totalDifficulty;
   if (tags !== undefined)       updates.tags              = tags;
   if (highlights !== undefined) updates.highlights        = highlights;
-  // if (isOneway         != null) updates.is_oneway          = isOneway;
-  // if (hideSafeStart    != null) updates.hide_safe_start    = hideSafeStart;
+  if (isOneway         != null) updates.is_oneway          = isOneway;
+  if (hideSafeStart    != null) updates.hide_safe_start    = hideSafeStart;
 
   const { error } = await supabaseAdmin.from("routes").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateTag("route-list", "max");
   return NextResponse.json({ ok: true });
 }
 
@@ -98,5 +101,6 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("routes").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidateTag("route-list", "max");
   return NextResponse.json({ ok: true });
 }
