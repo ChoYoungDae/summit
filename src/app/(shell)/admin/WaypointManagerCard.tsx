@@ -110,13 +110,13 @@ function WaypointForm({
       {/* Name */}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
-          <input type="text" placeholder="Summit" value={f.nameEn} onChange={set("nameEn")} className={INPUT} />
-        </label>
-        <label className="flex flex-col gap-1">
           <span className="text-xs text-[var(--color-text-muted)]">Name (KO)</span>
           <input type="text" placeholder="정상" value={f.nameKo} onChange={set("nameKo")}
             className={INPUT} style={{ fontFamily: "var(--font-ko)" }} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
+          <input type="text" placeholder="Summit" value={f.nameEn} onChange={set("nameEn")} className={INPUT} />
         </label>
       </div>
 
@@ -223,14 +223,14 @@ function WaypointForm({
       {/* Description */}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-[var(--color-text-muted)]">Description (EN)</span>
-          <textarea rows={2} placeholder="Brief description…" value={f.descEn} onChange={set("descEn")}
-            className={`${INPUT} resize-none`} />
-        </label>
-        <label className="flex flex-col gap-1">
           <span className="text-xs text-[var(--color-text-muted)]">Description (KO)</span>
           <textarea rows={2} placeholder="간단한 설명…" value={f.descKo} onChange={set("descKo")}
             className={`${INPUT} resize-none`} style={{ fontFamily: "var(--font-ko)" }} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-[var(--color-text-muted)]">Description (EN)</span>
+          <textarea rows={2} placeholder="Brief description…" value={f.descEn} onChange={set("descEn")}
+            className={`${INPUT} resize-none`} />
         </label>
       </div>
 
@@ -458,10 +458,10 @@ export default function WaypointManagerCard() {
                     <div className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] px-3 py-2.5">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium truncate">{w.name.en}</span>
-                          {w.name.ko && (
-                            <span className="text-xs text-[var(--color-text-muted)]" style={{ fontFamily: "var(--font-ko)" }}>
-                              {w.name.ko}
+                          <span className="text-sm font-medium truncate">{w.name.ko || w.name.en}</span>
+                          {w.name.ko && w.name.en && (
+                            <span className="text-xs text-[var(--color-text-muted)]">
+                              ({w.name.en})
                             </span>
                           )}
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${TYPE_COLORS[w.type] ?? "bg-gray-100 text-gray-600"}`}>

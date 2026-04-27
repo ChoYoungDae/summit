@@ -34,7 +34,8 @@ export default function RootLayout({
         <LocaleSync />
         <ServiceWorkerRegister />
         <FontLoader />
-        <div className="relative flex flex-col w-full max-w-[480px] mx-auto min-h-screen bg-[var(--bg)] shadow-2xl overflow-x-hidden">
+        {/* Main App Container - constraints moved to sub-layouts */}
+        <div className="relative flex flex-col w-full min-h-screen bg-[var(--bg)] overflow-x-hidden">
           {children}
         </div>
       </body>

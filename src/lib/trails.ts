@@ -230,6 +230,8 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
     track_data: GeoJsonLineString;
     start_waypoint_id: number;
     end_waypoint_id: number;
+    estimated_time_min?: number;
+    distance_m?: number;
     is_bus_combined?: boolean;
     bus_details?: { bus_numbers?: string[]; route_color?: string; bus_duration_min?: number; bus_stop_id_key?: string };
   }
@@ -243,7 +245,7 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
     allSegmentIds.length > 0
       ? supabase
           .from("segments")
-          .select("id, track_data, start_waypoint_id, end_waypoint_id, is_bus_combined, bus_details")
+          .select("id, track_data, start_waypoint_id, end_waypoint_id, is_bus_combined, bus_details, estimated_time_min, distance_m")
           .in("id", allSegmentIds)
       : Promise.resolve({ data: [] as SegmentSummary[] }),
   ]);
@@ -315,14 +317,26 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
       .map((id) => waypointMap.get(id))
       .filter(Boolean) as Waypoint[];
 
-    // Sum bus riding time across bus-combined segments
+    // Sum hiking stats and bus duration
     let busSegmentCount = 0;
-    const busDurationMin = segIds.reduce((sum, sid) => {
+    let busDurationMin  = 0;
+    let totalDurationMin = 0;
+    let totalDistanceM   = 0;
+
+    for (const sid of segIds) {
       const seg = segSummaryMap.get(sid);
-      if (!seg?.is_bus_combined) return sum;
-      busSegmentCount++;
-      return sum + (seg.bus_details?.bus_duration_min ?? 0);
-    }, 0);
+      if (!seg) continue;
+
+      // Add hiking stats
+      totalDurationMin += (seg.estimated_time_min || 0);
+      totalDistanceM   += (seg.distance_m || 0);
+
+      // Collect bus duration separately
+      if (seg.is_bus_combined) {
+        busSegmentCount++;
+        busDurationMin += (seg.bus_details?.bus_duration_min ?? 0);
+      }
+    }
 
     // Inject bus info from bus-combined segments
     for (const segId of segIds) {
@@ -349,7 +363,18 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
       }
     }
 
-    groups.get(row.mountain_id)!.routes.push({ route: rowToRoute(row), elevationTrack, waypoints, busDurationMin, busSegmentCount });
+    groups.get(row.mountain_id)!.routes.push({
+      route: {
+        ...rowToRoute(row),
+        // Prioritize DB-stored totals over segment sums to prevent 0.0km display during setup
+        totalDurationMin: row.total_duration_min ?? totalDurationMin,
+        totalDistanceM: row.total_distance_m ?? totalDistanceM,
+      },
+      elevationTrack,
+      waypoints,
+      busDurationMin,
+      busSegmentCount
+    });
   }
 
   return Array.from(groups.values());
@@ -408,18 +433,25 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     ? rowToMountain(mtRow as MountainRow)
     : { id: route.mountainId, slug: "", name: { en: "Unknown" } };
 
+  const totalDurationMin = resolvedSegments.reduce((sum, s) => sum + (s.estimatedTimeMin || 0), 0);
+  const totalDistanceM   = resolvedSegments.reduce((sum, s) => sum + (s.distanceM || 0), 0);
+
   return {
     ...route,
+    // Use DB totals if available, otherwise fallback to segment sum
+    totalDurationMin: route.totalDurationMin || totalDurationMin,
+    totalDistanceM: route.totalDistanceM || totalDistanceM,
     mountain,
     segments: resolvedSegments,
   };
 });
 
-export const getCachedRoute = unstable_cache(
-  (id: number) => fetchRoute(id),
-  ["route-detail"],
-  { revalidate: 60 * 60 }
-);
+export const getCachedRoute = (id: number) => 
+  unstable_cache(
+    async (rid: number) => fetchRoute(rid),
+    ["route-detail", String(id)],
+    { revalidate: 60 * 60, tags: ["route-detail", `route-detail-${id}`] }
+  )(id);
 
 // ── Home map data ─────────────────────────────────────────────────────────────
 

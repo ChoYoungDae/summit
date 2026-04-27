@@ -36,26 +36,32 @@ function buildWaypoints(route: ResolvedRoute): Waypoint[] {
 
 /** Approach GPS tracks: bus (station→stop) and walk (stop→trailhead). */
 function buildApproachTracks(route: ResolvedRoute): { bus: [number, number][], walk: [number, number][] } {
-  const seg = route.segments.find((s) => s.segmentType === "APPROACH");
-  if (!seg) return { bus: [], walk: [] };
-  const walk = seg.trackData.coordinates.map((c) => [c[0], c[1]] as [number, number]);
-  if (seg.isBusCombined && seg.busDetails?.bus_track_data) {
-    const bus = seg.busDetails.bus_track_data.coordinates.map((c) => [c[0], c[1]] as [number, number]);
-    return { bus, walk };
+  const segs = route.segments.filter((s) => s.segmentType === "APPROACH");
+  const bus: [number, number][] = [];
+  const walk: [number, number][] = [];
+
+  for (const s of segs) {
+    if (s.isBusCombined && s.busDetails?.bus_track_data) {
+      bus.push(...s.busDetails.bus_track_data.coordinates.map((c) => [c[0], c[1]] as [number, number]));
+    }
+    walk.push(...s.trackData.coordinates.map((c) => [c[0], c[1]] as [number, number]));
   }
-  return { bus: [], walk };
+  return { bus, walk };
 }
 
 /** Return GPS tracks: walk (trailhead→stop) and bus (stop→station). */
 function buildReturnTracks(route: ResolvedRoute): { bus: [number, number][], walk: [number, number][] } {
-  const seg = route.segments.find((s) => s.segmentType === "RETURN");
-  if (!seg) return { bus: [], walk: [] };
-  const walk = seg.trackData.coordinates.map((c) => [c[0], c[1]] as [number, number]);
-  if (seg.isBusCombined && seg.busDetails?.bus_track_data) {
-    const bus = seg.busDetails.bus_track_data.coordinates.map((c) => [c[0], c[1]] as [number, number]);
-    return { bus, walk };
+  const segs = route.segments.filter((s) => s.segmentType === "RETURN");
+  const bus: [number, number][] = [];
+  const walk: [number, number][] = [];
+
+  for (const s of segs) {
+    if (s.isBusCombined && s.busDetails?.bus_track_data) {
+      bus.push(...s.busDetails.bus_track_data.coordinates.map((c) => [c[0], c[1]] as [number, number]));
+    }
+    walk.push(...s.trackData.coordinates.map((c) => [c[0], c[1]] as [number, number]));
   }
-  return { bus: [], walk };
+  return { bus, walk };
 }
 
 /**
@@ -99,41 +105,67 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
   const { bus: approachBusTrack, walk: approachWalkTrack } = buildApproachTracks(route);
   const { bus: returnBusTrack,   walk: returnWalkTrack }   = buildReturnTracks(route);
 
-  const approachSeg = route.segments.find((s) => s.segmentType === "APPROACH");
-  const ascentSeg   = route.segments.find((s) => s.segmentType === "ASCENT");
-  const descentSeg  = route.segments.find((s) => s.segmentType === "DESCENT");
-  const returnSeg   = route.segments.find((s) => s.segmentType === "RETURN");
+  const approachSegs = route.segments.filter((s) => s.segmentType === "APPROACH");
+  const returnSegs   = route.segments.filter((s) => s.segmentType === "RETURN");
 
-  const approachIsBus = approachSeg?.isBusCombined ?? false;
-  const returnIsBus   = returnSeg?.isBusCombined   ?? false;
+  const approachIsBus = approachSegs.some((s) => s.isBusCombined);
+  const returnIsBus   = returnSegs.some((s) => s.isBusCombined);
 
-  // Bus stop coordinate: last point of bus_track_data = junction between bus and walk
-  const approachBusStopRaw = approachSeg?.busDetails?.bus_track_data?.coordinates;
-  const returnBusStopRaw   = returnSeg?.busDetails?.bus_track_data?.coordinates;
+  // Collect all bus numbers from all relevant segments, unique and joined
+  const approachBusNumbers = Array.from(new Set(
+    approachSegs.flatMap(s => s.busDetails?.bus_numbers ?? [])
+  )).join(", ");
+  
+  const returnBusNumbers = Array.from(new Set(
+    returnSegs.flatMap(s => s.busDetails?.bus_numbers ?? [])
+  )).join(", ");
 
-  const approachBusNumbers = approachSeg?.busDetails?.bus_numbers?.join(", ");
-  const returnBusNumbers   = returnSeg?.busDetails?.bus_numbers?.join(", ");
+  // Sum all segments by type to handle multi-stage routes correctly
+  const approachTimeMin = route.segments
+    .filter((s) => s.segmentType === "APPROACH")
+    .reduce((acc, s) => acc + (s.estimatedTimeMin || 0) + (s.busDetails?.bus_duration_min || 0), 0);
+    
+  const ascentMin = route.segments
+    .filter((s) => s.segmentType === "ASCENT")
+    .reduce((acc, s) => acc + (s.estimatedTimeMin || 0), 0);
+    
+  const descentMin = route.segments
+    .filter((s) => s.segmentType === "DESCENT")
+    .reduce((acc, s) => acc + (s.estimatedTimeMin || 0), 0);
+    
+  const returnTimeMin = route.segments
+    .filter((s) => s.segmentType === "RETURN")
+    .reduce((acc, s) => acc + (s.estimatedTimeMin || 0) + (s.busDetails?.bus_duration_min || 0), 0);
 
-  const approachStyle = seoulBusStyle(approachBusNumbers);
-  const returnStyle   = seoulBusStyle(returnBusNumbers);
+  const approachBusInfos = approachSegs
+    .filter(s => s.isBusCombined)
+    .map(s => {
+      const style = seoulBusStyle(s.busDetails?.bus_numbers?.join(", "));
+      const coords = s.busDetails?.bus_track_data?.coordinates;
+      return {
+        stopCoord: coords
+          ? ([coords[Math.floor(coords.length / 2)][0], coords[Math.floor(coords.length / 2)][1]] as [number, number])
+          : undefined,
+        busNumbers: s.busDetails?.bus_numbers?.join(", "),
+        color: style.color,
+        chipTextColor: style.chipTextColor,
+      };
+    });
 
-  const approachBusInfo = approachIsBus ? {
-    stopCoord: approachBusStopRaw
-      ? ([approachBusStopRaw[Math.floor(approachBusStopRaw.length / 2)][0], approachBusStopRaw[Math.floor(approachBusStopRaw.length / 2)][1]] as [number, number])
-      : undefined,
-    busNumbers: approachBusNumbers,
-    color: approachStyle.color,
-    chipTextColor: approachStyle.chipTextColor,
-  } : undefined;
-
-  const returnBusInfo = returnIsBus ? {
-    stopCoord: returnBusStopRaw
-      ? ([returnBusStopRaw[Math.floor(returnBusStopRaw.length / 2)][0], returnBusStopRaw[Math.floor(returnBusStopRaw.length / 2)][1]] as [number, number])
-      : undefined,
-    busNumbers: returnBusNumbers,
-    color: returnStyle.color,
-    chipTextColor: returnStyle.chipTextColor,
-  } : undefined;
+  const returnBusInfos = returnSegs
+    .filter(s => s.isBusCombined)
+    .map(s => {
+      const style = seoulBusStyle(s.busDetails?.bus_numbers?.join(", "));
+      const coords = s.busDetails?.bus_track_data?.coordinates;
+      return {
+        stopCoord: coords
+          ? ([coords[Math.floor(coords.length / 2)][0], coords[Math.floor(coords.length / 2)][1]] as [number, number])
+          : undefined,
+        busNumbers: s.busDetails?.bus_numbers?.join(", "),
+        color: style.color,
+        chipTextColor: style.chipTextColor,
+      };
+    });
 
   return (
     <TrailSection
@@ -146,15 +178,17 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
       returnWalkTrack={returnWalkTrack}
       approachIsBus={approachIsBus}
       returnIsBus={returnIsBus}
-      approachBusInfo={approachBusInfo}
-      returnBusInfo={returnBusInfo}
+      approachBusInfos={approachBusInfos}
+      returnBusInfos={returnBusInfos}
       sunsetMin={sunsetMin}
-      approachTimeMin={approachSeg?.estimatedTimeMin}
-      ascentMin={ascentSeg?.estimatedTimeMin}
-      descentMin={descentSeg?.estimatedTimeMin}
-      returnTimeMin={returnSeg?.estimatedTimeMin}
+      approachTimeMin={approachTimeMin}
+      ascentMin={ascentMin}
+      descentMin={descentMin}
+      returnTimeMin={returnTimeMin}
       routeName={tDB(route.mountain.name, locale)}
+      backHref={`/route?mountain=${route.mountain.id}`}
       locale={locale}
     />
   );
 }
+

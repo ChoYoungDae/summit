@@ -211,7 +211,7 @@ function WaypointSlotCard({
               <option value="">— pick one —</option>
               {existingWaypoints.map((wp) => (
                 <option key={wp.id} value={wp.id}>
-                  [{TYPE_LABELS[wp.type as WaypointType] ?? wp.type}] {wp.name.en}
+                  [{TYPE_LABELS[wp.type as WaypointType] ?? wp.type}] {wp.name.ko || wp.name.en}
                 </option>
               ))}
             </select>
@@ -272,12 +272,12 @@ function WaypointSlotCard({
             {data.type !== "STATION" && (
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <p className={LABEL}>Name (EN)</p>
-                  <input className={INPUT} value={data.nameEn} onChange={(e) => setField("nameEn", e.target.value)} placeholder="Dobongsan Trailhead" />
-                </div>
-                <div>
                   <p className={LABEL}>Name (KO)</p>
                   <input className={INPUT} value={data.nameKo} onChange={(e) => setField("nameKo", e.target.value)} placeholder="도봉산 등산로 입구" />
+                </div>
+                <div>
+                  <p className={LABEL}>Name (EN)</p>
+                  <input className={INPUT} value={data.nameEn} onChange={(e) => setField("nameEn", e.target.value)} placeholder="Dobongsan Trailhead" />
                 </div>
               </div>
             )}
@@ -313,18 +313,6 @@ function WaypointSlotCard({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <p className={LABEL}>Station name (EN)</p>
-                    <input
-                      className={INPUT}
-                      value={data.subwayStationEn ?? ""}
-                      onChange={(e) => {
-                        const en = e.target.value;
-                        onChange({ ...slot, data: { ...slot.data, subwayStationEn: en, nameEn: en ? `${en} Station` : "" } });
-                      }}
-                      placeholder="Dobongsan"
-                    />
-                  </div>
-                  <div>
                     <p className={LABEL}>Station name (KO)</p>
                     <input
                       className={INPUT}
@@ -334,6 +322,18 @@ function WaypointSlotCard({
                         onChange({ ...slot, data: { ...slot.data, subwayStation: ko, nameKo: ko ? `${ko}역` : "" } });
                       }}
                       placeholder="도봉산"
+                    />
+                  </div>
+                  <div>
+                    <p className={LABEL}>Station name (EN)</p>
+                    <input
+                      className={INPUT}
+                      value={data.subwayStationEn ?? ""}
+                      onChange={(e) => {
+                        const en = e.target.value;
+                        onChange({ ...slot, data: { ...slot.data, subwayStationEn: en, nameEn: en ? `${en} Station` : "" } });
+                      }}
+                      placeholder="Dobongsan"
                     />
                   </div>
                 </div>

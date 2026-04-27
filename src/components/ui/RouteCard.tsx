@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -58,7 +59,7 @@ interface RouteCardProps {
   busDurationMin?: number;
   busSegmentCount?: number;
   latestStartMin?: number | null;
-  stationInfo?: { name: LocalizedText; lines: (number | string)[] };
+  stationInfo?: { name: LocalizedText; lines: (number | string)[]; busNumbers?: string };
   locale?: string;
 }
 
@@ -70,6 +71,7 @@ export default function RouteCard({
   stationInfo,
   locale = "en",
 }: RouteCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const isPastLatestStart =
     latestStartMin != null && nowKSTMin() > latestStartMin;
 
@@ -109,12 +111,20 @@ export default function RouteCard({
               )
             )}
             {stationInfo && (
-              <span
-                className="text-[12px] font-semibold truncate"
-                style={{ color: "var(--color-text-body)" }}
-              >
-                {tDB(stationInfo.name, locale)}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="text-[12px] font-semibold truncate"
+                  style={{ color: "var(--color-text-body)" }}
+                >
+                  {tDB(stationInfo.name, locale)}
+                </span>
+                {stationInfo.busNumbers && (
+                  <span className="flex items-center gap-0.5 text-[10px] font-bold text-[#0068B7] bg-[#0068B7]/5 px-1.5 py-0.5 rounded-md shrink-0">
+                    <Bus size={10} strokeWidth={2.5} />
+                    {stationInfo.busNumbers}
+                  </span>
+                )}
+              </div>
             )}
             <Icon icon="ph:sneaker" width={14} height={14} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
           </div>
@@ -169,21 +179,14 @@ export default function RouteCard({
           {route.totalDurationMin != null && (
             <StatItem
               icon={<Footprints size={14} strokeWidth={2} />}
-              value={formatTime(
-                busDurationMin > 0 ? route.totalDurationMin - busDurationMin : route.totalDurationMin,
-                locale
-              )}
+              value={formatTime(route.totalDurationMin, locale)}
               label={tUI("statWalking", locale)}
             />
           )}
           {busDurationMin > 0 && (
             <StatItem
               icon={<Bus size={14} strokeWidth={2} />}
-              value={
-                busSegmentCount > 1
-                  ? `${Math.round(busDurationMin / busSegmentCount)}${tUI("minute", locale)} ×${busSegmentCount}`
-                  : formatTime(busDurationMin, locale)
-              }
+              value={formatTime(busDurationMin, locale)}
               label={tUI("statBus", locale)}
               color="#0068B7"
             />
@@ -197,7 +200,6 @@ export default function RouteCard({
             />
           )}
         </div>
-
 
         {/* Tags */}
         {route.tags && route.tags.length > 0 && (
@@ -220,7 +222,7 @@ export default function RouteCard({
 
         {/* Highlights */}
         {route.highlights && route.highlights.length > 0 && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5 px-1">
             {route.highlights.map((h, i) => (
               <div key={i} className="flex items-start gap-1.5">
                 <Icon
@@ -238,19 +240,53 @@ export default function RouteCard({
           </div>
         )}
 
-        {/* CTA */}
-        <div className="flex justify-center pt-0.5">
+        {/* Description */}
+        {route.description && (
+          <div className="relative px-1 group" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: "pointer" }}>
+            <p 
+              className={`text-sm leading-relaxed text-[var(--color-text-muted)] italic transition-all duration-300 ${isExpanded ? "" : "line-clamp-3"}`}
+              style={{
+                display: isExpanded ? "block" : "-webkit-box",
+                WebkitLineClamp: isExpanded ? "none" : 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {tDB(route.description, locale)}
+            </p>
+            {!isExpanded && (
+              <span 
+                className="absolute bottom-0 right-1 pl-6 pb-[2px] text-[11px] font-bold text-primary italic"
+                style={{ 
+                  color: "var(--color-primary)",
+                  background: "linear-gradient(to right, transparent, var(--color-card) 40%, var(--color-card) 100%)",
+                }}
+              >
+                {tUI("readMore", locale)}
+              </span>
+            )}
+            {isExpanded && (
+              <span className="inline-block text-[11px] font-bold text-primary mt-1 opacity-60 hover:opacity-100">
+                {locale === "ko" ? "↑ 접기" : "↑ Close"}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* CTA — Back to Bottom */}
+        <div className="flex justify-center pt-2">
           <Link
             href={`/route/${route.id}`}
-            className="inline-flex items-center gap-1 px-4 py-1 rounded-full border
+            className="inline-flex items-center gap-1 px-5 py-1.5 rounded-full border
                        active:opacity-70 transition-opacity"
             style={{
               borderColor: "var(--color-primary)",
               color: "var(--color-primary)",
+              background: "rgba(46,94,74,0.02)",
             }}
           >
-            <span className="text-sm font-semibold">{tUI("viewRoute", locale)}</span>
-            <ChevronRight size={14} strokeWidth={2} />
+            <span className="text-sm font-bold">{tUI("viewRoute", locale)}</span>
+            <ChevronRight size={14} strokeWidth={2.5} />
           </Link>
         </div>
       </div>

@@ -1,11 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { fetchRouteList } from "@/lib/trails";
 import { cookies } from "next/headers";
-
-const getCachedRouteList = unstable_cache(fetchRouteList, ["route-list"], {
-  revalidate: 60 * 60,
-  tags: ["route-list"],
-});
 import { tDB, tUI, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
 import type { SupportedLocale } from "@/lib/i18n";
 import { fetchSunsetMin } from "@/lib/sunset";
@@ -54,6 +49,15 @@ const TERRAIN_TAG_ICON: Record<string, LucideIcon> = {
   sunny:        Sun,
   exposed:      Flame,
 };
+
+const getCachedRouteList = unstable_cache(
+  async () => fetchRouteList(),
+  ["route-list"],
+  {
+    revalidate: 60 * 60, // 1 hour
+    tags: ["route-list"],
+  }
+);
 
 export default async function RouteListPage({
   searchParams,
@@ -211,7 +215,7 @@ export default async function RouteListPage({
               {routes.map(({ route, busDurationMin, busSegmentCount, waypoints }) => {
                 const latestStartMin =
                   sunsetMin !== null && route.totalDurationMin != null
-                    ? calcLatestStartFromDuration(route.totalDurationMin, sunsetMin)
+                    ? calcLatestStartFromDuration(route.totalDurationMin, busDurationMin, sunsetMin)
                     : null;
                 const stationWp = waypoints.find((w) => w.type === "STATION");
                 const stationInfo = stationWp
@@ -225,6 +229,7 @@ export default async function RouteListPage({
                           return !isNaN(n) && n > 0 ? n : t;
                         })
                         .filter((l) => l !== ""),
+                      busNumbers: stationWp.busNumbers,
                     }
                   : undefined;
                 return (

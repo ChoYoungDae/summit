@@ -251,9 +251,8 @@ export default function SegmentUploadCard() {
   }
 
   async function handleUpload() {
-    if (!editingId && (!file || !parsed)) return;
     if (!mountainId || !startWpId || !endWpId) return;
-    if (isBusCombined && (!midWpId || !busNumber)) return;
+    if (isBusCombined && !midWpId) return;
 
     setIsPending(true);
     setPhase("uploading");
@@ -262,17 +261,9 @@ export default function SegmentUploadCard() {
       if (editingId) form.append("id", String(editingId));
       else           form.append("mountainId", mountainId);
 
-      if (file)      form.append("gpx", file);
-
       if (isBusCombined) {
-        if (busFile) form.append("busGpx", busFile);
         form.append("isBusCombined",   "true");
         form.append("midWaypointId",   midWpId);
-        form.append("busType",         busType);
-        form.append("busNumber",       busNumber);
-        form.append("busColor",        BUS_COLORS[busType] || "#00A84D");
-        if (stationBusStopName.trim()) form.append("stationBusStopName", stationBusStopName.trim());
-        if (busInstructionPreview)     form.append("busInstruction",     busInstructionPreview);
         if (busDurationMin)            form.append("busDurationMin",     busDurationMin);
       }
 
@@ -280,7 +271,6 @@ export default function SegmentUploadCard() {
       form.append("startWaypointId", startWpId);
       form.append("endWaypointId",   endWpId);
       if (estimatedMin)              form.append("estimatedTimeMin", estimatedMin);
-      if (difficulty)                form.append("difficulty",       difficulty);
       if (nameEn.trim())             form.append("nameEn",           nameEn.trim());
       if (nameKo.trim())             form.append("nameKo",           nameKo.trim());
       if (segmentSlugPreview?.slug)  form.append("slug",             segmentSlugPreview.slug);
@@ -315,23 +305,24 @@ export default function SegmentUploadCard() {
   }
 
   const stepNum = phase === "input" ? 1 : phase === "preview" ? 2 : 3;
-  const canPreview = (!!parsed || !!editingId) && !!mountainId && !!startWpId && !!endWpId && !!nameKo && 
-    (!isBusCombined || (!!midWpId && !!busNumber && !!busDurationMin));
+  const canPreview = !!mountainId && !!startWpId && !!endWpId && !!nameKo && !!estimatedMin &&
+    (!isBusCombined || (!!midWpId && !!busDurationMin));
 
   const eleRange = parsed
     ? (() => { const e = parsed.points.map(p => p[2]); return `${Math.min(...e).toFixed(0)}m — ${Math.max(...e).toFixed(0)}m`; })()
-    : "";
+    : "—";
 
   const waypointLabel = (id: string) => {
     const w = waypoints.find(x => String(x.id) === id);
     if (!w) return "—";
-    return `${w.name.en}${w.name.ko ? ` (${w.name.ko})` : ""} [${w.type}]`;
+    const name = w.name.ko ? `${w.name.ko}${w.name.en ? ` (${w.name.en})` : ""}` : w.name.en;
+    return `${name} [${w.type}]`;
   };
 
   const mountainLabel = () => {
     const m = mountains.find(x => String(x.id) === mountainId);
     if (!m) return "—";
-    return `${m.name.en ?? ""}${m.name.ko ? ` (${m.name.ko})` : ""}`;
+    return m.name.ko ? `${m.name.ko}${m.name.en ? ` (${m.name.en})` : ""}` : (m.name.en ?? "—");
   };
 
   const busInstructionPreview = (() => {
@@ -398,27 +389,26 @@ export default function SegmentUploadCard() {
           {/* Segment Names (Internal) */}
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-[var(--color-text-muted)]">Segment Name (EN)</span>
-              <input type="text" placeholder="e.g. Bukhansanseong Trail" value={nameEn}
-                onChange={e => setNameEn(e.target.value)} className={INPUT} />
-            </label>
-            <label className="flex flex-col gap-1">
               <span className="text-xs text-[var(--color-text-muted)]">Segment Name (KO) *</span>
               <input type="text" placeholder="e.g. 북한산성 코스" value={nameKo}
                 onChange={e => setNameKo(e.target.value)} className={INPUT}
                 style={{ fontFamily: "var(--font-ko)" }} />
             </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-[var(--color-text-muted)]">Segment Name (EN)</span>
+              <input type="text" placeholder="e.g. Bukhansanseong Trail" value={nameEn}
+                onChange={e => setNameEn(e.target.value)} className={INPUT} />
+            </label>
           </div>
 
           {/* Segment type */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-center justify-between">
             <label className="flex flex-col gap-1 flex-1">
               <span className="text-xs text-[var(--color-text-muted)]">Segment Type *</span>
               <select value={segType} onChange={e => {
                 const t = e.target.value as SegType;
                 setSegType(t);
-                if (t === "APPROACH" || t === "RETURN") setDifficulty("");
-                else setIsBusCombined(false);
+                if (t !== "APPROACH" && t !== "RETURN") setIsBusCombined(false);
               }} className={INPUT}>
                 {(Object.keys(SEG_TYPE_LABELS) as SegType[]).map(t => (
                   <option key={t} value={t}>{SEG_TYPE_LABELS[t]}</option>
@@ -426,60 +416,15 @@ export default function SegmentUploadCard() {
               </select>
             </label>
             {(segType === "APPROACH" || segType === "RETURN") && (
-              <label className="flex items-center gap-2 mt-7 cursor-pointer">
+              <label className="flex items-center gap-2 mt-7 ml-4 cursor-pointer">
                 <input type="checkbox" checked={isBusCombined} onChange={e => setIsBusCombined(e.target.checked)} className="w-4 h-4 rounded text-primary focus:ring-primary/40 border-[var(--color-border)]" />
                 <span className="text-sm font-medium">Add Bus Route</span>
               </label>
             )}
           </div>
 
-          {/* Bus specific fields */}
-          {isBusCombined && (
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[#EEF5F1] border border-[#2E5E4A]/20">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-[#2E5E4A]">Bus Type</span>
-                <select value={busType} onChange={e => setBusType(e.target.value)} className={`${INPUT} border-[#2E5E4A]/30`}>
-                  <option value="BLUE">간선 (Blue)</option>
-                  <option value="GREEN">지선/마을 (Green)</option>
-                  <option value="RED">광역 (Red)</option>
-                  <option value="YELLOW">순환 (Yellow)</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-[#2E5E4A]">Bus Number *</span>
-                <input type="text" placeholder="e.g. 704" value={busNumber} onChange={e => setBusNumber(e.target.value)} className={`${INPUT} border-[#2E5E4A]/30`} />
-              </label>
-              <label className="col-span-2 flex flex-col gap-1">
-                <span className="text-xs text-[#2E5E4A]">
-                  {segType === "APPROACH" ? "Station-side Bus Boarding Stop" : "Station-side Bus Alighting Stop"}
-                  <span className="ml-1 opacity-60">(optional)</span>
-                </span>
-                <input
-                  type="text"
-                  placeholder={
-                    waypoints.find(x => String(x.id) === endWpId)?.name.en
-                      ? `e.g. ${waypoints.find(x => String(x.id) === endWpId)!.name.en} Bus Stop — leave blank to use station name`
-                      : "Enter the actual bus stop name near the station"
-                  }
-                  value={stationBusStopName}
-                  onChange={e => setStationBusStopName(e.target.value)}
-                  className={`${INPUT} border-[#2E5E4A]/30`}
-                />
-              </label>
-              <label className="col-span-2 flex flex-col gap-1">
-                <span className="text-xs text-[#2E5E4A]">Bus Riding Time (min) *</span>
-                <input type="number" placeholder="20" value={busDurationMin} onChange={e => setBusDurationMin(e.target.value)} className={`${INPUT} border-[#2E5E4A]/30`} />
-              </label>
-              {busInstructionPreview && (
-                <div className="col-span-2 rounded-lg bg-[#2E5E4A]/10 px-3 py-2 text-xs text-[#2E5E4A]">
-                  <span className="opacity-60 mr-1">Preview:</span>{busInstructionPreview}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Waypoint pickers */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${isBusCombined ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"}`}>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-[var(--color-text-muted)]">Start Waypoint *</span>
               <select value={startWpId} onChange={e => setStartWpId(e.target.value)}
@@ -487,7 +432,7 @@ export default function SegmentUploadCard() {
                 <option value="">— Select —</option>
                 {waypoints.map(w => (
                   <option key={w.id} value={w.id}>
-                    [{w.type}] {w.name.en}
+                    [{w.type}] {w.name.ko || w.name.en}
                   </option>
                 ))}
               </select>
@@ -496,15 +441,15 @@ export default function SegmentUploadCard() {
             {isBusCombined && (
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-[var(--color-text-muted)]">
-                  {segType === "APPROACH" ? "Bus Drop-off Stop (하차) *" : "Bus Boarding Stop (승차) *"}
+                  {segType === "APPROACH" ? "Bus Stop (하차) *" : "Bus Stop (승차) *"}
                 </span>
                 <select value={midWpId} onChange={e => setMidWpId(e.target.value)}
                   disabled={!mountainId || loadingWp} className={INPUT}>
                   <option value="">— Select —</option>
                   {waypoints.map(w => (
-                     <option key={w.id} value={w.id}>
-                     [{w.type}] {w.name.en} {w.ars_id ? `(${w.ars_id})` : ""}
-                   </option>
+                    <option key={w.id} value={w.id}>
+                      [{w.type}] {w.name.ko || w.name.en} {w.ars_id ? `(${w.ars_id})` : ""}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -517,54 +462,55 @@ export default function SegmentUploadCard() {
                 <option value="">— Select —</option>
                 {waypoints.map(w => (
                   <option key={w.id} value={w.id}>
-                    [{w.type}] {w.name.en}
+                    [{w.type}] {w.name.ko || w.name.en}
                   </option>
                 ))}
               </select>
             </label>
           </div>
 
-          {/* Optional fields */}
-          <div className={`grid gap-3 ${segType === "APPROACH" || segType === "RETURN" ? "grid-cols-1" : "grid-cols-2"}`}>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {isBusCombined ? "Total Est. Time (Bus + Walk) (min) — 합친 시간 *" : "Est. Time (min)"}
-              </span>
-              <input type="number" placeholder="45" value={estimatedMin}
-                onChange={e => setEstimatedMin(e.target.value)} className={INPUT} />
+          <div className="flex flex-col gap-3 p-3 rounded-xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-bg-light)]">
+            <label className="flex flex-col gap-1 cursor-pointer">
+              <span className="text-xs font-semibold">GPS File (.gpx, .geojson) *</span>
+              <input type="file" ref={fileRef} accept=".gpx,.geojson"
+                onChange={e => handleFileChange(e.target.files?.[0] || null)}
+                className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
             </label>
-            {segType !== "APPROACH" && segType !== "RETURN" && (
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-[var(--color-text-muted)]">Difficulty (1–5)</span>
-                <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className={INPUT}>
-                  <option value="">—</option>
-                  <option value="1">1 — Easy</option>
-                  <option value="2">2 — Novice</option>
-                  <option value="3">3 — Intermediate</option>
-                  <option value="4">4 — Advanced</option>
-                  <option value="5">5 — Expert</option>
-                </select>
+
+            {isBusCombined && (
+              <label className="flex flex-col gap-1 cursor-pointer border-t border-[var(--color-border)] pt-3">
+                <span className="text-xs font-semibold text-[#2E5E4A]">GPS File (.gpx, .geojson)</span>
+                <input type="file" ref={busFileRef} accept=".gpx,.geojson"
+                  onChange={e => handleFileChange(e.target.files?.[0] || null, true)}
+                  className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-[#2E5E4A]/10 file:text-[#2E5E4A] hover:file:bg-[#2E5E4A]/20" />
               </label>
             )}
           </div>
 
-          {/* Track file */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             {isBusCombined && (
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs text-[#2E5E4A]">Bus GPS File</span>
-                  <input ref={busFileRef} type="file" accept=".gpx,.geojson"
-                    onChange={e => handleFileChange(e.target.files?.[0] ?? null, true)}
-                    className="text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-[#2E5E4A] file:text-white file:text-xs file:cursor-pointer" />
-                </label>
-             )}
+          {/* Estimated time */}
+          {!isBusCombined ? (
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-[var(--color-text-muted)]">Walk GPS File {isBusCombined ? "" : "*"}</span>
-              <input ref={fileRef} type="file" accept=".gpx,.geojson"
-                onChange={e => handleFileChange(e.target.files?.[0] ?? null, false)}
-                className="text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-xs file:cursor-pointer" />
+              <span className="text-xs text-[var(--color-text-muted)]">Estimated Time (min) *</span>
+              <input type="number" placeholder="45" value={estimatedMin}
+                onChange={e => setEstimatedMin(e.target.value)} className={INPUT} />
             </label>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[#EEF5F1] border border-[#2E5E4A]/20">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-[#2E5E4A]">Bus Riding Time (min) *</span>
+                <input type="number" placeholder="20" value={busDurationMin}
+                  onChange={e => setBusDurationMin(e.target.value)} className={`${INPUT} border-[#2E5E4A]/30`} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-[#2E5E4A]">Walking Time (min) *</span>
+                <input type="number" placeholder="25" value={estimatedMin}
+                  onChange={e => setEstimatedMin(e.target.value)} className={`${INPUT} border-[#2E5E4A]/30`} />
+              </label>
+              <div className="col-span-2 text-[10px] text-[#2E5E4A] opacity-70">
+                Total: {Number(busDurationMin || 0) + Number(estimatedMin || 0)} min
+              </div>
+            </div>
+          )}
 
           {/* Segment slug preview */}
           {segmentSlugPreview && (
@@ -584,11 +530,40 @@ export default function SegmentUploadCard() {
           {parsing  && <Alert type="loading" message="Parsing…" />}
           {parseErr && <Alert type="error" message={parseErr} />}
 
-          {parsed && !parsing && (
+          {/* Duplicate Detection Warning */}
+          {(() => {
+            if (editingId) return null;
+            const duplicate = segments.find(s => 
+              String(s.start_waypoint_id) === startWpId && 
+              String(s.end_waypoint_id) === endWpId && 
+              s.segment_type === segType
+            );
+            if (!duplicate) return null;
+            return (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex flex-col gap-2">
+                <div className="flex items-start gap-2 text-amber-700 text-xs">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-1">
+                    <span className="font-bold">Existing Segment Found</span>
+                    <span>A segment with this route already exists (ID: {duplicate.id}). 
+                    To avoid errors, edit the existing one instead of creating a duplicate.</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => startEdit(duplicate)}
+                  className="text-[10px] font-bold text-amber-800 bg-amber-200/50 hover:bg-amber-200 px-2 py-1.5 rounded-lg transition-colors self-end"
+                >
+                  Edit Existing Segment #{duplicate.id}
+                </button>
+              </div>
+            );
+          })()}
+
+          {(parsed || phase === "input") && !parsing && (
             <div className="grid grid-cols-3 gap-2">
-              <Stat label="Points"    value={parsed.points.length.toLocaleString()} />
+              <Stat label="Points"    value={parsed ? parsed.points.length.toLocaleString() : "—"} />
               <Stat label="Elevation" value={eleRange} />
-              <Stat label="Start"     value={`${parsed.points[0][1].toFixed(4)}, ${parsed.points[0][0].toFixed(4)}`} />
+              <Stat label="Start"     value={parsed ? `${parsed.points[0][1].toFixed(4)}, ${parsed.points[0][0].toFixed(4)}` : "—"} />
             </div>
           )}
 
@@ -600,7 +575,7 @@ export default function SegmentUploadCard() {
       )}
 
       {/* ── Step 2 ── */}
-      {phase === "preview" && (parsed || editingId) && (
+      {phase === "preview" && (
         <div className="flex flex-col gap-3">
           <div className="rounded-xl border border-[var(--color-border)] divide-y divide-[var(--color-border)] text-sm">
             {[
@@ -700,7 +675,17 @@ export default function SegmentUploadCard() {
                             <span className={`font-medium truncate ${editingId === s.id ? "text-primary" : ""}`}>
                               {s.name?.en || s.name?.ko ? `${s.name.en ?? ""}${s.name.ko ? ` (${s.name.ko})` : ""}` : `Segment ${s.id}`}
                             </span>
-                            <span className="text-[10px] text-[var(--color-text-muted)] font-mono opacity-50">(ID: {s.id})</span>
+                            <span className="text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg-light)] px-1.5 py-0.5 rounded border border-[var(--color-border)] font-mono">
+                              {s.is_bus_combined ? (
+                                <>
+                                  <span className="text-[#2E5E4A] font-bold">Bus {s.bus_details?.bus_duration_min || 0}m</span>
+                                  <span className="mx-1">+</span>
+                                  <span>Walk {s.estimated_time_min || 0}m</span>
+                                </>
+                              ) : (
+                                `${s.estimated_time_min}m`
+                              )}
+                            </span>
                           </div>
                           <div className="text-[10px] text-[var(--color-text-muted)] truncate mt-0.5">
                             → {waypointLabel(String(s.end_waypoint_id))}

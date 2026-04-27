@@ -7,7 +7,8 @@ import { Icon } from "@iconify/react";
 import { parseTrackFile, type TrackPoint } from "@/lib/parseGpx";
 import { trackDistanceKm } from "@/lib/geo";
 import StepWaypoints from "./StepWaypoints";
-import type { PhotoItem, WaypointSlot, ExistingWaypoint } from "./types";
+import StepSegments from "./StepSegments";
+import type { PhotoItem, WaypointSlot, ExistingWaypoint, SegmentPreview } from "./types";
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
@@ -55,32 +56,49 @@ async function extractGps(file: File): Promise<{ lat: number; lon: number; ele?:
 // ── Step indicator ────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { label: "Mountain", icon: Mountain },
-  { label: "GPS",      icon: Route },
-  { label: "Photos",   icon: Camera },
-  { label: "Waypoints",icon: Mountain },
-  { label: "Captions", icon: Camera },
-  { label: "Save",     icon: Save },
+  { label: "Mountain",  icon: Mountain },
+  { label: "GPS",       icon: Route },
+  { label: "Photos",    icon: Camera },
+  { label: "Waypoints", icon: Mountain },
+  { label: "Segments",  icon: Route },
+  { label: "Captions",  icon: Camera },
+  { label: "Save",      icon: Save },
 ];
 
-function StepBar({ current }: { current: number }) {
+function StepBar({ current, onStepClick }: { current: number; onStepClick?: (step: number) => void }) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto pb-1">
-      {STEPS.map((s, i) => (
-        <div key={i} className="flex items-center gap-1 flex-none">
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors ${
-            i < current  ? "bg-primary text-white" :
-            i === current ? "bg-primary text-white ring-2 ring-primary/30" :
-            "bg-[var(--color-bg-light)] text-[var(--color-text-muted)] border border-[var(--color-border)]"
-          }`}>
-            {i < current ? <CheckCircle size={12} /> : i + 1}
+    <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar">
+      {STEPS.map((s, i) => {
+        const isPast = i < current;
+        const isCurrent = i === current;
+        const isClickable = isPast && onStepClick;
+
+        return (
+          <div key={i} className="flex items-center gap-1 flex-none">
+            <button
+              onClick={() => isClickable && onStepClick(i)}
+              disabled={!isClickable}
+              className={`flex items-center gap-1 transition-all group ${isClickable ? "cursor-pointer" : "cursor-default"}`}
+            >
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors ${
+                isPast  ? "bg-primary text-white group-hover:bg-primary/80" :
+                isCurrent ? "bg-primary text-white ring-2 ring-primary/30" :
+                "bg-[var(--color-bg-light)] text-[var(--color-text-muted)] border border-[var(--color-border)]"
+              }`}>
+                {isPast ? <CheckCircle size={12} /> : i + 1}
+              </div>
+              <span className={`text-[10px] font-medium hidden sm:inline ${
+                isCurrent ? "text-primary" : 
+                isPast ? "text-[var(--color-text-body)] group-hover:text-primary" : 
+                "text-[var(--color-text-muted)]"
+              }`}>
+                {s.label}
+              </span>
+            </button>
+            {i < STEPS.length - 1 && <ChevronRight size={10} className="text-[var(--color-border)] flex-none" />}
           </div>
-          <span className={`text-[10px] font-medium hidden sm:inline ${i === current ? "text-primary" : "text-[var(--color-text-muted)]"}`}>
-            {s.label}
-          </span>
-          {i < STEPS.length - 1 && <ChevronRight size={10} className="text-[var(--color-border)] flex-none" />}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -112,7 +130,11 @@ export default function NewRoutePage() {
   const [waypointSlots,     setWaypointSlots]     = useState<WaypointSlot[]>([]);
   const [existingWaypoints, setExistingWaypoints] = useState<ExistingWaypoint[]>([]);
 
-  // Step 4: Captions — use photos state (descEn/descKo fields)
+  // Step 4: Segments
+  const [segments,       setSegments]       = useState<SegmentPreview[]>([]);
+  const [segmentLoading, setSegmentLoading] = useState(false);
+
+  // Step 5: Captions — use photos state (descEn/descKo fields)
 
   // Step 5: Route meta + save
   const [routeNameEn,   setRouteNameEn]   = useState("");
@@ -120,6 +142,8 @@ export default function NewRoutePage() {
   const [routeDifficulty, setRouteDifficulty] = useState<number>(3);
   const [tags,       setTags]       = useState<{ en: string; ko: string }[]>([{ en: "", ko: "" }]);
   const [highlights, setHighlights] = useState<{ type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[]>([{ type: "highlight", en: "", ko: "" }]);
+  const [routeDescriptionEn, setRouteDescriptionEn] = useState("");
+  const [routeDescriptionKo, setRouteDescriptionKo] = useState("");
 
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
@@ -187,10 +211,49 @@ export default function NewRoutePage() {
   }
 
   // ── Navigation helpers ────────────────────────────────────────────────────
-  function next() {
+  async function next() {
     if (step === 0 && mountainId) {
       loadExistingWaypoints(mountainId);
     }
+
+    // Moving from Waypoints (3) to Segments (4)
+    if (step === 3) {
+      setSegmentLoading(true);
+      setError("");
+      try {
+        const waypointSpecs = waypointSlots.map((slot) => {
+          if (slot.source === "existing" && slot.existingId) return { existingId: slot.existingId };
+          return {
+            nameEn: slot.data.nameEn,
+            nameKo: slot.data.nameKo,
+            type:   slot.data.type,
+            lat:    slot.data.lat,
+            lon:    slot.data.lon,
+          };
+        });
+
+        const res = await fetch("/api/admin/create-route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mountainId,
+            routeNameEn: "PREVIEW", // dummy
+            trackPoints,
+            waypointSpecs,
+            preview: true,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to infer segments");
+        setSegments(data.segments || []);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Segment inference failed");
+        setSegmentLoading(false);
+        return; // stay on current step
+      }
+      setSegmentLoading(false);
+    }
+
     setError("");
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
@@ -206,8 +269,9 @@ export default function NewRoutePage() {
         if (s.source === "existing") return !!s.existingId;
         return !!(s.data.nameEn && s.data.type && s.data.lat && s.data.lon);
       });
-      case 4: return true;
-      case 5: return !!routeNameEn;
+      case 4: return segments.length > 0;
+      case 5: return true;
+      case 6: return !!routeNameEn;
       default: return true;
     }
   }
@@ -242,6 +306,8 @@ export default function NewRoutePage() {
         };
       });
 
+      const segmentSpecs = segments.map((s) => ({ estimated_time_min: s.durationMin }));
+
       // 1. Create waypoints + segments + route
       const createRes = await fetch("/api/admin/create-route", {
         method:  "POST",
@@ -253,8 +319,12 @@ export default function NewRoutePage() {
           routeDifficulty: routeDifficulty || undefined,
           trackPoints,
           waypointSpecs,
+          segmentSpecs,
           tags:       tags.filter((t) => t.en || t.ko),
           highlights: highlights.filter((h) => h.en || h.ko),
+          description: (routeDescriptionEn || routeDescriptionKo)
+            ? { en: routeDescriptionEn, ko: routeDescriptionKo }
+            : undefined,
         }),
       });
       const createData = await createRes.json();
@@ -328,11 +398,11 @@ export default function NewRoutePage() {
       {/* Header */}
       <div className="rounded-2xl bg-primary p-5 text-white">
         <p className="font-semibold text-[1.125rem]">New Route</p>
-        <p className="text-white/70 text-xs mt-1">GPS → Photos → Waypoints → Save</p>
+        <p className="text-white/70 text-xs mt-1">GPS → Photos → Waypoints → Segments → Save</p>
       </div>
 
       {/* Step bar */}
-      <StepBar current={step} />
+      <StepBar current={step} onStepClick={setStep} />
 
       {/* Error */}
       {error && (
@@ -526,8 +596,25 @@ export default function NewRoutePage() {
         />
       )}
 
-      {/* ── Step 4: Photo captions ── */}
+      {/* ── Step 4: Segments ── */}
       {step === 4 && (
+        <>
+          {segmentLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              <p className="text-sm font-medium text-[var(--color-text-muted)]">Inferring segments…</p>
+            </div>
+          ) : (
+            <StepSegments
+              segments={segments}
+              onChange={setSegments}
+            />
+          )}
+        </>
+      )}
+
+      {/* ── Step 5: Photo captions ── */}
+      {step === 5 && (
         <div className={CARD}>
           <p className="text-sm font-semibold text-[var(--color-text-body)]">
             Photo captions <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
@@ -544,21 +631,21 @@ export default function NewRoutePage() {
                 <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                   <input
                     className={INPUT}
-                    placeholder="Description (EN)"
-                    value={p.descEn}
-                    onChange={(e) => {
-                      const next = [...photos];
-                      next[idx] = { ...next[idx], descEn: e.target.value };
-                      setPhotos(next);
-                    }}
-                  />
-                  <input
-                    className={INPUT}
                     placeholder="설명 (KO)"
                     value={p.descKo}
                     onChange={(e) => {
                       const next = [...photos];
                       next[idx] = { ...next[idx], descKo: e.target.value };
+                      setPhotos(next);
+                    }}
+                  />
+                  <input
+                    className={INPUT}
+                    placeholder="Description (EN)"
+                    value={p.descEn}
+                    onChange={(e) => {
+                      const next = [...photos];
+                      next[idx] = { ...next[idx], descEn: e.target.value };
                       setPhotos(next);
                     }}
                   />
@@ -578,20 +665,11 @@ export default function NewRoutePage() {
         </div>
       )}
 
-      {/* ── Step 5: Route meta + save ── */}
-      {step === 5 && (
+      {/* ── Step 6: Route meta + save ── */}
+      {step === 6 && (
         <div className={CARD}>
           <p className="text-sm font-semibold text-[var(--color-text-body)]">Route details</p>
 
-          <div>
-            <p className={LABEL}>Route name (EN) *</p>
-            <input
-              className={INPUT}
-              placeholder="Bukhansan Baegundae Beginner"
-              value={routeNameEn}
-              onChange={(e) => setRouteNameEn(e.target.value)}
-            />
-          </div>
           <div>
             <p className={LABEL}>Route name (KO)</p>
             <input
@@ -599,6 +677,15 @@ export default function NewRoutePage() {
               placeholder="북한산 백운대 초보 코스"
               value={routeNameKo}
               onChange={(e) => setRouteNameKo(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className={LABEL}>Route name (EN) *</p>
+            <input
+              className={INPUT}
+              placeholder="Bukhansan Baegundae Beginner"
+              value={routeNameEn}
+              onChange={(e) => setRouteNameEn(e.target.value)}
             />
           </div>
           <div>
@@ -619,6 +706,24 @@ export default function NewRoutePage() {
               ))}
             </div>
           </div>
+          <div>
+            <p className={LABEL}>Route description (KO)</p>
+            <textarea
+              className={`${INPUT} min-h-[80px] resize-y`}
+              placeholder="경로에 대한 상세 설명..."
+              value={routeDescriptionKo}
+              onChange={(e) => setRouteDescriptionKo(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className={LABEL}>Route description (EN)</p>
+            <textarea
+              className={`${INPUT} min-h-[80px] resize-y`}
+              placeholder="Detailed description of the route..."
+              value={routeDescriptionEn}
+              onChange={(e) => setRouteDescriptionEn(e.target.value)}
+            />
+          </div>
 
           {/* Tags */}
           <div className="flex flex-col gap-2">
@@ -637,21 +742,21 @@ export default function NewRoutePage() {
               <div key={i} className="flex gap-1.5 items-center">
                 <input
                   className={INPUT}
-                  placeholder="Subway Access"
-                  value={tag.en}
-                  onChange={(e) => {
-                    const next = [...tags];
-                    next[i] = { ...next[i], en: e.target.value };
-                    setTags(next);
-                  }}
-                />
-                <input
-                  className={INPUT}
                   placeholder="지하철 접근"
                   value={tag.ko}
                   onChange={(e) => {
                     const next = [...tags];
                     next[i] = { ...next[i], ko: e.target.value };
+                    setTags(next);
+                  }}
+                />
+                <input
+                  className={INPUT}
+                  placeholder="Subway Access"
+                  value={tag.en}
+                  onChange={(e) => {
+                    const next = [...tags];
+                    next[i] = { ...next[i], en: e.target.value };
                     setTags(next);
                   }}
                 />
@@ -705,21 +810,21 @@ export default function NewRoutePage() {
                 </div>
                 <input
                   className={INPUT}
-                  placeholder="Best subway access on this mountain."
-                  value={h.en}
-                  onChange={(e) => {
-                    const next = [...highlights];
-                    next[i] = { ...next[i], en: e.target.value };
-                    setHighlights(next);
-                  }}
-                />
-                <input
-                  className={INPUT}
                   placeholder="이 산에서 지하철 접근성이 가장 좋습니다."
                   value={h.ko}
                   onChange={(e) => {
                     const next = [...highlights];
                     next[i] = { ...next[i], ko: e.target.value };
+                    setHighlights(next);
+                  }}
+                />
+                <input
+                  className={INPUT}
+                  placeholder="Best subway access on this mountain."
+                  value={h.en}
+                  onChange={(e) => {
+                    const next = [...highlights];
+                    next[i] = { ...next[i], en: e.target.value };
                     setHighlights(next);
                   }}
                 />
@@ -737,6 +842,10 @@ export default function NewRoutePage() {
               <span className="font-semibold text-[var(--color-text-body)]">Waypoints:</span>{" "}
               {waypointSlots.length} ({waypointSlots.filter((s) => s.source === "new").length} new,{" "}
               {waypointSlots.filter((s) => s.source === "existing").length} existing)
+            </p>
+            <p>
+              <span className="font-semibold text-[var(--color-text-body)]">Duration:</span>{" "}
+              <span className="font-num">{segments.reduce((sum, s) => sum + s.durationMin, 0)} min</span>
             </p>
             <p>
               <span className="font-semibold text-[var(--color-text-body)]">Photos:</span>{" "}

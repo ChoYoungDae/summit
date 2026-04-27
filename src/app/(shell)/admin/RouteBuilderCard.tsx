@@ -178,7 +178,11 @@ export default function RouteBuilderCard() {
     .map(id => segments.find(s => s.id === id))
     .filter(Boolean) as Segment[];
 
-const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_time_min ?? 0), 0) || null;
+  const totalDurationMin = selectedSegments.reduce((acc, s) => {
+    const walk = s.estimated_time_min ?? 0;
+    // user explicitly requested to exclude bus duration from total
+    return acc + walk;
+  }, 0) || null;
   const totalDistanceM   = selectedSegments.reduce((acc, s) => acc + (s.distance_m ?? 0), 0) || null;
   const maxDifficulty    = selectedSegments.reduce((acc, s) => Math.max(acc, s.difficulty ?? 0), 0) || null;
 
@@ -187,10 +191,15 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
     if (!id || selectedIds.includes(id)) return;
     setSelectedIds(prev => [...prev, id]);
     setAddingId("");
+    // Reset phase so "Update Route" button reappears
+    setPhase("idle");
+    setMsg("");
   }
 
   function removeSegment(idx: number) {
     setSelectedIds(prev => prev.filter((_, i) => i !== idx));
+    setPhase("idle");
+    setMsg("");
   }
 
   function moveSegment(idx: number, dir: -1 | 1) {
@@ -200,16 +209,20 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
       [arr[idx], arr[j]] = [arr[j], arr[idx]];
       return arr;
     });
+    setPhase("idle");
+    setMsg("");
   }
 
   function waypointName(id: number) {
     const w = waypoints.find(w => w.id === id);
-    return w ? (tDB(w.name, locale) || `WP#${id}`) : `WP#${id}`;
+    if (!w) return `WP#${id}`;
+    return w.name.ko ? `${w.name.ko}${w.name.en ? ` (${w.name.en})` : ""}` : w.name.en;
   }
 
   function segmentName(s: Segment): string | null {
     if (!s.name) return null;
-    return tDB(s.name as { en: string }, locale) || null;
+    const name = s.name as { en?: string; ko?: string };
+    return name.ko ? `${name.ko}${name.en ? ` (${name.en})` : ""}` : (name.en || null);
   }
 
   async function handleSave() {
@@ -364,16 +377,14 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
         const { error } = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(error);
       }
-      setSegments(prev => prev.map(s => s.id !== segId ? s : {
-        ...s,
-        segment_type:       segEditType,
-        start_waypoint_id:  parseInt(segEditStartWp),
-        end_waypoint_id:    parseInt(segEditEndWp),
-        estimated_time_min: segEditTime ? parseInt(segEditTime) : undefined,
-        difficulty:         segEditDiff ? parseInt(segEditDiff) : undefined,
-        name:               (segEditNameEn || segEditNameKo) ? { en: segEditNameEn, ko: segEditNameKo } : s.name,
-        is_bus_combined:    isBusApplicable && segEditIsBus,
-      }));
+      
+      // Force re-fetch all segments for this mountain to ensure total accuracy
+      const segRes = await fetch(`/api/admin/segments?mountainId=${mountainId}`);
+      const latestSegments = await segRes.json();
+      if (Array.isArray(latestSegments)) {
+        setSegments(latestSegments);
+      }
+      
       setEditingSegId(null);
       setSegEditGpx(null);
       setSegEditBusGpx(null);
@@ -434,7 +445,7 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
           <option value="">— Select mountain —</option>
           {mountains.map(m => (
             <option key={m.id} value={m.id}>
-              {m.name.en}{m.name.ko ? ` (${m.name.ko})` : ""}
+              {m.name.ko ? `${m.name.ko}${m.name.en ? ` (${m.name.en})` : ""}` : m.name.en}
             </option>
           ))}
         </select>
@@ -496,15 +507,15 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
             <SectionLabel>{isEditMode ? "Edit Route Name" : "New Route Name"}</SectionLabel>
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
-                <input type="text" placeholder="Gwanaksan Classic" value={nameEn}
-                  onChange={e => setNameEn(e.target.value)} className={INPUT} />
-              </label>
-              <label className="flex flex-col gap-1">
                 <span className="text-xs text-[var(--color-text-muted)]">Name (KO)</span>
                 <input type="text" placeholder="관악산 클래식" value={nameKo}
                   onChange={e => setNameKo(e.target.value)} className={INPUT}
                   style={{ fontFamily: "var(--font-ko)" }} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
+                <input type="text" placeholder="Gwanaksan Classic" value={nameEn}
+                  onChange={e => setNameEn(e.target.value)} className={INPUT} />
               </label>
             </div>
             <div className="flex flex-wrap gap-4 px-1">
@@ -577,6 +588,109 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
                       </div>
                     </div>
 
+                    {/* Inline Edit Form */}
+                    {editingSegId === seg.id && (
+                      <div className="px-3 pb-3 border-t border-[var(--color-border)] pt-3 flex flex-col gap-3 bg-white rounded-b-xl">
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Type</span>
+                            <select value={segEditType} onChange={e => {
+                              const t = e.target.value;
+                              setSegEditType(t);
+                              if (t !== "APPROACH" && t !== "RETURN") setSegEditIsBus(false);
+                            }} className={INPUT}>
+                              {Object.keys(SEG_TYPE_COLORS).map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </label>
+                          <label className="flex items-center gap-2 mt-5 cursor-pointer">
+                            {(segEditType === "APPROACH" || segEditType === "RETURN") && (
+                              <>
+                                <input type="checkbox" checked={segEditIsBus} onChange={e => setSegEditIsBus(e.target.checked)} className="w-4 h-4 rounded text-primary border-[var(--color-border)]" />
+                                <span className="text-xs font-medium">Add Bus</span>
+                              </>
+                            )}
+                          </label>
+                        </div>
+
+                        <div className={`grid gap-2 ${segEditIsBus ? "grid-cols-3" : "grid-cols-2"}`}>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Start</span>
+                            <select value={segEditStartWp} onChange={e => setSegEditStartWp(e.target.value)} className={INPUT}>
+                              {waypoints.map(w => <option key={w.id} value={w.id}>{waypointName(w.id)}</option>)}
+                            </select>
+                          </label>
+                          {segEditIsBus && (
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Bus Stop</span>
+                              <select value={segEditMidWp} onChange={e => setSegEditMidWp(e.target.value)} className={INPUT}>
+                                <option value="">— Select —</option>
+                                {waypoints.map(w => <option key={w.id} value={w.id}>{waypointName(w.id)}</option>)}
+                              </select>
+                            </label>
+                          )}
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase text-[var(--color-text-muted)]">End</span>
+                            <select value={segEditEndWp} onChange={e => setSegEditEndWp(e.target.value)} className={INPUT}>
+                              {waypoints.map(w => <option key={w.id} value={w.id}>{waypointName(w.id)}</option>)}
+                            </select>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Name (KO)</span>
+                            <input value={segEditNameKo} onChange={e => setSegEditNameKo(e.target.value)} className={INPUT} />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Name (EN)</span>
+                            <input value={segEditNameEn} onChange={e => setSegEditNameEn(e.target.value)} className={INPUT} />
+                          </label>
+                        </div>
+
+                        <div className="flex flex-col gap-2 bg-[var(--color-bg-light)] p-2 rounded-lg">
+                          {!segEditIsBus ? (
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Duration (min)</span>
+                              <input type="number" value={segEditTime} onChange={e => setSegEditTime(e.target.value)} className={INPUT} />
+                            </label>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="flex flex-col gap-1">
+                                <span className="text-[10px] uppercase text-[#2E5E4A]">Bus Time</span>
+                                <input type="number" value={segEditBusDurationMin} onChange={e => setSegEditBusDurationMin(e.target.value)} className={INPUT} />
+                              </label>
+                              <label className="flex flex-col gap-1">
+                                <span className="text-[10px] uppercase text-[#2E5E4A]">Walking Time</span>
+                                <input type="number" value={segEditTime} onChange={e => setSegEditTime(e.target.value)} className={INPUT} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* GPS File Upload */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase text-[var(--color-text-muted)]">Walk GPS File (.gpx, .geojson)</span>
+                            <input type="file" accept=".gpx,.geojson" onChange={e => setSegEditGpx(e.target.files?.[0] || null)}
+                              className="text-[10px] border border-dashed border-[var(--color-border)] rounded-lg p-2" />
+                          </label>
+                          {segEditIsBus && (
+                            <label className="flex flex-col gap-1">
+                              <span className="text-[10px] uppercase text-[#2E5E4A]">Bus GPS File (.gpx, .geojson)</span>
+                              <input type="file" accept=".gpx,.geojson" onChange={e => setSegEditBusGpx(e.target.files?.[0] || null)}
+                                className="text-[10px] border border-dashed border-[#2E5E4A]/30 rounded-lg p-2" />
+                            </label>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button onClick={closeSegEdit} className="flex-1 py-2 text-xs font-semibold border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-light)] transition-colors">Cancel</button>
+                          <button onClick={() => saveSegEdit(seg.id)} disabled={segSaving} className="flex-1 py-2 text-xs font-semibold bg-primary text-white rounded-lg disabled:opacity-40">
+                            {segSaving ? "Saving..." : "Save Segment"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -587,7 +701,7 @@ const totalDurationMin = selectedSegments.reduce((acc, s) => acc + (s.estimated_
               <div className="flex gap-2 min-w-0">
                 <select value={addingId} onChange={e => setAddingId(e.target.value)}
                   className={`${INPUT} flex-1 min-w-0`}>
-                  <option value="">— Add segment —</option>
+                  <option value="">— Add existing segment from this mountain —</option>
                   {sortedWpIds.map(wpId => (
                     <optgroup key={wpId} label={waypointName(wpId)}>
                       {availableGroups[wpId]

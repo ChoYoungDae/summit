@@ -421,10 +421,10 @@ export interface MapViewProps {
   approachIsBus?: boolean;
   /** true → return track styled as bus (thin, 60 % opacity) */
   returnIsBus?: boolean;
-  /** Bus chip info for the approach segment */
-  approachBusInfo?: BusSegmentInfo;
-  /** Bus chip info for the return segment */
-  returnBusInfo?: BusSegmentInfo;
+  /** Array of bus chip info for all approach segments */
+  approachBusInfos?: BusSegmentInfo[];
+  /** Array of bus chip info for all return segments */
+  returnBusInfos?: BusSegmentInfo[];
   /** Trail photos to show as camera markers on the map. */
   photos?: RoutePhoto[];
   /** Called when a photo marker is tapped. */
@@ -464,8 +464,8 @@ export default function MapView({
   returnWalkTrack = [],
   approachIsBus = false,
   returnIsBus = false,
-  approachBusInfo,
-  returnBusInfo,
+  approachBusInfos = [],
+  returnBusInfos = [],
   photos = [],
   onPhotoClick,
   bottomPadding = 0,
@@ -901,14 +901,14 @@ export default function MapView({
               id="approach-bus-glow"
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": approachBusInfo?.color ?? COLOR_BUS, "line-width": 16, "line-opacity": 0.12 }}
+              paint={{ "line-color": approachBusInfos[0]?.color ?? COLOR_BUS, "line-width": 16, "line-opacity": 0.12 }}
             />
             {/* Main Road Line */}
             <Layer
               id="approach-bus-line"
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": approachBusInfo?.color ?? COLOR_BUS, "line-width": 10, "line-opacity": 1.0 }}
+              paint={{ "line-color": approachBusInfos[0]?.color ?? COLOR_BUS, "line-width": 10, "line-opacity": 1.0 }}
             />
             {/* Center Stripe */}
             <Layer
@@ -957,14 +957,14 @@ export default function MapView({
               id="return-bus-glow"
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": returnBusInfo?.color ?? COLOR_BUS, "line-width": 16, "line-opacity": 0.12 }}
+              paint={{ "line-color": returnBusInfos[0]?.color ?? COLOR_BUS, "line-width": 16, "line-opacity": 0.12 }}
             />
             {/* Main Road Line */}
             <Layer
               id="return-bus-line"
               type="line"
               layout={{ "line-join": "round", "line-cap": "round" }}
-              paint={{ "line-color": returnBusInfo?.color ?? COLOR_BUS, "line-width": 10, "line-opacity": 1.0 }}
+              paint={{ "line-color": returnBusInfos[0]?.color ?? COLOR_BUS, "line-width": 10, "line-opacity": 1.0 }}
             />
             {/* Center Stripe */}
             <Layer
@@ -1092,32 +1092,34 @@ export default function MapView({
         })}
 
         {/* Bus stop markers — shown at the boarding/alighting point of bus segments */}
-        {approachIsBus && approachBusInfo?.stopCoord && (
+        {approachIsBus && approachBusInfos.map((info, i) => info.stopCoord && (
           <Marker
-            longitude={approachBusInfo.stopCoord[0]}
-            latitude={approachBusInfo.stopCoord[1]}
+            key={`approach-bus-${i}`}
+            longitude={info.stopCoord[0]}
+            latitude={info.stopCoord[1]}
             anchor="bottom"
           >
             <BusChip 
-              busNumbers={approachBusInfo.busNumbers} 
-              color={approachBusInfo.color} 
-              chipTextColor={approachBusInfo.chipTextColor} 
+              busNumbers={info.busNumbers} 
+              color={info.color} 
+              chipTextColor={info.chipTextColor} 
             />
           </Marker>
-        )}
-        {returnIsBus && returnBusInfo?.stopCoord && (
+        ))}
+        {returnIsBus && returnBusInfos.map((info, i) => info.stopCoord && (
           <Marker
-            longitude={returnBusInfo.stopCoord[0]}
-            latitude={returnBusInfo.stopCoord[1]}
+            key={`return-bus-${i}`}
+            longitude={info.stopCoord[0]}
+            latitude={info.stopCoord[1]}
             anchor="bottom"
           >
             <BusChip 
-              busNumbers={returnBusInfo.busNumbers} 
-              color={returnBusInfo.color} 
-              chipTextColor={returnBusInfo.chipTextColor} 
+              busNumbers={info.busNumbers} 
+              color={info.color} 
+              chipTextColor={info.chipTextColor} 
             />
           </Marker>
-        )}
+        ))}
 
         {/* Photo markers — amber camera dots */}
         {photos.filter(p => p.lat != null && p.lon != null).map(photo => (

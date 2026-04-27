@@ -97,7 +97,7 @@ export default function FloatingTrailHeader({
 
   return (
     <div
-      className="absolute top-3 left-3 right-3 z-10 rounded-2xl overflow-hidden border border-white/30"
+      className="absolute top-3 left-3 right-3 z-10 rounded-2xl overflow-hidden border border-white/30 pointer-events-auto"
       style={cardStyle}
     >
       {/* ── Back link row ────────────────────────────────── */}
@@ -120,9 +120,11 @@ export default function FloatingTrailHeader({
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-black text-[1.15rem] leading-tight tracking-tight">
-                {locale === "ko"
-                  ? `${tDB(stationInfo.name, locale)}${stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}`
-                  : `${stationInfo.exit ? `${tUI("exit", locale)} ${stationInfo.exit}, ` : ""}${tDB(stationInfo.name, locale)}`}
+                {(() => {
+                  const name = tDB(stationInfo.name, locale);
+                  const exit = stationInfo.exit ? ` ${stationInfo.exit}${locale === "ko" ? "번 출구" : ` ${tUI("exit", locale)}`}` : "";
+                  return `${name}${exit}`;
+                })()}
               </span>
               {stationInfo.line && SUBWAY_LINE_COLORS[stationInfo.line] && (
                 <span

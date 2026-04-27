@@ -2,6 +2,8 @@ import type { ResolvedRoute } from "@/types/trail";
 
 /** How many minutes before sunset the hiker must be off the mountain. */
 export const SUNSET_BUFFER_MIN = 120;
+/** Basic rest time at the summit. */
+export const SUMMIT_REST_MIN = 30;
 
 /**
  * Calculate the latest time a hiker can depart from the subway exit (KST).
@@ -10,7 +12,7 @@ export const SUNSET_BUFFER_MIN = 120;
  *   latestStart = sunset − SUNSET_BUFFER_MIN − totalHikingTime
  *
  * where:
- *   totalHikingTime = approach + round(ascent × m) + round(descent × m) + return
+ *   totalHikingTime = (approach + round(ascent × m) + round(descent × m) + return) + SUMMIT_REST_MIN
  *   m = skillMultiplier (0.6–1.5) — applied to ASCENT + DESCENT segments only
  *
  * Returns minutes from midnight (KST), or null if ascent/descent time is missing.
@@ -20,22 +22,38 @@ export function calcLatestStartMin(
   sunsetMin: number,
   skillMultiplier = 1.0
 ): number | null {
-  const ascent = route.segments.find((s) => s.segmentType === "ASCENT");
-  const descent = route.segments.find((s) => s.segmentType === "DESCENT");
+  if (!route.segments || route.segments.length === 0) return null;
 
-  // Ascent and descent times are required for a meaningful estimate
-  if (!ascent?.estimatedTimeMin || !descent?.estimatedTimeMin) return null;
+  let totalHikingTime = 0;
+  let hasAscentOrDescent = false;
 
-  const approach = route.segments.find((s) => s.segmentType === "APPROACH");
-  const ret = route.segments.find((s) => s.segmentType === "RETURN");
+  for (const seg of route.segments) {
+    const baseTime = seg.estimatedTimeMin || 0;
+    
+    if (seg.segmentType === "ASCENT" || seg.segmentType === "DESCENT") {
+      totalHikingTime += Math.round(baseTime * skillMultiplier);
+      hasAscentOrDescent = true;
+    } else {
+      totalHikingTime += baseTime;
+    }
 
-  const total =
-    (approach?.estimatedTimeMin ?? 0) +
-    Math.round(ascent.estimatedTimeMin * skillMultiplier) +
-    Math.round(descent.estimatedTimeMin * skillMultiplier) +
-    (ret?.estimatedTimeMin ?? 0);
+    if (seg.isBusCombined && seg.busDetails?.bus_duration_min) {
+      totalHikingTime += seg.busDetails.bus_duration_min;
+    }
+  }
 
-  return sunsetMin - SUNSET_BUFFER_MIN - total;
+  if (totalHikingTime === 0) return null;
+
+  // Add summit rest only if it's a mountain hike (has ascent/descent)
+  if (hasAscentOrDescent) {
+    totalHikingTime += SUMMIT_REST_MIN;
+  }
+
+  const result = sunsetMin - SUNSET_BUFFER_MIN - totalHikingTime;
+  
+  console.log(`[safetyEngine] Sunset: ${sunsetMin}m, Buffer: ${SUNSET_BUFFER_MIN}m, TotalTime: ${totalHikingTime}m => Result: ${result}m`);
+  
+  return result;
 }
 
 /**
@@ -43,10 +61,12 @@ export function calcLatestStartMin(
  * total duration is available (skillMultiplier is always 1.0 on list view).
  */
 export function calcLatestStartFromDuration(
-  totalDurationMin: number,
+  hikingDurationMin: number,
+  busDurationMin: number,
   sunsetMin: number
 ): number {
-  return sunsetMin - SUNSET_BUFFER_MIN - totalDurationMin;
+  // Always include summit rest for the simplified version as most routes are mountain hikes
+  return sunsetMin - SUNSET_BUFFER_MIN - hikingDurationMin - busDurationMin - SUMMIT_REST_MIN;
 }
 
 /**

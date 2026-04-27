@@ -4,6 +4,7 @@ import SegmentUploadCard from "./SegmentUploadCard";
 import RouteBuilderCard from "./RouteBuilderCard";
 import PhotoUploadCard from "./PhotoUploadCard";
 import RouteEditCard from "./RouteEditCard";
+import TranslationSyncCard from "./TranslationSyncCard";
 
 export default function AdminPage() {
   return (
@@ -16,6 +17,8 @@ export default function AdminPage() {
           Build routes: add waypoints → upload GPX segments → compose routes.
         </p>
       </section>
+
+      <TranslationSyncCard />
 
       <Link
         href="/admin/new-route"

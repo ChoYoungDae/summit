@@ -51,3 +51,13 @@ export interface ExistingWaypoint {
   ars_id?:      string | null;
   bus_numbers?: string | null;
 }
+
+export interface SegmentPreview {
+  segType:       string;
+  startWpName:   string;
+  startWpNameKo?: string;
+  endWpName:     string;
+  endWpNameKo?:   string;
+  distanceM:     number;
+  durationMin:   number;
+}

@@ -105,12 +105,14 @@ function extractCoords(geojson: any): GeoCoord[] {
   const type: string = geojson?.type;
 
   if (type === "FeatureCollection") {
-    // First LineString or MultiLineString feature
+    let bestCoords: GeoCoord[] = [];
     for (const f of geojson.features ?? []) {
       const coords = extractCoords(f);
-      if (coords.length > 0) return coords;
+      if (coords.length > bestCoords.length) {
+        bestCoords = coords;
+      }
     }
-    return [];
+    return bestCoords;
   }
 
   if (type === "Feature") return extractCoords(geojson.geometry);

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("routes")
-    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, tags, highlights")
+    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, tags, highlights, description")
     .eq("mountain_id", mountainId)
     .order("id");
 
@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
   }).select("id").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  revalidateTag("route-list", "max");
+  // @ts-ignore
+  revalidateTag("route-list");
+  // @ts-ignore
+  revalidateTag("route-detail");
   return NextResponse.json({ id: data.id });
 }
 
@@ -72,9 +75,10 @@ export async function PATCH(req: NextRequest) {
     hideSafeStart?: boolean;
     tags?: { en: string; ko: string }[];
     highlights?: { type: "highlight" | "pro_tip" | "warning"; text: { en: string; ko: string } }[];
+    description?: { en: string; ko: string };
   };
 
-  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart, tags, highlights } = body;
+  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart, tags, highlights, description } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
@@ -85,12 +89,18 @@ export async function PATCH(req: NextRequest) {
   if (totalDifficulty  != null) updates.total_difficulty    = totalDifficulty;
   if (tags !== undefined)       updates.tags              = tags;
   if (highlights !== undefined) updates.highlights        = highlights;
+  if (description !== undefined) updates.description      = description;
   if (isOneway         != null) updates.is_oneway          = isOneway;
   if (hideSafeStart    != null) updates.hide_safe_start    = hideSafeStart;
 
   const { error } = await supabaseAdmin.from("routes").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  revalidateTag("route-list", "max");
+  // @ts-ignore
+  revalidateTag("route-list");
+  // @ts-ignore
+  revalidateTag("route-detail");
+  // @ts-ignore
+  revalidateTag(`route-detail-${id}`);
   return NextResponse.json({ ok: true });
 }
 
@@ -101,6 +111,11 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("routes").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  revalidateTag("route-list", "max");
+  // @ts-ignore
+  revalidateTag("route-list");
+  // @ts-ignore
+  revalidateTag("route-detail");
+  // @ts-ignore
+  revalidateTag(`route-detail-${id}`);
   return NextResponse.json({ ok: true });
 }

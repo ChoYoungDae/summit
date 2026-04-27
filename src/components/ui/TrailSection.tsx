@@ -62,6 +62,7 @@ interface BusInfo {
   stopCoord?: [number, number];
   busNumbers?: string;
   color?: string;
+  chipTextColor?: string;
 }
 
 interface Props {
@@ -74,8 +75,8 @@ interface Props {
   returnWalkTrack?: [number, number][];
   approachIsBus?: boolean;
   returnIsBus?: boolean;
-  approachBusInfo?: BusInfo;
-  returnBusInfo?: BusInfo;
+  approachBusInfos?: BusInfo[];
+  returnBusInfos?: BusInfo[];
   locale?: string;
   sunsetMin?: number | null;
   approachTimeMin?: number;
@@ -83,6 +84,7 @@ interface Props {
   descentMin?: number;
   returnTimeMin?: number;
   routeName?: string;
+  backHref?: string;
 }
 
 const MIN_SHEET_H = 88;
@@ -97,8 +99,8 @@ export default function TrailSection({
   returnWalkTrack = [],
   approachIsBus = false,
   returnIsBus = false,
-  approachBusInfo,
-  returnBusInfo,
+  approachBusInfos = [],
+  returnBusInfos = [],
   locale = "en",
   sunsetMin,
   approachTimeMin,
@@ -106,6 +108,7 @@ export default function TrailSection({
   descentMin,
   returnTimeMin,
   routeName,
+  backHref,
 }: Props) {
   const [hoveredPoint,          setHoveredPoint]          = useState<[number, number, number] | null>(null);
   const [chartHighlightIndex,   setChartHighlightIndex]   = useState<number | null>(null);
@@ -362,8 +365,8 @@ export default function TrailSection({
         returnWalkTrack={returnWalkTrack}
         approachIsBus={approachIsBus}
         returnIsBus={returnIsBus}
-        approachBusInfo={approachBusInfo}
-        returnBusInfo={returnBusInfo}
+        approachBusInfos={approachBusInfos}
+        returnBusInfos={returnBusInfos}
         bottomPadding={sheetHeightPx}
         controlsBottomOffset={sheetHeightPx}
         locale={locale}
@@ -402,6 +405,7 @@ export default function TrailSection({
             trailheadETAMin={trailheadETAMin}
             finalETAMin={finalETAMin}
             routeName={routeName}
+            backHref={backHref}
             locale={locale}
             hikingPhase={gps.phase}
             hikingMode={hikingMode}
@@ -531,14 +535,16 @@ export default function TrailSection({
             const canPrev    = photoIndex > 0;
             const canNext    = photoIndex < photos.length - 1;
 
-            // Find if this photo represents a Waypoint
+            // Find if this photo represents a Waypoint (increased threshold to 100m)
             let linkedWpt: Waypoint | null = null;
             if (activePhoto.lat != null && activePhoto.lon != null) {
-              const minDist = 0.02; // 20 meters
+              const minDist = 0.1; // 100 meters
               linkedWpt = waypoints.find(wpt => haversineKm(activePhoto.lat!, activePhoto.lon!, wpt.lat, wpt.lon) < minDist) || null;
             }
 
-            const desc = activePhoto.description?.[locale] ?? activePhoto.description?.ko ?? activePhoto.description?.en;
+            const photoDesc = activePhoto.description ? (typeof activePhoto.description === 'string' ? activePhoto.description : tDB(activePhoto.description as any, locale)) : "";
+            const wptDesc   = linkedWpt?.description ? tDB(linkedWpt.description, locale) : "";
+            const displayCaption = photoDesc || wptDesc;
 
             return (
               <div
@@ -570,7 +576,7 @@ export default function TrailSection({
                       style={{ objectPosition: "center 65%" }}
                     />
 
-                    {/* Waypoint Indicator Overlay (The "Distinguisher") */}
+                    {/* Waypoint Indicator Overlay */}
                     {linkedWpt && (
                       <div className="absolute top-4 left-4 right-4 flex flex-col items-start gap-1 pointer-events-none">
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-md shadow-lg">
@@ -630,13 +636,13 @@ export default function TrailSection({
                   </div>
 
                   {/* Caption Section */}
-                  {(desc || linkedWpt?.description) && (
+                  {displayCaption && (
                     <div className="px-6 py-5">
                       <p
                         className="text-[15px] leading-relaxed text-[var(--color-text-body)] text-center"
                         style={locale === "ko" ? { fontFamily: "var(--font-ko)" } : undefined}
                       >
-                        {desc || (linkedWpt?.description ? tDB(linkedWpt.description, locale) : "")}
+                        {displayCaption}
                       </p>
                     </div>
                   )}

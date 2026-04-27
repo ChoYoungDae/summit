@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { toSlug, buildSegmentSlug } from "@/lib/slug";
 
@@ -44,6 +45,8 @@ type ResolvedWaypoint = {
   busColor?: string;
   busDurationMin?: number;
   busNumbers?: string;
+  nameEn?: string;
+  nameKo?: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -111,9 +114,12 @@ export async function POST(req: NextRequest) {
       waypointSpecs:   WaypointSpec[];
       tags?:       { en: string; ko: string }[];
       highlights?: { type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[];
+      description?: { en: string; ko: string };
+      preview?:      boolean;
+      segmentSpecs?: { estimated_time_min: number }[];
     };
 
-    const { mountainId, routeNameEn, routeNameKo, routeDifficulty, trackPoints, waypointSpecs, tags, highlights } = body;
+    const { mountainId, routeNameEn, routeNameKo, routeDifficulty, trackPoints, waypointSpecs, tags, highlights, description, preview, segmentSpecs } = body;
 
     if (!mountainId || !routeNameEn || !trackPoints?.length || !waypointSpecs?.length) {
       return NextResponse.json(
@@ -138,7 +144,7 @@ export async function POST(req: NextRequest) {
       if ("existingId" in spec) {
         const { data: wp, error } = await supabaseAdmin
           .from("waypoints")
-          .select("id, slug, type, lat, lon, bus_numbers")
+          .select("id, slug, type, lat, lon, bus_numbers, name")
           .eq("id", spec.existingId)
           .single();
         if (error || !wp) {
@@ -151,32 +157,40 @@ export async function POST(req: NextRequest) {
           lat:  wp.lat,
           lon:  wp.lon,
           busNumbers: wp.bus_numbers ?? undefined,
+          nameEn: (wp.name as any)?.en,
+          nameKo: (wp.name as any)?.ko,
         });
       } else {
         const slug = toSlug(spec.nameEn);
-        const { data: wp, error: wpErr } = await supabaseAdmin
-          .from("waypoints")
-          .insert({
-            mountain_id:    mountainId,
-            name:           { en: spec.nameEn, ...(spec.nameKo ? { ko: spec.nameKo } : {}) },
-            type:           spec.type,
-            lat:            spec.lat,
-            lon:            spec.lon,
-            slug,
-            ...(spec.elevationM != null && Number.isFinite(spec.elevationM) ? { elevation_m: Math.round(spec.elevationM) } : {}),
-            ...(spec.exitNumber   ? { exit_number:    spec.exitNumber }   : {}),
-            ...(spec.subwayLine   ? { subway_line:    spec.subwayLine }   : {}),
-            ...(spec.subwayStation ? { subway_station: spec.subwayStation } : {}),
-            ...(spec.arsId        ? { ars_id:         spec.arsId }        : {}),
-            ...(spec.busNumbers   ? { bus_numbers:    spec.busNumbers }   : {}),
-          })
-          .select("id")
-          .single();
-        if (wpErr) {
-          return NextResponse.json({ error: `Create waypoint failed: ${wpErr.message}` }, { status: 500 });
+        let waypointId = 0;
+
+        if (!preview) {
+          const { data: wp, error: wpErr } = await supabaseAdmin
+            .from("waypoints")
+            .insert({
+              mountain_id:    mountainId,
+              name:           { en: spec.nameEn, ...(spec.nameKo ? { ko: spec.nameKo } : {}) },
+              type:           spec.type,
+              lat:            spec.lat,
+              lon:            spec.lon,
+              slug,
+              ...(spec.elevationM != null && Number.isFinite(spec.elevationM) ? { elevation_m: Math.round(spec.elevationM) } : {}),
+              ...(spec.exitNumber   ? { exit_number:    spec.exitNumber }   : {}),
+              ...(spec.subwayLine   ? { subway_line:    spec.subwayLine }   : {}),
+              ...(spec.subwayStation ? { subway_station: spec.subwayStation } : {}),
+              ...(spec.arsId        ? { ars_id:         spec.arsId }        : {}),
+              ...(spec.busNumbers   ? { bus_numbers:    spec.busNumbers }   : {}),
+            })
+            .select("id")
+            .single();
+          if (wpErr) {
+            return NextResponse.json({ error: `Create waypoint failed: ${wpErr.message}` }, { status: 500 });
+          }
+          waypointId = wp.id;
         }
+
         resolved.push({
-          id:            wp.id,
+          id:            waypointId,
           slug,
           type:          spec.type,
           lat:           spec.lat,
@@ -184,6 +198,8 @@ export async function POST(req: NextRequest) {
           busColor:      spec.busColor,
           busDurationMin: spec.busDurationMin,
           busNumbers:    spec.busNumbers,
+          nameEn:        spec.nameEn,
+          nameKo:        spec.nameKo,
         });
       }
     }
@@ -220,8 +236,10 @@ export async function POST(req: NextRequest) {
       segType:          SegmentType;
       startWaypointId:  number;
       startWpSlug:      string;
+      startWpIdx:       number; // Index in 'resolved' array
       endWaypointId:    number;
       endWpSlug:        string;
+      endWpIdx:         number; // Index in 'resolved' array
       track:            TrackPoint[]; // walk track
       isBusCombined:    boolean;
       busTrack?:        TrackPoint[];
@@ -248,8 +266,10 @@ export async function POST(req: NextRequest) {
             segType:          "APPROACH",
             startWaypointId:  startWp.id,
             startWpSlug:      startWp.slug,
+            startWpIdx:       seg.startWpIdx,
             endWaypointId:    nextEndWp.id,
             endWpSlug:        nextEndWp.slug,
+            endWpIdx:         nextSeg.endWpIdx,
             track:            nextSeg.track,  // walk: bus stop → trailhead
             isBusCombined:    true,
             busTrack:         seg.track,      // bus: station → bus stop
@@ -273,8 +293,10 @@ export async function POST(req: NextRequest) {
             segType:          "RETURN",
             startWaypointId:  startWp.id,
             startWpSlug:      startWp.slug,
+            startWpIdx:       seg.startWpIdx,
             endWaypointId:    nextEndWp.id,
             endWpSlug:        nextEndWp.slug,
+            endWpIdx:         nextSeg.endWpIdx,
             track:            seg.track,       // walk: trailhead → bus stop
             isBusCombined:    true,
             busTrack:         nextSeg.track,   // bus: bus stop → station
@@ -290,8 +312,10 @@ export async function POST(req: NextRequest) {
         segType:         inferSegmentType(startWp.type, endWp.type),
         startWaypointId: startWp.id,
         startWpSlug:     startWp.slug,
+        startWpIdx:      seg.startWpIdx,
         endWaypointId:   endWp.id,
         endWpSlug:       endWp.slug,
+        endWpIdx:        seg.endWpIdx,
         track:           seg.track,
         isBusCombined:   false,
       });
@@ -303,14 +327,37 @@ export async function POST(req: NextRequest) {
     const segmentIds: number[] = [];
     let totalDurationMin = 0;
     let totalDistanceM   = 0;
+    const previewSegments: any[] = [];
 
-    for (const seg of finalSegs) {
+    for (const [idx, seg] of finalSegs.entries()) {
       const stats   = computeStats(seg.track);
       // Naismith variant: ~2 km/h ascent pace + 10 m elevation per minute
-      const estTime = Math.max(
+      let estTime = Math.max(
         1,
         Math.round(stats.distance_m / 1000 / 2.0 * 60 + stats.total_ascent_m / 10),
       );
+
+      // Override with manual duration if provided
+      if (segmentSpecs?.[idx]?.estimated_time_min != null) {
+        estTime = segmentSpecs[idx].estimated_time_min;
+      }
+
+      if (preview) {
+        const swp = resolved[seg.startWpIdx];
+        const ewp = resolved[seg.endWpIdx];
+        previewSegments.push({
+          segType:            seg.segType,
+          startWpName:        swp.nameEn || swp.slug,
+          startWpNameKo:      swp.nameKo,
+          endWpName:          ewp.nameEn || ewp.slug,
+          endWpNameKo:        ewp.nameKo,
+          distanceM:          stats.distance_m,
+          durationMin:        estTime,
+        });
+        totalDurationMin += estTime;
+        totalDistanceM   += stats.distance_m;
+        continue;
+      }
 
       const segSlug = buildSegmentSlug(mountainSlug, seg.segType, seg.startWpSlug, seg.endWpSlug);
 
@@ -361,6 +408,14 @@ export async function POST(req: NextRequest) {
       totalDistanceM   += stats.distance_m;
     }
 
+    if (preview) {
+      return NextResponse.json({
+        segments: previewSegments,
+        totalDurationMin,
+        totalDistanceM,
+      });
+    }
+
     // ── Step 6: Insert route ──────────────────────────────────────────────────
 
     const { data: route, error: routeErr } = await supabaseAdmin
@@ -374,12 +429,23 @@ export async function POST(req: NextRequest) {
         ...(routeDifficulty ? { total_difficulty: routeDifficulty } : {}),
         ...(tags?.length      ? { tags: tags.map((t) => ({ en: t.en, ko: t.ko })) } : {}),
         ...(highlights?.length ? { highlights: highlights.map((h) => ({ type: h.type, text: { en: h.en, ko: h.ko } })) } : {}),
+        ...(description ? { description } : {}),
       })
       .select("id")
       .single();
 
     if (routeErr) {
       return NextResponse.json({ error: `Route insert failed: ${routeErr.message}` }, { status: 500 });
+    }
+
+    // ── Step 7: Revalidate cache ──────────────────────────────────────────────
+    try {
+      const { revalidatePath } = await import("next/cache");
+      revalidatePath("/route");
+      // @ts-ignore - Next.js type mismatch in this file
+      revalidateTag("route-list");
+    } catch (e) {
+      console.error("Revalidation failed:", e);
     }
 
     return NextResponse.json({ routeId: route.id, segmentIds });

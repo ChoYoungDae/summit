@@ -183,9 +183,26 @@ export async function PATCH(req: NextRequest) {
     updates.sub_segments = null;
   }
 
-  const { error } = await supabaseAdmin.from("segments").update(updates).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  const { data: updated, error: updateError } = await supabaseAdmin
+    .from("segments")
+    .update(updates)
+    .eq("id", id)
+    .select("id, slug, name, segment_type, start_waypoint_id, end_waypoint_id, distance_m, total_ascent_m, total_descent_m, estimated_time_min, difficulty, is_bus_combined, bus_details")
+    .single();
+
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  try {
+    const { revalidateTag } = await import("next/cache");
+    // @ts-ignore
+    revalidateTag("route-detail");
+    // @ts-ignore
+    revalidateTag("route-list");
+  } catch (e) {
+    console.error("[segments] Revalidation failed", e);
+  }
+
+  return NextResponse.json(updated);
 }
 
 // DELETE /api/admin/segments?id=X
@@ -195,6 +212,17 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("segments").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  try {
+    const { revalidateTag } = await import("next/cache");
+    // @ts-ignore
+    revalidateTag("route-detail");
+    // @ts-ignore
+    revalidateTag("route-list");
+  } catch (e) {
+    console.error("[segments] Revalidation failed", e);
+  }
+
   return NextResponse.json({ ok: true });
 }
 
@@ -213,9 +241,6 @@ export async function POST(req: NextRequest) {
     const nameEn           = (form.get("nameEn") as string | null)?.trim() || null;
     const nameKo           = (form.get("nameKo") as string | null)?.trim() || null;
 
-    if (!(gpxFile instanceof File)) {
-      return NextResponse.json({ error: "Track file (GPX or GeoJSON) required" }, { status: 400 });
-    }
     const missingFields = [
       !mountainId      && "mountainId",
       !segmentType     && "segmentType",
@@ -226,11 +251,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Required: ${missingFields.join(", ")}` }, { status: 400 });
     }
 
-    const text   = await gpxFile.text();
-    const points = gpxFile.name.toLowerCase().endsWith(".geojson")
-      ? parseGeoJson(text)
-      : parseGpx(text);
-    const stats  = computeStats(points);
+    let points: TrackPoint[] = [];
+    let stats: { distance_m: number; total_ascent_m: number; total_descent_m: number };
+
+    if (gpxFile instanceof File && gpxFile.size > 0) {
+      const text = await gpxFile.text();
+      points = gpxFile.name.toLowerCase().endsWith(".geojson")
+        ? parseGeoJson(text)
+        : parseGpx(text);
+      stats = computeStats(points);
+    } else {
+      // Create a simple 2-point track from waypoints
+      const { data: wps, error: wpErr } = await supabaseAdmin
+        .from("waypoints")
+        .select("id, lat, lon, elevation_m")
+        .in("id", [startWaypointId, endWaypointId]);
+
+      if (wpErr || !wps || wps.length < 2) {
+        // If we can't find both waypoints, we might only find one if start==end (unlikely)
+        // or none if IDs are invalid.
+        // Fallback to dummy points if necessary, but ideally we find them.
+        const sw = wps?.find(w => w.id === startWaypointId);
+        const ew = wps?.find(w => w.id === endWaypointId);
+        const p1: TrackPoint = sw ? [sw.lon, sw.lat, sw.elevation_m || 0] : [0, 0, 0];
+        const p2: TrackPoint = ew ? [ew.lon, ew.lat, ew.elevation_m || 0] : [0.001, 0.001, 0];
+        points = [p1, p2];
+      } else {
+        const sw = wps.find(w => w.id === startWaypointId)!;
+        const ew = wps.find(w => w.id === endWaypointId)!;
+        points = [
+          [sw.lon, sw.lat, sw.elevation_m || 0],
+          [ew.lon, ew.lat, ew.elevation_m || 0],
+        ];
+      }
+      stats = computeStats(points);
+    }
 
     const isBusCombined      = form.get("isBusCombined") === "true";
     const busGpx             = form.get("busGpx");
@@ -283,6 +338,17 @@ export async function POST(req: NextRequest) {
     }).select("id").single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    try {
+      const { revalidateTag } = await import("next/cache");
+      // @ts-ignore
+      revalidateTag("route-detail");
+      // @ts-ignore
+      revalidateTag("route-list");
+    } catch (e) {
+      console.error("[segments] Revalidation failed", e);
+    }
+
     return NextResponse.json({ id: data.id, pointCount: points.length, ...stats });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
