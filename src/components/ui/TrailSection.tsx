@@ -3,7 +3,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { getDistance } from "geolib";
 import MapViewLoader from "./MapViewLoader";
-import WaypointSheet from "./WaypointSheet";
 import FloatingTrailHeader from "./FloatingTrailHeader";
 import HikingBottomSheet from "./HikingBottomSheet";
 import type { SegmentElevationInfo } from "./ElevationChart";
@@ -215,6 +214,7 @@ export default function TrailSection({
 
   // ── Safety: latestStartMin ────────────────────────────────────────────────
   const latestStartMin = useMemo(() => {
+    if (route.hideSafeStart) return null;
     if (sunsetMin == null) return null;
     return calcLatestStartMin(route, sunsetMin, skillMultiplier);
   }, [route, sunsetMin, skillMultiplier]);
@@ -380,6 +380,7 @@ export default function TrailSection({
         onPhotoClick={setActivePhoto}
         offRouteEnabled={offRouteEnabled}
         onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
+        offRouteThresholdM={offRouteThreshold}
       />
 
       <div
@@ -409,6 +410,7 @@ export default function TrailSection({
             locale={locale}
             hikingPhase={gps.phase}
             hikingMode={hikingMode}
+            nightView={!!route.hideSafeStart}
           />
 
           {/* ── Off-route alert overlay ──────────────────────────────────── */}
@@ -513,6 +515,7 @@ export default function TrailSection({
 
           <HikingBottomSheet
             isHiking={isHiking}
+            hikingMode={hikingMode}
             onToggleHiking={handleToggleHiking}
             gps={gps}
             track={track}

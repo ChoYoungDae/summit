@@ -39,15 +39,15 @@ const MARKER_STYLE: Record<string, MarkerStyle> = {
   SUMMIT:    { IconComponent: Flag,       bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 40, border: `2px solid ${COLOR_PRIMARY}` },
   JUNCTION:  { IconComponent: GitFork,    bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 28, border: `2px solid ${COLOR_PRIMARY}` },
   SHELTER:   { IconComponent: Camera,     bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 28, border: `2px solid ${COLOR_PRIMARY}` },
+  BUS_STOP:  { IconComponent: Bus,        bg: COLOR_BUS, iconColor: "#ffffff",     size: 30, border: "none" },
 };
 
 /** Types that trigger a proximity notification pill while hiking */
 const ALERT_ON_TYPES = new Set<string>(["SUMMIT", "JUNCTION", "TRAILHEAD"]);
 
 // ── Static UI strings (5 supported locales) ───────────────────────────────────
-const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Record<string, string> }> = {
+const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, string> }> = {
   en: {
-    offRoute: "Off route — return to the trail",
     gpsHttps: "HTTPS required for GPS",
     alert: {
       JUNCTION:  "Check your path! Make sure you're heading the right way.",
@@ -56,7 +56,6 @@ const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Re
     },
   },
   ko: {
-    offRoute: "경로 이탈 — 등산로로 돌아가세요",
     gpsHttps: "GPS를 사용하려면 HTTPS가 필요합니다",
     alert: {
       JUNCTION:  "경로를 확인하세요! 올바른 방향으로 가고 있는지 확인하세요.",
@@ -65,7 +64,6 @@ const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Re
     },
   },
   zh: {
-    offRoute: "偏离路线 — 请返回登山道",
     gpsHttps: "GPS需要HTTPS连接",
     alert: {
       JUNCTION:  "请确认路线！确保您朝正确方向行进。",
@@ -74,7 +72,6 @@ const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Re
     },
   },
   ja: {
-    offRoute: "ルート外れ — 登山道に戻ってください",
     gpsHttps: "GPSにはHTTPSが必要です",
     alert: {
       JUNCTION:  "ルートを確認してください！正しい方向に進んでいるか確認してください。",
@@ -83,7 +80,6 @@ const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Re
     },
   },
   es: {
-    offRoute: "Fuera de ruta — regresa al sendero",
     gpsHttps: "Se requiere HTTPS para el GPS",
     alert: {
       JUNCTION:  "¡Verifica tu ruta! Asegúrate de ir en la dirección correcta.",
@@ -94,7 +90,6 @@ const UI_STRINGS: Record<string, { offRoute: string; gpsHttps: string; alert: Re
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const OFF_ROUTE_M      = 50;
 const GPS_ACCURACY_M   = 150; // ignore fixes worse than this
 const WAYPOINT_ALERT_M = 40;
 
@@ -126,9 +121,10 @@ function checkOffRoute(
   lat: number,
   lon: number,
   track: [number, number, number][],
+  thresholdM: number,
 ): boolean {
   for (const [tLon, tLat] of track) {
-    if (haversineM(lat, lon, tLat, tLon) < OFF_ROUTE_M) return false;
+    if (haversineM(lat, lon, tLat, tLon) < thresholdM) return false;
   }
   return true;
 }
@@ -347,37 +343,56 @@ function GpsArrow({
   rotation: number;
   isOffRoute: boolean;
 }) {
+  const color = isOffRoute ? COLOR_GPS_OFF : COLOR_GPS;
   return (
-    <div className="relative flex items-center justify-center">
-      {/* Pulse background */}
-      {!isOffRoute && (
+    <div className="relative flex items-center justify-center" style={{ width: 44, height: 44 }}>
+      {/* Concentric ripple rings — 3 rings with staggered delays */}
+      {[0, 1.05, 2.1].map((delay) => (
         <div
-          className="absolute w-6 h-6 rounded-full"
+          key={delay}
+          className="absolute rounded-full"
           style={{
-            background: COLOR_GPS,
-            animation: "gpsPulse 2s ease-out infinite",
+            width: 20,
+            height: 20,
+            background: color,
+            opacity: 0,
+            animation: `gpsRipple 3.15s ease-out ${delay}s infinite`,
+            pointerEvents: "none",
           }}
         />
-      )}
+      ))}
+
+      {/* Solid center dot with white border */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: 14,
+          height: 14,
+          background: color,
+          border: "2.5px solid #fff",
+          boxShadow: `0 0 0 1.5px ${color}, 0 2px 6px rgba(0,0,0,0.3)`,
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Direction arrow — rotates to show heading */}
       <div
         style={{
+          position: "absolute",
           width: 28,
           height: 28,
           pointerEvents: "none",
           transform: `rotate(${rotation}deg)`,
           transformOrigin: "50% 50%",
           transition: "transform 0.2s linear",
+          zIndex: 2,
         }}
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="28"
-          height="28"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
           <path
-            d="M12 2 L20 20 L12 15 L4 20 Z"
-            fill={isOffRoute ? COLOR_GPS_OFF : COLOR_GPS}
+            d="M12 2 L19 20 L12 15.5 L5 20 Z"
+            fill={color}
             stroke="white"
             strokeWidth="1.5"
             strokeLinejoin="round"
@@ -447,6 +462,8 @@ export interface MapViewProps {
   offRouteEnabled?: boolean;
   /** Called when the user taps the off-route toggle button on the map. */
   onToggleOffRoute?: () => void;
+  /** Off-route threshold in metres — matches the Settings value. Defaults to 30. */
+  offRouteThresholdM?: number;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -473,6 +490,7 @@ export default function MapView({
   locale = "en",
   offRouteEnabled = true,
   onToggleOffRoute,
+  offRouteThresholdM = 30,
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -488,27 +506,34 @@ export default function MapView({
   const [mapBearing, setMapBearing] = useState(0);
   const [mapError,   setMapError]   = useState<string | null>(null);
   const [gpsError,   setGpsError]   = useState<string | null>(null);
-  const [hasCenteredOnStart, setHasCenteredOnStart] = useState(false);
 
   // Refs for stable interval/closure access
-  const isTrackingRef      = useRef(false);
-  const isHikingRef        = useRef(isHiking);
-  const offRouteEnabledRef = useRef(offRouteEnabled);
-  const gpsWatchRef        = useRef<number | null>(null);
-  const trackRef        = useRef(track); // stable reference for interval closure
+  const isTrackingRef           = useRef(false);
+  const isHikingRef             = useRef(isHiking);
+  const offRouteEnabledRef      = useRef(offRouteEnabled);
+  const offRouteThresholdRef    = useRef(offRouteThresholdM);
+  const gpsWatchRef             = useRef<number | null>(null);
+  const trackRef                = useRef(track); // stable reference for interval closure
+  const gpsPosRef               = useRef<[number, number] | null>(null);
+  const hasCenteredOnStartRef   = useRef(false);
+  const bottomPaddingRef        = useRef(bottomPadding);
 
-  // Keep offRouteEnabledRef in sync; clear banner when alert is disabled
+  // Keep offRoute refs in sync
   useEffect(() => {
     offRouteEnabledRef.current = offRouteEnabled;
     if (!offRouteEnabled) setIsOffRoute(false);
   }, [offRouteEnabled]);
+
+  useEffect(() => {
+    offRouteThresholdRef.current = offRouteThresholdM;
+  }, [offRouteThresholdM]);
 
   // Keep isHikingRef in sync with prop; reset off-route when hiking stops
   useEffect(() => {
     isHikingRef.current = isHiking;
     if (!isHiking) {
       setIsOffRoute(false);
-      setHasCenteredOnStart(false);
+      hasCenteredOnStartRef.current = false;
       // Finish — return to full-route overview
       if (isMapLoaded && mapRef.current) {
         setIsTracking(false);
@@ -523,22 +548,9 @@ export default function MapView({
       }
       return;
     }
-    // Hiking just started — center map on user's GPS position if available
-    if (gpsPos && isMapLoaded && mapRef.current) {
-      mapRef.current.easeTo({ center: gpsPos, zoom: 16, duration: 700 });
-      setHasCenteredOnStart(true);
-    }
-    // watchPosition is always running — no manual poll needed
+    // Centering handled by bottomPadding effect to avoid animation conflict
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHiking, isMapLoaded]);
-
-  // Handle delayed GPS centering after hike starts
-  useEffect(() => {
-    if (isHiking && !hasCenteredOnStart && gpsPos && isMapLoaded && mapRef.current) {
-      mapRef.current.easeTo({ center: gpsPos, zoom: 16, duration: 700 });
-      setHasCenteredOnStart(true);
-    }
-  }, [isHiking, hasCenteredOnStart, gpsPos, isMapLoaded]);
 
   // ── Derived: bounds + center + GeoJSON ─────────────────────────────────────
   const { bounds } = useMemo(() => {
@@ -648,9 +660,11 @@ export default function MapView({
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
     if (accuracy > GPS_ACCURACY_M) return; // skip imprecise fixes
-    setGpsPos([lon, lat]);
+    const newPos: [number, number] = [lon, lat];
+    setGpsPos(newPos);
+    gpsPosRef.current = newPos;
     if (isHikingRef.current) {
-      setIsOffRoute(offRouteEnabledRef.current && checkOffRoute(lat, lon, trackRef.current));
+      setIsOffRoute(offRouteEnabledRef.current && checkOffRoute(lat, lon, trackRef.current, offRouteThresholdRef.current));
     }
     if (heading !== null && speed !== null && speed > 0.5) {
       setGpsHeading(heading);
@@ -702,14 +716,43 @@ export default function MapView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bounds, handleGpsPos]);
 
-  // Animate map camera padding as the bottom sheet rises / falls
+  // Keep bottomPaddingRef in sync for use in gpsPos effect
+  useEffect(() => {
+    bottomPaddingRef.current = bottomPadding;
+  }, [bottomPadding]);
+
+  // Animate map padding — and center on GPS when hiking first starts
   useEffect(() => {
     if (!isMapLoaded || !mapRef.current) return;
-    mapRef.current.easeTo({
-      padding: { top: 0, left: 0, right: 0, bottom: bottomPadding },
-      duration: 320,
-    });
+    if (isHikingRef.current && !hasCenteredOnStartRef.current && gpsPosRef.current) {
+      hasCenteredOnStartRef.current = true;
+      mapRef.current.easeTo({
+        center: gpsPosRef.current,
+        zoom: 16,
+        padding: { top: 0, left: 0, right: 0, bottom: bottomPadding },
+        duration: 700,
+      });
+    } else {
+      mapRef.current.easeTo({
+        padding: { top: 0, left: 0, right: 0, bottom: bottomPadding },
+        duration: 320,
+      });
+    }
   }, [bottomPadding, isMapLoaded]);
+
+  // Delayed GPS centering — fires when GPS fix arrives after hiking already started
+  useEffect(() => {
+    if (!gpsPos || !isMapLoaded || !mapRef.current) return;
+    if (!isHikingRef.current || hasCenteredOnStartRef.current) return;
+    hasCenteredOnStartRef.current = true;
+    mapRef.current.easeTo({
+      center: gpsPos,
+      zoom: 16,
+      padding: { top: 0, left: 0, right: 0, bottom: bottomPaddingRef.current },
+      duration: 700,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gpsPos, isMapLoaded]);
 
   // Cleanup GPS watch on unmount
   useEffect(() => {
@@ -1168,25 +1211,6 @@ export default function MapView({
         </div>
       )}
 
-      {/* Off-route warning banner — only while hiking */}
-      {isHiking && isOffRoute && gpsPos && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="absolute top-3 left-4 right-4 z-10
-                     flex items-center justify-center gap-2 px-4 py-3
-                     rounded-2xl text-white text-sm font-bold
-                     pointer-events-none"
-          style={{
-            background: COLOR_GPS_OFF,
-            boxShadow: "0 4px 16px rgba(200,54,42,0.45)",
-            animation: "offRoutePulse 1.4s ease-in-out infinite",
-          }}
-        >
-          <span aria-hidden="true" style={{ fontSize: 16 }}>⚠</span>
-          {(UI_STRINGS[locale] ?? UI_STRINGS.en).offRoute}
-        </div>
-      )}
 
       {/* Waypoint proximity alert pill — only while hiking, rest type excluded */}
       {nearAlertWaypoint && !isOffRoute && (() => {

@@ -150,6 +150,8 @@ export type HikingPhase = "ascent" | "descent";
 export interface ResolvedSegment extends Segment {
   startWaypoint: Waypoint;
   endWaypoint: Waypoint;
+  /** BUS_STOP waypoint at the boarding/alighting point of a bus-combined segment */
+  busStopWaypoint?: Waypoint;
 }
 
 /** Route with mountain and all segments (+ waypoints) resolved */

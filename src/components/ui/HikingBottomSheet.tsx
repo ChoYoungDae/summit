@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import ElevationChart from "./ElevationChart";
 import type { SegmentElevationInfo } from "./ElevationChart";
 import type { RoutePhoto, HikingPhase } from "@/types/trail";
@@ -24,11 +24,6 @@ export const MIN_H = 88; // px — visible height at min snap
 
 // mid snap: show at most MID_MAX_H px — prevents large blank space on tall screens
 const MID_MAX_H = 280;
-
-function snapTranslateY(snap: Snap, vh: number): number {
-  if (snap === "min") return vh - MIN_H;
-  return vh - Math.min(Math.round(vh * 0.45), MID_MAX_H);
-}
 
 function snapVisibleH(snap: Snap, vh: number): number {
   if (snap === "min") return MIN_H;
@@ -51,6 +46,7 @@ function phaseLabel(phase: HikingPhase, locale: string): string {
 
 interface Props {
   isHiking: boolean;
+  hikingMode?: "preview" | "active";
   onToggleHiking: () => void;
   gps: HikingGPSState;
   track: [number, number, number][];
@@ -71,6 +67,7 @@ interface Props {
 
 export default function HikingBottomSheet({
   isHiking,
+  hikingMode = "preview",
   onToggleHiking,
   gps,
   track,
@@ -87,11 +84,6 @@ export default function HikingBottomSheet({
   onCancelPrompt,
 }: Props) {
   const [snap, setSnap] = useState<Snap>("min");
-  const [liveY, setLiveY] = useState<number | null>(null);
-
-  const dragStartY  = useRef(0);
-  const baseY       = useRef(0);
-  const isDragging  = useRef(false);
 
   const pathname = usePathname();
   const { skill } = useHikingLevel();
@@ -104,12 +96,11 @@ export default function HikingBottomSheet({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-expand to mid when hiking starts so the user sees clear feedback
+  // Auto-expand to mid when hiking starts
   useEffect(() => {
     if (isHiking) {
       const vh = window.innerHeight;
       setSnap("mid");
-      setLiveY(null);
       onSheetHeightChange?.(snapVisibleH("mid", vh));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,72 +111,26 @@ export default function HikingBottomSheet({
     if (!isHiking && highlightIndex != null) {
       const vh = window.innerHeight;
       setSnap("mid");
-      setLiveY(null);
       onSheetHeightChange?.(snapVisibleH("mid", vh));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightIndex]);
 
-  // ── Drag handlers ─────────────────────────────────────────────────────────
-
   function handleHandleTap() {
     const vh = window.innerHeight;
     const nextSnap: Snap = snap === "min" ? "mid" : "min";
     setSnap(nextSnap);
-    setLiveY(null);
     onSheetHeightChange?.(snapVisibleH(nextSnap, vh));
-  }
-
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    isDragging.current = true;
-    dragStartY.current = e.clientY;
-    baseY.current = snapTranslateY(snap, window.innerHeight);
-    setLiveY(baseY.current);
-  }
-
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!isDragging.current) return;
-    const vh  = window.innerHeight;
-    const dy  = e.clientY - dragStartY.current;
-    const raw = baseY.current + dy;
-    const clamped = Math.max(vh * 0.05, Math.min(vh - 40, raw));
-    setLiveY(clamped);
-    onSheetHeightChange?.(vh - clamped);
-  }
-
-  function onPointerUp() {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    if (liveY === null) return;
-
-    const vh = window.innerHeight;
-    const snaps: Snap[] = ["min", "mid"];
-    const closest = snaps.reduce<Snap>(
-      (best, s) =>
-        Math.abs(liveY - snapTranslateY(s, vh)) <
-        Math.abs(liveY - snapTranslateY(best, vh))
-          ? s
-          : best,
-      "min",
-    );
-
-    setSnap(closest);
-    setLiveY(null);
-    onSheetHeightChange?.(snapVisibleH(closest, vh));
   }
 
   // ── Transform ─────────────────────────────────────────────────────────────
 
   const transform =
-    liveY !== null
-      ? `translateY(${liveY}px)`
-      : snap === "min"
+    snap === "min"
       ? `translateY(calc(100dvh - ${MIN_H}px))`
       : `translateY(calc(100dvh - min(45dvh, ${MID_MAX_H}px)))`;
 
-  const transition =
-    liveY !== null ? "none" : "transform 0.32s cubic-bezier(0.32,0.72,0,1)";
+  const transition = "transform 0.32s cubic-bezier(0.32,0.72,0,1)";
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -205,16 +150,16 @@ export default function HikingBottomSheet({
         }}
       >
 
-        {/* ── Drag handle ───────────────────────────────────── */}
+        {/* ── Tap handle ── */}
         <div
-          className="flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing touch-none select-none"
+          className="flex flex-col items-center pt-2 pb-1 select-none cursor-pointer"
           onClick={handleHandleTap}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
         >
-          <div className="w-9 h-1 rounded-full bg-gray-300" />
+          <div className="w-9 h-1 rounded-full bg-gray-300 mb-0.5" />
+          {snap === "min"
+            ? <ChevronUp size={14} className="text-gray-400 animate-bounce-hint" />
+            : <ChevronDown size={14} className="text-gray-400 animate-bounce-hint" />
+          }
         </div>
 
         {/* ══════════════════════════════════════════════════════
@@ -222,48 +167,61 @@ export default function HikingBottomSheet({
         ══════════════════════════════════════════════════════ */}
         <div className="px-5">
           {isHiking ? (
-            /* Active hiking: progress bar */
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <span
-                    className="text-[11px] font-semibold uppercase tracking-wide"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    {gps.phase === "ascent" ? tUI("ascending", locale) : tUI("descending", locale)} · {progressPct}%
-                  </span>
-                  <span
-                    className="text-[11px] font-medium tabular-nums"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    {fmtKm(gps.remainingM)} {phaseLabel(gps.phase, locale)}
-                  </span>
-                </div>
-                <div
-                  className="h-2 rounded-full overflow-hidden"
-                  style={{ background: "var(--color-bg-light)" }}
-                >
+            hikingMode === "active" ? (
+              /* On-trail: progress bar + End Hike */
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wide"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      {gps.phase === "ascent" ? tUI("ascending", locale) : tUI("descending", locale)} · {progressPct}%
+                    </span>
+                    <span
+                      className="text-[11px] font-medium tabular-nums"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      {fmtKm(gps.remainingM)} {phaseLabel(gps.phase, locale)}
+                    </span>
+                  </div>
                   <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${progressPct}%`,
-                      background:
-                        gps.phase === "ascent"
-                          ? "var(--color-primary)"
-                          : "var(--color-secondary)",
-                    }}
-                  />
+                    className="h-2 rounded-full overflow-hidden"
+                    style={{ background: "var(--color-bg-light)" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${progressPct}%`,
+                        background:
+                          gps.phase === "ascent"
+                            ? "var(--color-primary)"
+                            : "var(--color-secondary)",
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <button
-                onClick={onToggleHiking}
-                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-opacity active:opacity-70"
-                style={{ background: "var(--color-secondary)" }}
-              >
-                {tUI("endHike", locale)}
-              </button>
-            </div>
+                <button
+                  onClick={onToggleHiking}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-opacity active:opacity-70"
+                  style={{ background: "var(--color-secondary)" }}
+                >
+                  {tUI("endHike", locale)}
+                </button>
+              </div>
+            ) : (
+              /* Preview mode: not on trail yet — just offer cancel */
+              <div className="flex justify-end">
+                <button
+                  onClick={onToggleHiking}
+                  className="shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold transition-opacity active:opacity-70"
+                  style={{ background: "rgba(200,54,42,0.08)", color: "var(--color-secondary)" }}
+                >
+                  {tUI("goBack", locale)}
+                </button>
+              </div>
+            )
           ) : showOffRoutePrompt ? (
             /* Case 2: off-route alert confirmation before starting */
             <div className="flex flex-col gap-3 w-full">

@@ -411,8 +411,16 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     .map((sid) => segMap.get(sid))
     .filter(Boolean) as Segment[];
 
+  const busStopIds = segments
+    .filter(s => s.busDetails?.bus_stop_id_key)
+    .map(s => parseInt(s.busDetails!.bus_stop_id_key!))
+    .filter(id => !isNaN(id));
+
   const waypointIds = [
-    ...new Set(segments.flatMap((s) => [s.startWaypointId, s.endWaypointId])),
+    ...new Set([
+      ...segments.flatMap((s) => [s.startWaypointId, s.endWaypointId]),
+      ...busStopIds,
+    ]),
   ];
   const { data: wptRows } = await supabase
     .from("waypoints")
@@ -423,11 +431,15 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
     ((wptRows ?? []) as WaypointRow[]).map((w) => [w.id, rowToWaypoint(w)])
   );
 
-  const resolvedSegments: ResolvedSegment[] = segments.map((seg) => ({
-    ...seg,
-    startWaypoint: waypointMap.get(seg.startWaypointId)!,
-    endWaypoint: waypointMap.get(seg.endWaypointId)!,
-  }));
+  const resolvedSegments: ResolvedSegment[] = segments.map((seg) => {
+    const midId = seg.busDetails?.bus_stop_id_key ? parseInt(seg.busDetails.bus_stop_id_key) : null;
+    return {
+      ...seg,
+      startWaypoint: waypointMap.get(seg.startWaypointId)!,
+      endWaypoint: waypointMap.get(seg.endWaypointId)!,
+      ...(midId && waypointMap.has(midId) ? { busStopWaypoint: waypointMap.get(midId) } : {}),
+    };
+  });
 
   const mountain: Mountain = mtRow
     ? rowToMountain(mtRow as MountainRow)

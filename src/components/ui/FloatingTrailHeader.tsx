@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, AlertTriangle, Flag, Train } from "lucide-react";
+import { ChevronLeft, AlertTriangle, Flag, Train, Moon } from "lucide-react";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
 import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
@@ -37,6 +37,7 @@ interface Props {
   locale?: string;
   hikingPhase?: HikingPhase;
   hikingMode?: "preview" | "active";
+  nightView?: boolean;
 }
 
 export default function FloatingTrailHeader({
@@ -52,6 +53,7 @@ export default function FloatingTrailHeader({
   locale: propLocale,
   hikingPhase,
   hikingMode,
+  nightView,
 }: Props) {
   const { locale: hookLocale } = useLanguage();
   const locale = propLocale || hookLocale;
@@ -114,7 +116,7 @@ export default function FloatingTrailHeader({
         </Link>
       )}
 
-      <div className="flex items-center justify-between gap-6 px-4 pb-3.5 pt-1">
+      <div className={`flex justify-between gap-6 px-4 pb-3.5 pt-1 ${nightView && (!isHiking || hikingMode !== "active") ? "items-start" : "items-center"}`}>
         {/* Left: Station info section */}
         {stationInfo ? (
           <div className="flex flex-col gap-1 min-w-0">
@@ -160,18 +162,31 @@ export default function FloatingTrailHeader({
         {/* Right: Triple ETA Stack */}
         <div className="flex flex-col items-end gap-1 shrink-0">
           {(!isHiking || hikingMode !== "active") ? (
-            /* PRE-HIKE MODE */
-            <>
-              {latestStartMin != null && renderETALine(
-                tUI("lastSafeStart", locale),
-                latestStartMin,
-                AlertTriangle,
-                isPastLatestStart ? "#EF4444" : "#D97706",
-                isPastLatestStart ? "#EF4444" : "#D97706"
-              )}
-              {renderETALine(tUI("summitArrival", locale), peakETAMin, Flag)}
-              {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
-            </>
+            nightView ? (
+              /* NIGHT VIEW MODE */
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={{ background: "#1A237E" }}
+              >
+                <Moon className="w-3.5 h-3.5 text-white" />
+                <span className="text-[12px] font-bold tracking-wide text-white">
+                  Night View
+                </span>
+              </div>
+            ) : (
+              /* PRE-HIKE MODE */
+              <>
+                {latestStartMin != null && renderETALine(
+                  tUI("lastSafeStart", locale),
+                  latestStartMin,
+                  AlertTriangle,
+                  isPastLatestStart ? "#EF4444" : "#D97706",
+                  isPastLatestStart ? "#EF4444" : "#D97706"
+                )}
+                {renderETALine(tUI("summitArrival", locale), peakETAMin, Flag)}
+                {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
+              </>
+            )
           ) : hikingPhase === "ascent" ? (
             /* ASCENT MODE */
             <>

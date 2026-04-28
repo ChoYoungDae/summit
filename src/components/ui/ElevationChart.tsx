@@ -9,7 +9,6 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
-  ReferenceDot,
 } from "recharts";
 import { Bus, Footprints, Flag } from "lucide-react";
 import type { SegmentType, RoutePhoto } from "@/types/trail";
@@ -547,25 +546,6 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                 />
               ))}
 
-              {/* ── Summit elevation dot ── */}
-              {summitPt && (
-                <ReferenceDot
-                  x={summitPt.dist}
-                  y={summitPt.ele}
-                  r={5}
-                  fill={COLOR_ASCENT}
-                  stroke="#fff"
-                  strokeWidth={1.5}
-                  label={{
-                    value: `${summitPt.ele}m`,
-                    position: "top",
-                    fill: COLOR_ASCENT,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    fontFamily: "var(--font-num)",
-                  }}
-                />
-              )}
 
               {/* ── Photo camera markers ── */}
               {photos

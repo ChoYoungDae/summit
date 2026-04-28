@@ -24,11 +24,17 @@ function buildWaypoints(route: ResolvedRoute): Waypoint[] {
   const seen = new Set<number>();
   const result: Waypoint[] = [];
   for (const seg of route.segments) {
-    for (const wpt of [seg.startWaypoint, seg.endWaypoint]) {
-      if (!seen.has(wpt.id)) {
-        seen.add(wpt.id);
-        result.push(wpt);
-      }
+    if (!seen.has(seg.startWaypoint.id)) {
+      seen.add(seg.startWaypoint.id);
+      result.push(seg.startWaypoint);
+    }
+    if (seg.busStopWaypoint && !seen.has(seg.busStopWaypoint.id)) {
+      seen.add(seg.busStopWaypoint.id);
+      result.push(seg.busStopWaypoint);
+    }
+    if (!seen.has(seg.endWaypoint.id)) {
+      seen.add(seg.endWaypoint.id);
+      result.push(seg.endWaypoint);
     }
   }
   return result;
@@ -141,11 +147,14 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
     .filter(s => s.isBusCombined)
     .map(s => {
       const style = seoulBusStyle(s.busDetails?.bus_numbers?.join(", "));
+      const busStop = s.busStopWaypoint;
       const coords = s.busDetails?.bus_track_data?.coordinates;
+      // Bus stop is where you alight: waypoint coord if available, else last point of bus track
+      const stopCoord: [number, number] | undefined = busStop
+        ? [busStop.lon, busStop.lat]
+        : coords ? [coords[coords.length - 1][0], coords[coords.length - 1][1]] : undefined;
       return {
-        stopCoord: coords
-          ? ([coords[Math.floor(coords.length / 2)][0], coords[Math.floor(coords.length / 2)][1]] as [number, number])
-          : undefined,
+        stopCoord,
         busNumbers: s.busDetails?.bus_numbers?.join(", "),
         color: style.color,
         chipTextColor: style.chipTextColor,
@@ -156,11 +165,14 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
     .filter(s => s.isBusCombined)
     .map(s => {
       const style = seoulBusStyle(s.busDetails?.bus_numbers?.join(", "));
+      const busStop = s.busStopWaypoint;
       const coords = s.busDetails?.bus_track_data?.coordinates;
+      // Bus stop is where you board: waypoint coord if available, else first point of bus track
+      const stopCoord: [number, number] | undefined = busStop
+        ? [busStop.lon, busStop.lat]
+        : coords ? [coords[0][0], coords[0][1]] : undefined;
       return {
-        stopCoord: coords
-          ? ([coords[Math.floor(coords.length / 2)][0], coords[Math.floor(coords.length / 2)][1]] as [number, number])
-          : undefined,
+        stopCoord,
         busNumbers: s.busDetails?.bus_numbers?.join(", "),
         color: style.color,
         chipTextColor: style.chipTextColor,

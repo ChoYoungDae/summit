@@ -98,6 +98,15 @@ body {
   letter-spacing: -0.01em; /* Nunito numbers read better slightly tighter */
 }
 
+/* ─── Bottom sheet handle hint: 3 bounces then stop ────────── */
+@keyframes bounceHint {
+  0%, 100% { transform: translateY(0);    animation-timing-function: cubic-bezier(0.8,0,1,1); }
+  50%       { transform: translateY(-4px); animation-timing-function: cubic-bezier(0,0,0.2,1); }
+}
+.animate-bounce-hint {
+  animation: bounceHint 0.8s ease 3;
+}
+
 /* ─── ETA number update animation ──────────────────────────── */
 @keyframes etaUpdate {
   from { opacity: 0; transform: translateY(-4px); }
@@ -115,6 +124,12 @@ body {
   0%   { transform: scale(1);   opacity: 1;   }
   50%  { transform: scale(1.4); opacity: 0.3; }
   100% { transform: scale(1.8); opacity: 0;   }
+}
+
+/* ─── GPS ripple: concentric expanding rings ─────────────── */
+@keyframes gpsRipple {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(3.2); opacity: 0;   }
 }
 
 /* ─── Home map: sketch/pencil filter applied to canvas only ── */

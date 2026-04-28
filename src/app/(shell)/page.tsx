@@ -1,5 +1,7 @@
 "use client";
 import { TrainFront, Navigation, Sun, Map } from "lucide-react";
+import Link from "next/link";
+import { Icon } from "@iconify/react";
 import MountainDiscovery from "@/components/ui/MountainDiscovery";
 import { useLanguage } from "@/lib/useLanguage";
 import { tUI } from "@/lib/i18n";
@@ -97,24 +99,49 @@ export default function HomePage() {
       {/* ── Interest Chips + Mountain Illustration (shared state) ── */}
       <MountainDiscovery />
 
-      {/* ── Personal Note ────────────────────────────────────────── */}
+      {/* ── Personal Note & Feedback ────────────────────────────── */}
       <section 
         className="mt-2 rounded-[16px] border border-[#4A5D4E]/20 bg-[#F9F9F9] p-6 flex flex-col gap-4 shadow-sm"
       >
-        <div className="flex">
-          <span 
-            className="inline-flex items-center bg-[#4A5D4E] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em]"
-            style={{ fontFamily: "var(--font-en)" }}
-          >
-            {tUI("personalNoteDate", locale)}
-          </span>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex">
+              <span 
+                className="inline-flex items-center bg-[#4A5D4E] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em]"
+                style={{ fontFamily: "var(--font-en)" }}
+              >
+                {tUI("personalNoteDate", locale)}
+              </span>
+            </div>
+            <p 
+              className="text-[0.9375rem] leading-[1.6] text-[#3A3A45]"
+              style={{ letterSpacing: "-0.01em" }}
+            >
+              {tUI("personalNote", locale)}
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="h-[0.5px] bg-[#000000]/10 w-full" />
+
+          {/* Feedback Section */}
+          <div className="flex flex-col gap-3">
+            <p 
+              className="text-[0.9375rem] leading-[1.6] text-[#3A3A45]"
+              style={{ letterSpacing: "-0.01em" }}
+            >
+              {tUI("serviceNoteDescription", locale)}
+            </p>
+            <Link
+              href="https://docs.google.com/forms/d/e/1FAIpQLSfuIAIdYil3vwRWOWBzrnxexNv_wcdvC24yN2-EhfPZM9JplQ/viewform?usp=sf_link"
+              target="_blank"
+              className="inline-flex items-center gap-1.5 text-[0.875rem] font-bold text-[var(--color-primary)] hover:opacity-80 transition-opacity"
+            >
+              <Icon icon="ph:chat-circle-dots" width={18} height={18} />
+              {tUI("sendFeedback", locale)}
+            </Link>
+          </div>
         </div>
-        <p 
-          className="text-[0.9375rem] leading-[1.6] text-[#3A3A45]"
-          style={{ letterSpacing: "-0.01em" }}
-        >
-          {tUI("personalNote", locale)}
-        </p>
       </section>
 
     </div>
