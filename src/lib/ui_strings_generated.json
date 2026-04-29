@@ -162,7 +162,8 @@
     "settingsNote": "This affects estimated hiking time and Safety Hiking Deadline calculations across all routes.",
     "infoSectionTourismDesc": "Need gear? Start your journey here. These centers provide everything international hikers need for a perfect day on the mountain.",
     "infoWhyNatureDesc": "Forget 'wilderness' fear. Trails are meticulously maintained with stairs, mats, and safety rails — secure for all skill levels.",
-    "infoSafetyGearDesc": "Most Seoul mountains (Bukhansan, Gwanaksan) are granite-based. Standard sneakers are slippery on these rocks — hiking boots with good grip are mandatory. Rent at the Tourism Center if needed."
+    "infoSafetyGearDesc": "Most Seoul mountains (Bukhansan, Gwanaksan) are granite-based. Standard sneakers are slippery on these rocks — hiking boots with good grip are mandatory. Rent at the Tourism Center if needed.",
+    "serviceNoteDescription": "The service is in its early stages and under constant development, so there may be some errors. Feedback on any inconveniences or improvements is always welcome."
   },
   "ko": {
     "lastSafeStart": "안전 산행 마감 시간",
@@ -327,7 +328,8 @@
     "settingsNote": "이 설정은 모든 경로의 예상 소요 시간 및 안전 산행 마감 시간 계산에 반영됩니다.",
     "infoSectionTourismDesc": "등산 장비가 필요하신가요? 이곳에서 시작하세요. 외국인 등산객들을 위한 모든 서비스가 준비되어 있습니다.",
     "infoWhyNatureDesc": "오지에서의 두려움은 잊으세요. 등산로는 계단, 멍석, 안전 난간 등으로 꼼꼼하게 관리되어 있어 모든 수준의 등산객이 안전하게 즐길 수 있습니다.",
-    "infoSafetyGearDesc": "서울의 주요 산(북한산, 관악산)은 대부분 거대한 화강암 바위로 이루어져 있습니다. 일반 운동화는 미끄러울 수 있으니 접지력이 좋은 등산화가 필수입니다. 필요하다면 등산관광센터에서 대여하세요."
+    "infoSafetyGearDesc": "서울의 주요 산(북한산, 관악산)은 대부분 거대한 화강암 바위로 이루어져 있습니다. 일반 운동화는 미끄러울 수 있으니 접지력이 좋은 등산화가 필수입니다. 필요하다면 등산관광센터에서 대여하세요.",
+    "serviceNoteDescription": "서비스 초기 단계로 계속해서 개발 중이며 오류가 있을 수 있습니다. 불편한 점이나 개선 사항은 언제든지 피드백으로 알려주세요."
   },
   "zh": {
     "lastSafeStart": "最晚安全出发时间",
@@ -492,7 +494,8 @@
     "settingsNote": "这会影响所有路线的预计徒步时间和安全徒步截止时间计算。",
     "infoSectionTourismDesc": "需要装备吗？从这里开始您的旅程。这些中心为国际徒步者提供完美登山日所需的一切。",
     "infoWhyNatureDesc": "忘记对“荒野”的恐惧。步道经过精心维护，设有楼梯、垫子和安全护栏——适合所有技能水平的登山者。",
-    "infoSafetyGearDesc": "首尔的大多数山脉（北汉山、冠岳山）都是花岗岩基质。普通运动鞋在这些岩石上很滑——抓地力良好的登山鞋是必须的。如有需要，可在旅游中心租赁。"
+    "infoSafetyGearDesc": "首尔的大多数山脉（北汉山、冠岳山）都是花岗岩基质。普通运动鞋在这些岩石上很滑——抓地力良好的登山鞋是必须的。如有需要，可在旅游中心租赁。",
+    "serviceNoteDescription": "目前处于早期开发阶段并持续改进中，可能存在一些错误。欢迎随时针对不便之处或改进建议提供反馈。"
   },
   "ja": {
     "lastSafeStart": "安全登山締め切り時間",
@@ -657,7 +660,8 @@
     "settingsNote": "この設定は、すべてのルート의 予想登山時間および安全登山締め切り時間の計算に反映されます。",
     "infoSectionTourismDesc": "装備が必要ですか？ここから旅を始めましょう。これらのセンターは、海外登山者が完璧な一日を過ごすために必要なすべてを提供します。",
     "infoWhyNatureDesc": "「人里離れた地」への恐怖は忘れてください。登山道は階段、マット、安全柵などで入念に管理されており、あらゆるスキルの登山者が安全に楽しめます。",
-    "infoSafetyGearDesc": "ソウルの主な山（北漢山、冠岳山）は、ほとんどが巨大な花崗岩でできています。普通の運動靴は滑りやすいため、グリップの良い登山靴が必須です。必要に応じて、観光センターでレンタルしてください。"
+    "infoSafetyGearDesc": "ソウルの主な山（北漢山、冠岳山）は、ほとんどが巨大な花崗岩でできています。普通の運動靴は滑りやすいため、グリップの良い登山靴が必須です。必要に応じて、観光センターでレンタルしてください。",
+    "serviceNoteDescription": "現在は開発の初期段階にあり、継続的にアップデートを行っているため、エラーが発生する可能性があります。不便な点や改善案がございましたら、いつでもフィードバックをお寄せください。"
   },
   "es": {
     "lastSafeStart": "Última hora de inicio segura",
@@ -822,6 +826,7 @@
     "settingsNote": "Esto afecta el tiempo estimado de caminata y los cálculos del límite de tiempo para una caminata segura en todas las rutas.",
     "infoSectionTourismDesc": "¿Necesitas equipo? Comienza tu viaje aquí. Estos centros brindan todo lo que los excursionistas internacionales necesitan para un día perfecto en la montaña.",
     "infoWhyNatureDesc": "Olvídate del miedo a lo 'salvaje'. Los senderos están meticulosamente mantenidos con escaleras, alfombras y barandillas de seguridad, seguros para todos los niveles de habilidad.",
-    "infoSafetyGearDesc": "La mayoría de las montañas de Seúl (Bukhansan, Gwanaksan) son a base de granito. Las zapatillas estándar son resbaladizas en estas rocas; las botas de senderismo con buen agarre son obligatorias. Alquila en el Centro de Turismo si es necesario."
+    "infoSafetyGearDesc": "La mayoría de las montañas de Seúl (Bukhansan, Gwanaksan) son a base de granito. Las zapatillas estándar son resbaladizas en estas rocas; las botas de senderismo con buen agarre son obligatorias. Alquila en el Centro de Turismo si es necesario.",
+    "serviceNoteDescription": "El servicio está en una fase temprana de desarrollo y se actualiza constantemente, por lo que puede haber algunos errores. Los comentarios sobre cualquier inconveniente o mejora son siempre bienvenidos."
   }
 }
