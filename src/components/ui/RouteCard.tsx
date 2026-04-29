@@ -83,20 +83,20 @@ export default function RouteCard({
         boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
       }}
     >
-      {/* ── Station + safety banner ── */}
-      {!route.hideSafeStart && latestStartMin != null && (
+      {/* ── Station banner ── always shown if stationInfo exists ── */}
+      {stationInfo && (
         <div
           className="flex items-center justify-between gap-2 px-3 py-2"
           style={{ background: "#FFFFFF", borderBottom: "1px solid rgba(0,0,0,0.10)" }}
         >
-          {/* Left: subway line circles + station name + shoe icon */}
+          {/* Left: subway line circles + station name */}
           <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            {stationInfo?.lines.map((line) =>
+            {stationInfo.lines.map((line) =>
               typeof line === "string" ? (
                 <span
                   key={line}
-                  className="inline-flex items-center justify-center rounded-full px-1.5 h-[18px] text-white shrink-0"
-                  style={{ fontSize: "9px", fontWeight: 700, background: METRO_COLOR[line] ?? "#888", fontFamily: "var(--font-ko)" }}
+                  className="inline-flex items-center justify-center rounded px-1.5 h-[18px] text-white shrink-0"
+                  style={{ fontSize: "10px", fontWeight: 700, background: METRO_COLOR[line] ?? "#888", fontFamily: "var(--font-ko)" }}
                 >
                   {line}
                 </span>
@@ -110,40 +110,38 @@ export default function RouteCard({
                 </span>
               )
             )}
-            {stationInfo && (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className="text-[12px] font-semibold truncate"
-                  style={{ color: "var(--color-text-body)" }}
-                >
-                  {tDB(stationInfo.name, locale)}
-                </span>
-                {stationInfo.busNumbers && (
-                  <span className="flex items-center gap-0.5 text-[10px] font-bold text-[#0068B7] bg-[#0068B7]/5 px-1.5 py-0.5 rounded-md shrink-0">
-                    <Bus size={10} strokeWidth={2.5} />
-                    {stationInfo.busNumbers}
-                  </span>
-                )}
-              </div>
+            <span
+              className="text-[12px] font-semibold truncate"
+              style={{ color: "var(--color-text-body)" }}
+            >
+              {tDB(stationInfo.name, locale)}
+            </span>
+            {stationInfo.busNumbers && (
+              <span className="flex items-center gap-0.5 text-[10px] font-bold text-[#0068B7] bg-[#0068B7]/5 px-1.5 py-0.5 rounded-md shrink-0">
+                <Bus size={10} strokeWidth={2.5} />
+                {stationInfo.busNumbers}
+              </span>
             )}
             <Icon icon="ph:sneaker" width={14} height={14} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
           </div>
-          {/* Right: last safe start */}
-          <div className="flex items-center gap-1 shrink-0">
-            <Icon icon="ph:warning-circle" width={12} height={12} style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)" }} />
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              {tUI("lastSafeStart", locale)}
-            </span>
-            <span
-              className="font-num text-[11px] font-bold"
-              style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-body)" }}
-            >
-              {formatMinutesAsTime(latestStartMin)}
-            </span>
-          </div>
+          {/* Right: last safe start — only when available */}
+          {!route.hideSafeStart && latestStartMin != null && (
+            <div className="flex items-center gap-1 shrink-0">
+              <Icon icon="ph:warning-circle" width={12} height={12} style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)" }} />
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                {tUI("lastSafeStart", locale)}
+              </span>
+              <span
+                className="font-num text-[11px] font-bold"
+                style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-body)" }}
+              >
+                {formatMinutesAsTime(latestStartMin)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

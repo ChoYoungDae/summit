@@ -7,7 +7,7 @@ import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
 import { useLanguage } from "@/lib/useLanguage";
 
-const SUBWAY_LINE_COLORS: Record<number, string> = {
+const SUBWAY_LINE_COLORS: Record<number | string, string> = {
   1: "#0052A4",
   2: "#00A84D",
   3: "#EF7C1C",
@@ -17,6 +17,7 @@ const SUBWAY_LINE_COLORS: Record<number, string> = {
   7: "#747F00",
   8: "#E6186C",
   9: "#BDB092",
+  "신림": "#3D85C8",
 };
 
 interface Props {
@@ -106,11 +107,11 @@ export default function FloatingTrailHeader({
       {routeName && (
         <Link
           href={backHref}
-          className="flex items-center gap-1 px-4 pt-2.5 pb-1"
+          className="flex items-center gap-0.5 pl-1 pr-4 pt-2.5 pb-1"
           style={{ color: "var(--color-primary)" }}
         >
-          <ChevronLeft className="w-5 h-5 shrink-0" />
-          <span className="text-[16px] font-extrabold tracking-tight truncate">
+          <ChevronLeft className="w-6 h-6 shrink-0" />
+          <span className="text-[20px] font-extrabold tracking-tight truncate">
             {routeName}
           </span>
         </Link>
@@ -120,40 +121,50 @@ export default function FloatingTrailHeader({
         {/* Left: Station info section */}
         {stationInfo ? (
           <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-black text-[1.15rem] leading-tight tracking-tight">
-                {(() => {
-                  const name = tDB(stationInfo.name, locale);
-                  const exit = stationInfo.exit ? ` ${stationInfo.exit}${locale === "ko" ? "번 출구" : ` ${tUI("exit", locale)}`}` : "";
-                  return `${name}${exit}`;
-                })()}
-              </span>
-              {stationInfo.line && SUBWAY_LINE_COLORS[stationInfo.line] && (
+            {/* Row 1: line circles + exit badge */}
+            <div className="flex items-center gap-1.5">
+              {stationInfo.lines?.map((ln) =>
+                typeof ln === "string" ? (
+                  <span
+                    key={ln}
+                    className="inline-flex items-center justify-center rounded-full px-1.5 text-white font-black leading-none shrink-0"
+                    style={{ height: 20, fontSize: 10, background: SUBWAY_LINE_COLORS[ln] ?? "#888", fontFamily: "var(--font-ko)" }}
+                  >
+                    {ln}
+                  </span>
+                ) : (
+                  <span
+                    key={ln}
+                    className="inline-flex items-center justify-center text-white font-black text-[11px] leading-none shrink-0"
+                    style={{ width: 20, height: 20, borderRadius: "50%", background: SUBWAY_LINE_COLORS[ln] ?? "#888" }}
+                  >
+                    {ln}
+                  </span>
+                )
+              )}
+              {stationInfo.exit && (
                 <span
-                  className="inline-flex items-center justify-center text-white font-black text-[11px] leading-none shrink-0"
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    background: SUBWAY_LINE_COLORS[stationInfo.line],
-                  }}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md font-black text-[11px] leading-none shrink-0"
+                  style={{ background: "#1A1A1A", color: "#F5C842" }}
                 >
-                  {stationInfo.line}
+                  Exit {stationInfo.exit}
                 </span>
               )}
             </div>
-            {locale !== "ko" && stationInfo.name.ko && (
-              <span
-                className="text-[11px] font-semibold"
-                style={{
-                  fontFamily: "var(--font-ko)",
-                  color: "var(--color-text-muted)",
-                }}
-              >
-                {stationInfo.name.ko}
-                {stationInfo.exit ? ` ${stationInfo.exit}번 출구` : ""}
+            {/* Row 2: English name (primary) + Korean name (70% size) */}
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="font-black text-[1.15rem] leading-tight tracking-tight">
+                {tDB(stationInfo.name, locale)}
               </span>
-            )}
+              {locale !== "ko" && stationInfo.name.ko && (
+                <span
+                  className="font-semibold leading-tight"
+                  style={{ fontSize: "0.8rem", color: "var(--color-text-muted)", fontFamily: "var(--font-ko)" }}
+                >
+                  {stationInfo.name.ko}
+                </span>
+              )}
+            </div>
           </div>
         ) : (
           <div />

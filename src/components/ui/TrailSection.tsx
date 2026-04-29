@@ -113,6 +113,7 @@ export default function TrailSection({
   const [chartHighlightIndex,   setChartHighlightIndex]   = useState<number | null>(null);
   const [selectedWaypointIndex, setSelectedWaypointIndex] = useState<number | null>(null);
   const [isHiking,              setIsHiking]              = useState(false);
+  const [isLocating,            setIsLocating]            = useState(false);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
   const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
@@ -173,35 +174,21 @@ export default function TrailSection({
     nearestTrackIndex: gps.nearestTrackIndex,
   });
 
+  const summitElevationM = useMemo(
+    () => waypoints.find((w) => w.type === "SUMMIT")?.elevationM,
+    [waypoints]
+  );
+
   // ── Elevation segments for multi-segment chart ───────────────────────────
   const elevationSegments = useMemo<SegmentElevationInfo[]>(() => {
-    return route.segments.map((seg) => {
-      // Base walk/hiking coordinates with elevation
-      let points: [number, number, number][] = seg.trackData.coordinates.map(
-        (c) => [c[0], c[1], c[2] ?? 0]
-      );
-
-      // For bus-combined segments, prepend bus track (APPROACH) or append (RETURN)
-      // Bus GPS usually lacks elevation so those points appear flat at ele=0.
-      if (seg.isBusCombined && seg.busDetails?.bus_track_data) {
-        const busPts: [number, number, number][] =
-          seg.busDetails.bus_track_data.coordinates.map(
-            (c) => [c[0], c[1], c[2] ?? 0]
-          );
-        if (seg.segmentType === "APPROACH") {
-          points = [...busPts, ...points];
-        } else if (seg.segmentType === "RETURN") {
-          points = [...points, ...busPts];
-        }
-      }
-
-      return {
-        type: seg.segmentType,
-        isBus: seg.isBusCombined ?? false,
-        busColor: seg.busDetails?.route_color,
-        points,
-      };
-    });
+    return route.segments.map((seg) => ({
+      type: seg.segmentType,
+      isBus: false,
+      busColor: seg.busDetails?.route_color,
+      // For bus-combined segments, track_data holds the walk portion only;
+      // the bus portion (bus_track_data) has no meaningful elevation and is excluded.
+      points: seg.trackData.coordinates.map((c) => [c[0], c[1], c[2] ?? 0] as [number, number, number]),
+    }));
   }, [route.segments]);
 
   // ── Station info ──────────────────────────────────────────────────────────
@@ -209,7 +196,30 @@ export default function TrailSection({
     const approachSeg = route.segments.find((s) => s.segmentType === "APPROACH");
     const sw = approachSeg?.startWaypoint;
     if (!sw || sw.type !== "STATION") return undefined;
-    return { name: sw.name };
+
+    // Parse exit from DB field, or fall back to extracting from the name string
+    // English name may be stored as "Exit 4, Sadang Station"
+    let exit: number | undefined;
+    let cleanEn = sw.name.en ?? "";
+    let cleanKo = sw.name.ko ?? "";
+    const enMatch = cleanEn.match(/^Exit\s+(\d+),\s*(.+)$/i);
+    if (enMatch) { exit = parseInt(enMatch[1], 10); cleanEn = enMatch[2].trim(); }
+    if (!exit && sw.exitNumber) exit = parseInt(sw.exitNumber, 10) || undefined;
+    // Korean: strip "N번 출구" suffix
+    cleanKo = cleanKo.replace(/\s*\d+번\s*출구\s*$/, "").trim();
+
+    const lines = sw.subwayLine
+      ? sw.subwayLine.split(",").map((s) => {
+          const t = s.trim();
+          const n = parseInt(t, 10);
+          return !isNaN(n) && n > 0 ? n : t;
+        }).filter((l) => l !== "")
+      : undefined;
+    return {
+      name: { ...sw.name, en: cleanEn, ko: cleanKo || sw.name.ko },
+      lines: lines?.length ? lines : undefined,
+      exit: exit && !isNaN(exit) ? exit : undefined,
+    };
   }, [route.segments]);
 
   // ── Safety: latestStartMin ────────────────────────────────────────────────
@@ -324,12 +334,15 @@ export default function TrailSection({
       setIsHiking(false);
       return;
     }
+    if (isLocating) return;
     if (!navigator.geolocation || track.length === 0) {
       startHiking();
       return;
     }
+    setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setIsLocating(false);
         const trailhead = track[0]!;
         const dist = getDistance(
           { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
@@ -341,8 +354,8 @@ export default function TrailSection({
           setShowOffRoutePrompt(true);
         }
       },
-      () => startHiking(),
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 30_000 },
+      () => { setIsLocating(false); startHiking(); },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
     );
   }
 
@@ -516,15 +529,15 @@ export default function TrailSection({
           <HikingBottomSheet
             isHiking={isHiking}
             hikingMode={hikingMode}
+            isLocating={isLocating}
             onToggleHiking={handleToggleHiking}
             gps={gps}
             track={track}
             elevationSegments={elevationSegments}
+            summitElevationM={summitElevationM}
             onHover={handleHover}
             highlightIndex={elevationHighlightIndex}
             onSheetHeightChange={setSheetHeightPx}
-            photos={photos}
-            onPhotoClick={setActivePhoto}
             showOffRoutePrompt={showOffRoutePrompt}
             offRouteEnabled={offRouteEnabled}
             onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}

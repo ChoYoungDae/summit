@@ -134,11 +134,9 @@ export interface RoutePhoto {
 }
 
 // ── Station info (for FloatingTrailHeader subway chip) ───────────────────────
-// Derived from the APPROACH segment's startWaypoint (STATION type).
-// line and exit are optional — not yet stored in the waypoints schema.
 export interface StationInfo {
   name: LocalizedText;
-  line?: number;
+  lines?: (number | string)[];
   exit?: number;
 }
 

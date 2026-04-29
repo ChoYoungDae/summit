@@ -11,8 +11,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Bus, Footprints, Flag } from "lucide-react";
-import type { SegmentType, RoutePhoto } from "@/types/trail";
-import { Icon } from "@iconify/react";
+import type { SegmentType } from "@/types/trail";
 
 // ── Color palette ─────────────────────────────────────────────────────────────
 const COLOR_ASCENT   = "#10B981"; // Emerald green — climbing
@@ -51,6 +50,24 @@ interface BoundaryInfo {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function smoothElevations(data: ElevationPoint[], radius = 8): ElevationPoint[] {
+  return data.map((pt, i) => {
+    const lo = Math.max(0, i - radius);
+    const hi = Math.min(data.length - 1, i + radius);
+    let sum = 0, count = 0;
+    for (let j = lo; j <= hi; j++) { sum += data[j].ele; count++; }
+    const smoothed = sum / count;
+    return {
+      ...pt,
+      ele:         smoothed,
+      eleApproach: pt.eleApproach != null ? smoothed : undefined,
+      eleAscent:   pt.eleAscent   != null ? smoothed : undefined,
+      eleDescent:  pt.eleDescent  != null ? smoothed : undefined,
+      eleReturn:   pt.eleReturn   != null ? smoothed : undefined,
+    };
+  });
+}
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -138,10 +155,12 @@ function NodeIconLabel({
   viewBox,
   segType,
   isBus,
+  elevM,
 }: {
   viewBox?: { x: number; y: number; width: number; height: number };
   segType: SegmentType;
   isBus: boolean;
+  elevM?: number;
 }) {
   if (!viewBox) return null;
   const { x } = viewBox;
@@ -150,7 +169,6 @@ function NodeIconLabel({
   let IconComp: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 
   if (segType === "DESCENT") {
-    // Transition to descent = summit reached → Flag
     color = COLOR_DESCENT;
     IconComp = Flag;
   } else if (isBus) {
@@ -160,14 +178,15 @@ function NodeIconLabel({
     color = COLOR_ASCENT;
     IconComp = Footprints;
   } else {
-    // RETURN walk
-    color = COLOR_DESCENT; // Return walk matches descent color theme but dashed in legend
+    color = COLOR_DESCENT;
     IconComp = Footprints;
   }
 
+  const label = elevM != null ? `${elevM}m` : null;
+  const labelW = label ? label.length * 6.5 + 10 : 0;
+
   return (
     <g>
-      {/* White halo for map-background legibility */}
       <circle cx={x} cy={11} r={10} fill="white" opacity={0.9} />
       <circle cx={x} cy={11} r={9} fill="white" stroke={color} strokeWidth={1.5} />
       <foreignObject x={x - 6} y={5} width={12} height={12}>
@@ -185,59 +204,25 @@ function NodeIconLabel({
           <IconComp size={9} color={color} strokeWidth={2.5} />
         </div>
       </foreignObject>
+      {label && (
+        <g>
+          <rect x={x + 13} y={4} width={labelW} height={14} rx={7} fill="rgba(17,17,22,0.82)" />
+          <text
+            x={x + 13 + labelW / 2}
+            y={11}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={10}
+            fontFamily="var(--font-num)"
+            fontWeight="bold"
+            fill="white"
+          >
+            {label}
+          </text>
+        </g>
+      )}
     </g>
   );
-}
-
-// ── Photo camera label (rendered inside Recharts SVG via ReferenceLine label) ─
-
-function PhotoIconLabel({
-  viewBox,
-  onClick,
-}: {
-  viewBox?: { x: number; y: number; width: number; height: number };
-  onClick?: () => void;
-}) {
-  if (!viewBox) return null;
-  const { x } = viewBox;
-  return (
-    <g style={{ cursor: "pointer" }} onClick={onClick}>
-      <circle cx={x} cy={11} r={10} fill="white" opacity={0.9} />
-      <circle cx={x} cy={11} r={9} fill="#F59E0B" />
-      <foreignObject x={x - 6} y={5} width={12} height={12}>
-        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-        {/* @ts-ignore — xmlns attribute required for foreignObject HTML context */}
-        <div
-          style={{
-            width: 12,
-            height: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon icon="ph:camera" width={9} height={9} color="#fff" />
-        </div>
-      </foreignObject>
-    </g>
-  );
-}
-
-// ── Find dist value for a lat/lon in the elevation data ───────────────────────
-function findDistForCoord(
-  data: { dist: number; origPt: [number, number, number] }[],
-  lat: number,
-  lon: number,
-): number | null {
-  if (data.length === 0) return null;
-  let minDist = Infinity;
-  let best = data[0].dist;
-  for (const pt of data) {
-    const [pLon, pLat] = pt.origPt;
-    const d = (pLat - lat) ** 2 + (pLon - lon) ** 2;
-    if (d < minDist) { minDist = d; best = pt.dist; }
-  }
-  return best;
 }
 
 // ── Legend row ────────────────────────────────────────────────────────────────
@@ -257,8 +242,8 @@ function LegendDash({
         <line
           x1={0} y1={4} x2={18} y2={4}
           stroke={color}
-          strokeWidth={dashed ? 2 : 2.5}
-          strokeDasharray={dashed ? "5 3" : undefined}
+          strokeWidth={2.5}
+          strokeDasharray={dashed ? "2 3" : undefined}
           strokeLinecap="round"
         />
       </svg>
@@ -279,20 +264,18 @@ interface Props {
    * Built by gps.nearestTrackIndex or chart click.
    */
   highlightTrackIndex?: number | null;
-  /** Route photos to show as camera markers along the elevation profile. */
-  photos?: RoutePhoto[];
-  /** Called when a photo marker is clicked. */
-  onPhotoClick?: (photo: RoutePhoto) => void;
+  summitElevationM?: number;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ElevationChart({ segments, onHover, highlightTrackIndex, photos = [], onPhotoClick }: Props) {
+export default function ElevationChart({ segments, onHover, highlightTrackIndex, summitElevationM }: Props) {
   const nonBusSegments = useMemo(() => segments.filter((s) => !s.isBus), [segments]);
-  const { data, trackIndexMap, boundaries } = useMemo(
+  const { data: rawData, trackIndexMap, boundaries } = useMemo(
     () => buildData(nonBusSegments),
     [nonBusSegments]
   );
+  const data = useMemo(() => smoothElevations(rawData), [rawData]);
   const rafRef = useRef<number | null>(null);
 
   const approachSeg = nonBusSegments.find((s) => s.type === "APPROACH");
@@ -336,23 +319,14 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
 
   const highlightPt = highlightGlobalIndex != null ? data[highlightGlobalIndex] : null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderDot = useCallback((props: any) => {
-    if (props.index !== highlightGlobalIndex) return <g key={props.index} />;
-    const { cx, cy, value } = props;
-    if (value === undefined || value === null || !isFinite(cy)) return <g key={props.index} />;
-    return (
-      <circle
-        key={`dot-${props.index}`}
-        cx={cx}
-        cy={cy}
-        r={7}
-        fill={COLOR_ACTIVE}
-        stroke="#fff"
-        strokeWidth={2}
-      />
-    );
-  }, [highlightGlobalIndex]);
+  const yDomain = useMemo(() => {
+    const eles = data.map((d) => d.ele).filter((e) => isFinite(e) && e > 0);
+    if (eles.length === 0) return ["auto", "auto"] as const;
+    const minEle = Math.min(...eles);
+    const maxEle = Math.max(...eles);
+    const range = Math.max(maxEle - minEle, 40);
+    return [Math.max(0, Math.floor(minEle - range * 0.06)), Math.ceil(maxEle + range * 0.04)] as const;
+  }, [data]);
 
   // Summit point: boundary where DESCENT starts (= peak reached)
   const summitPt = useMemo(() => {
@@ -363,9 +337,57 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
         Math.abs(pt.dist - summitBoundary.dist) < Math.abs(best.dist - summitBoundary.dist) ? pt : best
       );
     }
-    // Fallback: max elevation point
     return data.reduce((best, pt) => (pt.ele > best.ele ? pt : best));
   }, [data, boundaries]);
+
+  const summitDataIndex = useMemo(
+    () => (summitPt ? data.indexOf(summitPt) : -1),
+    [summitPt, data]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderAscentDot = useCallback((props: any) => {
+    const { cx, cy, index, value } = props;
+    if (value === undefined || value === null || !isFinite(cy)) return <g key={index} />;
+
+    // Summit elevation label — rendered at the actual peak pixel position
+    if (summitElevationM && index === summitDataIndex) {
+      const label = `${summitElevationM}m`;
+      const w = label.length * 7 + 12;
+      return (
+        <g key={`summit-label-${index}`}>
+          <rect x={cx - w / 2} y={cy - 19} width={w} height={15} rx={7.5} fill="rgba(17,17,22,0.82)" />
+          <text
+            x={cx}
+            y={cy - 11}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={10}
+            fontFamily="var(--font-num)"
+            fontWeight="bold"
+            fill="white"
+          >
+            {label}
+          </text>
+        </g>
+      );
+    }
+
+    if (index !== highlightGlobalIndex) return <g key={index} />;
+    return (
+      <circle key={`dot-${index}`} cx={cx} cy={cy} r={7} fill={COLOR_ACTIVE} stroke="#fff" strokeWidth={2} />
+    );
+  }, [highlightGlobalIndex, summitDataIndex, summitElevationM]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderDescentDot = useCallback((props: any) => {
+    const { cx, cy, index, value } = props;
+    if (value === undefined || value === null || !isFinite(cy)) return <g key={index} />;
+    if (index !== highlightGlobalIndex) return <g key={index} />;
+    return (
+      <circle key={`dot-${index}`} cx={cx} cy={cy} r={7} fill={COLOR_ACTIVE} stroke="#fff" strokeWidth={2} />
+    );
+  }, [highlightGlobalIndex]);
 
   // X axis ticks: start, summit, end
   const xTicks = useMemo(() => {
@@ -388,36 +410,30 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
   return (
     <div
       className="px-2 pt-3 pb-1 rounded-xl"
-      style={{ minHeight: "140px", background: "#F2F2F5" }}
+      style={{ minHeight: "160px", background: "#F2F2F5" }}
       onTouchEnd={handleLeave}
     >
       {/* Inline legend */}
       <div className="flex items-center justify-end gap-2.5 px-2 mb-1">
-        {hasApproach && <LegendDash color={approachColor} dashed label="Walk" />}
+        {hasApproach && <LegendDash color={approachColor} dashed label="Approach" />}
         {hasAscent   && <LegendDash color={COLOR_ASCENT}  label="Ascent"  />}
         {hasDescent  && <LegendDash color={COLOR_DESCENT} label="Descent" />}
-        {hasReturn   && <LegendDash color={returnColor}   dashed label="Walk" />}
+        {hasReturn   && <LegendDash color={returnColor}   dashed label="Return" />}
       </div>
 
       {data.length > 0 ? (
         // drop-shadow gives the strokes a subtle white glow — improves legibility
         // over complex map backgrounds when the sheet is partially transparent
         <div style={{ filter: "drop-shadow(0 0 1px rgba(255,255,255,0.7)) drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
-          <ResponsiveContainer width="100%" height={132}>
+          <ResponsiveContainer width="100%" height={152}>
             <AreaChart
               data={data}
-              margin={{ top: 28, right: 8, bottom: 4, left: 4 }}
+              margin={{ top: 22, right: 8, bottom: 4, left: 4 }}
               onMouseMove={handlePointSelect}
               onClick={handlePointSelect}
               onMouseLeave={handleLeave}
             >
-              {/* SVG definitions: ascent gradient fill */}
-              <defs>
-                <linearGradient id="elevAscentGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={COLOR_ASCENT} stopOpacity={0.22} />
-                  <stop offset="100%" stopColor={COLOR_ASCENT} stopOpacity={0} />
-                </linearGradient>
-              </defs>
+              <defs />
 
               <XAxis
                 dataKey="dist"
@@ -427,7 +443,7 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                 axisLine={false}
                 tickFormatter={(v: number) => (v === 0 ? "0" : `${v.toFixed(1)} km`)}
               />
-              <YAxis hide width={0} domain={["auto", "dataMax + 20"]} />
+              <YAxis hide width={0} domain={yDomain} />
 
               {/* Horizontal baseline */}
               <ReferenceLine y={0} stroke="#D1D5DB" strokeWidth={1} ifOverflow="visible" />
@@ -472,11 +488,11 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
 
               {/* ── Approach segment (walk — dashed) ── */}
               <Area
-                type="monotone"
+                type="basis"
                 dataKey="eleApproach"
                 stroke={approachColor}
-                strokeWidth={1.5}
-                strokeDasharray="8 5"
+                strokeWidth={3}
+                strokeDasharray="4 6"
                 strokeLinecap="round"
                 fill="none"
                 dot={false}
@@ -485,15 +501,15 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                 connectNulls={false}
               />
 
-              {/* ── Ascent segment — emerald + gradient fill ── */}
+              {/* ── Ascent segment — solid, no fill ── */}
               <Area
-                type="monotone"
+                type="basis"
                 dataKey="eleAscent"
                 stroke={COLOR_ASCENT}
                 strokeWidth={3}
                 strokeLinecap="round"
-                fill="url(#elevAscentGrad)"
-                dot={renderDot}
+                fill="none"
+                dot={renderAscentDot}
                 activeDot={{ r: 4, fill: COLOR_ACTIVE, stroke: "#fff", strokeWidth: 1.5 }}
                 isAnimationActive={false}
                 connectNulls={false}
@@ -501,13 +517,13 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
 
               {/* ── Descent segment — purple solid ── */}
               <Area
-                type="monotone"
+                type="basis"
                 dataKey="eleDescent"
                 stroke={COLOR_DESCENT}
                 strokeWidth={3}
                 strokeLinecap="round"
                 fill="none"
-                dot={renderDot}
+                dot={renderDescentDot}
                 activeDot={{ r: 4, fill: COLOR_ACTIVE, stroke: "#fff", strokeWidth: 1.5 }}
                 isAnimationActive={false}
                 connectNulls={false}
@@ -515,11 +531,11 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
 
               {/* ── Return segment (walk — dashed) ── */}
               <Area
-                type="monotone"
+                type="basis"
                 dataKey="eleReturn"
                 stroke={returnColor}
-                strokeWidth={1.5}
-                strokeDasharray="8 5"
+                strokeWidth={3}
+                strokeDasharray="4 6"
                 strokeLinecap="round"
                 fill="none"
                 dot={false}
@@ -541,38 +557,17 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
                     <NodeIconLabel
                       segType={b.segType}
                       isBus={b.isBus}
+                      elevM={b.segType === "DESCENT" && !b.isBus ? summitElevationM : undefined}
                     />
                   }
                 />
               ))}
 
-
-              {/* ── Photo camera markers ── */}
-              {photos
-                .filter(p => p.lat != null && p.lon != null)
-                .map(photo => {
-                  const dist = findDistForCoord(data, photo.lat!, photo.lon!);
-                  if (dist === null) return null;
-                  return (
-                    <ReferenceLine
-                      key={`photo-${photo.id}`}
-                      x={dist}
-                      stroke="rgba(245,158,11,0.4)"
-                      strokeWidth={1}
-                      strokeDasharray="2 3"
-                      ifOverflow="visible"
-                      label={
-                        <PhotoIconLabel onClick={() => onPhotoClick?.(photo)} />
-                      }
-                    />
-                  );
-                })
-              }
             </AreaChart>
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="h-[118px] flex items-center justify-center text-xs text-[var(--color-text-muted)]">
+        <div className="h-[138px] flex items-center justify-center text-xs text-[var(--color-text-muted)]">
           No elevation data available
         </div>
       )}
