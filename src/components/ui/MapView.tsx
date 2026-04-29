@@ -12,7 +12,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Waypoint, RoutePhoto } from "@/types/trail";
 import { Footprints, GitFork, Camera, Flag, TrainFront, Bus } from "lucide-react";
 import { Icon } from "@iconify/react";
-import { tDB, tUI } from "@/lib/i18n";
+import { tDB } from "@/lib/i18n";
 
 // ── Brand colors ──────────────────────────────────────────────────────────────
 const COLOR_BUS          = "#FF7A00"; // Bright Orange
@@ -90,8 +90,8 @@ const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, strin
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GPS_ACCURACY_M         = 150;  // ongoing filter — reject fixes worse than this
-const GPS_ACCURACY_FIRST_M   = 500;  // relaxed threshold for mobile GPS cold start
+const GPS_ACCURACY_M         = 150;   // ongoing filter — reject fixes worse than this
+const GPS_ACCURACY_FIRST_M   = 5000; // permissive for mobile cold start (network/WiFi fix)
 const WAYPOINT_ALERT_M = 40;
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
@@ -716,13 +716,15 @@ export default function MapView({
           console.warn("[GPS]", err.message, err.code);
           setGpsAcquiring(false);
           const ui = UI_STRINGS[locale] ?? UI_STRINGS.en;
-          if (err.message.includes("secure origins") || err.code === 1) {
+          if (err.code === 1) {
+            setGpsError("Location access denied — enable in browser settings");
+          } else if (err.message.includes("secure origins")) {
             setGpsError(ui.gpsHttps);
           } else if (err.code === 2 || err.code === 3) {
             setGpsError("GPS unavailable — check location settings");
           }
         },
-        { enableHighAccuracy: true, maximumAge: 3_000, timeout: 20_000 },
+        { enableHighAccuracy: true, maximumAge: 3_000, timeout: 30_000 },
       );
     }
   // bottomPadding is intentionally excluded — only matters at load time
@@ -835,7 +837,6 @@ export default function MapView({
     if (!isMapLoaded || !mapRef.current || selectedWaypointIndex == null) return;
     const wpt = waypoints[selectedWaypointIndex];
     if (!wpt) return;
-    const desc = wpt.description ? tDB(wpt.description, locale) : undefined;
     mapRef.current.easeTo({ center: [wpt.lon, wpt.lat], zoom: 15, duration: 600 });
   }, [selectedWaypointIndex, waypoints, isMapLoaded]);
 
@@ -1264,20 +1265,22 @@ export default function MapView({
         );
       })()}
 
-      {/* My Location button — always visible once GPS fix acquired */}
-      {gpsPos && (
+      {/* My Location button — visible once GPS is started (acquiring or has fix) */}
+      {(gpsPos || gpsAcquiring) && (
         <button
-          onClick={centerOnGps}
-          aria-label="Center map on my location"
+          onClick={gpsPos ? centerOnGps : undefined}
+          aria-label={gpsPos ? "Center map on my location" : "Acquiring GPS…"}
+          disabled={!gpsPos}
           className="absolute right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
           style={{
             bottom: controlsBottomOffset + 52,
             transition: controlsTransition,
             background: "rgba(255,255,255,0.92)",
             border: "1px solid rgba(0,0,0,0.1)",
+            opacity: gpsPos ? 1 : 0.5,
           }}
         >
-          <Icon icon="ph:crosshair" width={18} height={18} color="#2E5E4A" />
+          <Icon icon={gpsPos ? "ph:crosshair" : "ph:circle-notch"} width={18} height={18} color="#2E5E4A" />
         </button>
       )}
 
