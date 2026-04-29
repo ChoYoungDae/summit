@@ -26,28 +26,40 @@ import type { LucideIcon } from "lucide-react";
 // Label comes from DB (tag.en). Only icon mapping lives here.
 
 const TERRAIN_TAG_ICON: Record<string, LucideIcon> = {
-  rocky:        Layers,
-  granite:      Layers,
-  steep:        TrendingUp,
-  forested:     Trees,
-  forest:       Trees,
-  pine:         Trees,
-  ridge: MountainSnow,
-  view:         Eye,
-  viewpoint:    Eye,
-  "city-view":  Eye,
-  "night-view": Eye,
-  stream:       Waves,
-  water:        Droplets,
-  cultural:     Footprints,
-  historic:     Footprints,
-  adventure:    Flame,
-  adventurous:  Flame,
-  accessible:   Footprints,
-  windy:        Wind,
-  gentle:       TrendingUp,
-  sunny:        Sun,
-  exposed:      Flame,
+  rocky:            Layers,
+  granite:          Layers,
+  "granite-peaks":  Layers,
+  steep:            TrendingUp,
+  "sharp-peaks":    TrendingUp,
+  forested:         Trees,
+  forest:           Trees,
+  "lush-forest":    Trees,
+  pine:             Trees,
+  ridge:            MountainSnow,
+  "ridge-walk":     MountainSnow,
+  view:             Eye,
+  viewpoint:        Eye,
+  "city-view":      Eye,
+  "night-view":     Eye,
+  "skyline-view":   Eye,
+  "downtown-view":  Eye,
+  stream:           Waves,
+  water:            Droplets,
+  cultural:         Footprints,
+  historic:         Footprints,
+  "fortress-wall":  Footprints,
+  adventure:        Flame,
+  adventurous:      Flame,
+  accessible:       Footprints,
+  "easy-boardwalk": Footprints,
+  "heart-of-seoul": Footprints,
+  "vast-ridges":    Layers,
+  "national-park":  MountainSnow,
+  "circular-loop":  Waves,
+  windy:            Wind,
+  gentle:           TrendingUp,
+  sunny:            Sun,
+  exposed:          Flame,
 };
 
 const getCachedRouteList = unstable_cache(
@@ -202,7 +214,7 @@ export default async function RouteListPage({
                         }}
                       >
                         {TagIcon && <TagIcon size={13} strokeWidth={2} />}
-                        {tUI(tagKey as any, locale) || tDB(tag, locale)}
+                        {tDB(tag, locale) || tUI(tagKey as any, locale)}
                       </span>
                     );
                   })}
@@ -218,20 +230,34 @@ export default async function RouteListPage({
                     ? calcLatestStartFromDuration(route.totalDurationMin, busDurationMin, sunsetMin)
                     : null;
                 const stationWp = waypoints.find((w) => w.type === "STATION");
-                const stationInfo = stationWp
-                  ? {
-                      name: stationWp.name,
-                      lines: (stationWp.subwayLine ?? "")
-                        .split(",")
-                        .map((l) => {
-                          const t = l.trim();
-                          const n = parseInt(t, 10);
-                          return !isNaN(n) && n > 0 ? n : t;
-                        })
-                        .filter((l) => l !== ""),
-                      busNumbers: stationWp.busNumbers,
-                    }
-                  : undefined;
+                let stationInfo = undefined;
+                if (stationWp) {
+                  let cleanEn = stationWp.name.en ?? "";
+                  let cleanKo = stationWp.name.ko ?? "";
+                  let inferredExit = stationWp.exitNumber;
+                  // English: "Exit 4, Sadang Station" -> "Sadang Station"
+                  const enMatch = cleanEn.match(/^Exit\s+(\d+),\s*(.+)$/i);
+                  if (enMatch) {
+                    if (!inferredExit) inferredExit = enMatch[1];
+                    cleanEn = enMatch[2].trim();
+                  }
+                  // Korean: "사당역 4번 출구" -> "사당역"
+                  cleanKo = cleanKo.replace(/\s*\d+번\s*출구\s*$/, "").trim();
+
+                  stationInfo = {
+                    name: { ...stationWp.name, en: cleanEn, ko: cleanKo },
+                    lines: (stationWp.subwayLine ?? "")
+                      .split(",")
+                      .map((l) => {
+                        const t = l.trim();
+                        const n = parseInt(t, 10);
+                        return !isNaN(n) && n > 0 ? n : t;
+                      })
+                      .filter((l) => l !== ""),
+                    busNumbers: stationWp.busNumbers,
+                    exitNum: inferredExit,
+                  };
+                }
                 return (
                   <RouteCard
                     key={route.id}

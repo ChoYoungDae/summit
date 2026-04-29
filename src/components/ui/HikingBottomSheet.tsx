@@ -215,8 +215,8 @@ export default function HikingBottomSheet({
               <div className="flex justify-end">
                 <button
                   onClick={onToggleHiking}
-                  className="shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold transition-opacity active:opacity-70"
-                  style={{ background: "rgba(200,54,42,0.08)", color: "var(--color-secondary)" }}
+                  className="shrink-0 px-4 py-1.5 rounded-lg text-sm font-semibold transition-opacity active:opacity-70"
+                  style={{ background: "rgba(200,54,42,0.12)", color: "var(--color-secondary)" }}
                 >
                   {tUI("goBack", locale)}
                 </button>

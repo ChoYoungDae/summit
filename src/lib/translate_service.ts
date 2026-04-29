@@ -13,7 +13,10 @@ const supabase = createClient(
 );
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+
+
+
 
 interface LocalizedText {
   ko: string;
@@ -81,7 +84,9 @@ async function processTable(tableName: string, textColumn: string) {
     return;
   }
 
-  const glossary = await getGlossary();
+  const allGlossary = await getGlossary();
+  const glossary = allGlossary.filter((g: any) => g.category !== 'ui');
+
 
   for (const item of data) {
     const localized = (item as any)[textColumn] as LocalizedText;
@@ -102,10 +107,18 @@ async function processTable(tableName: string, textColumn: string) {
       const updatedLocalized = { ...localized, ...translations };
       const updatedHash = calculateHash(`${localized.ko}|${updatedLocalized.en}`);
       const updatedMeta = { ...meta, source_hash: updatedHash, translated_at: new Date().toISOString() };
-      await supabase.from(tableName).update({ [textColumn]: updatedLocalized, translation_meta: updatedMeta }).eq('id', (item as any).id);
+      const { error: updateError } = await supabase.from(tableName).update({ [textColumn]: updatedLocalized, translation_meta: updatedMeta }).eq('id', (item as any).id);
+      if (updateError) {
+        console.error(`Error updating item ${(item as any).id} in ${tableName}:`, updateError);
+      } else {
+        console.log(`Successfully updated item ${(item as any).id} in ${tableName}`);
+      }
     }
+    // Add delay to avoid rate limits
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 }
+
 
 async function syncUIStrings() {
   console.log('Syncing UI strings from DB to code...');

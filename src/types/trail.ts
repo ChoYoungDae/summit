@@ -9,8 +9,8 @@ export interface Mountain {
   imageUrl?: string;
   region?: string;
   maxElevationM?: number;
-  /** Stored as jsonb[] in DB: [{id, en, ko}] */
-  terrainTags?: { id: string; en: string; ko?: string }[];
+  /** Stored as jsonb[] in DB: [{id, en, ko, zh, ja, es}] */
+  terrainTags?: (LocalizedText & { id: string })[];
 }
 
 export interface MountainSummary extends Mountain {

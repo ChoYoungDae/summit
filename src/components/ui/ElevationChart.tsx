@@ -322,10 +322,8 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
   const yDomain = useMemo(() => {
     const eles = data.map((d) => d.ele).filter((e) => isFinite(e) && e > 0);
     if (eles.length === 0) return ["auto", "auto"] as const;
-    const minEle = Math.min(...eles);
     const maxEle = Math.max(...eles);
-    const range = Math.max(maxEle - minEle, 40);
-    return [Math.max(0, Math.floor(minEle - range * 0.06)), Math.ceil(maxEle + range * 0.04)] as const;
+    return [0, Math.ceil(maxEle * 1.05)] as const;
   }, [data]);
 
   // Summit point: boundary where DESCENT starts (= peak reached)

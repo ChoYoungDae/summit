@@ -8,6 +8,7 @@ import {
   Footprints,
   TrendingUp,
   Bus,
+  Moon,
 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { tDB, tUI } from "@/lib/i18n";
@@ -59,7 +60,12 @@ interface RouteCardProps {
   busDurationMin?: number;
   busSegmentCount?: number;
   latestStartMin?: number | null;
-  stationInfo?: { name: LocalizedText; lines: (number | string)[]; busNumbers?: string };
+  stationInfo?: {
+    name: LocalizedText;
+    lines: (number | string)[];
+    busNumbers?: string;
+    exitNum?: string | number;
+  };
   locale?: string;
 }
 
@@ -74,6 +80,8 @@ export default function RouteCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const isPastLatestStart =
     latestStartMin != null && nowKSTMin() > latestStartMin;
+  const isNightView = route.tags?.some(t => t.en === "Night View");
+
 
   return (
     <div
@@ -110,6 +118,14 @@ export default function RouteCard({
                 </span>
               )
             )}
+            {stationInfo.exitNum && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] font-black text-[9px] leading-none shrink-0"
+                style={{ background: "#1A1A1A", color: "#F5C842", fontFamily: "var(--font-en)" }}
+              >
+                Exit {stationInfo.exitNum}
+              </span>
+            )}
             <span
               className="text-[12px] font-semibold truncate"
               style={{ color: "var(--color-text-body)" }}
@@ -124,24 +140,38 @@ export default function RouteCard({
             )}
             <Icon icon="ph:sneaker" width={14} height={14} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />
           </div>
-          {/* Right: last safe start — only when available */}
-          {!route.hideSafeStart && latestStartMin != null && (
-            <div className="flex items-center gap-1 shrink-0">
-              <Icon icon="ph:warning-circle" width={12} height={12} style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)" }} />
-              <span
-                className="text-[10px] font-semibold uppercase tracking-wide"
-                style={{ color: "var(--color-text-muted)" }}
+          {/* Right side: Night View or Last Safe Start */}
+          <div className="flex items-center gap-2 shrink-0">
+            {isNightView && (
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full"
+                style={{ background: "#1A237E" }}
               >
-                {tUI("lastSafeStart", locale)}
-              </span>
-              <span
-                className="font-num text-[11px] font-bold"
-                style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-body)" }}
-              >
-                {formatMinutesAsTime(latestStartMin)}
-              </span>
-            </div>
-          )}
+                <Moon size={10} className="text-white fill-white" />
+                <span className="text-[10px] font-bold tracking-tight text-white leading-none">
+                  Night View
+                </span>
+              </div>
+            )}
+            
+            {!route.hideSafeStart && latestStartMin != null && (
+              <div className="flex items-center gap-1">
+                <Icon icon="ph:warning-circle" width={12} height={12} style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-muted)" }} />
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {tUI("lastSafeStart", locale)}
+                </span>
+                <span
+                  className="font-num text-[11px] font-bold"
+                  style={{ color: isPastLatestStart ? "#EF4444" : "var(--color-text-body)" }}
+                >
+                  {formatMinutesAsTime(latestStartMin)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -90,7 +90,8 @@ const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, strin
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GPS_ACCURACY_M   = 150; // ignore fixes worse than this
+const GPS_ACCURACY_M         = 150;  // ongoing filter — reject fixes worse than this
+const GPS_ACCURACY_FIRST_M   = 500;  // relaxed threshold for mobile GPS cold start
 const WAYPOINT_ALERT_M = 40;
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
@@ -500,6 +501,7 @@ export default function MapView({
   const [isOffRoute,   setIsOffRoute]   = useState(false);
   const [isMapLoaded,       setIsMapLoaded]       = useState(false);
   const [isFootprintReady,  setIsFootprintReady]  = useState(false);
+  const [gpsAcquiring,      setGpsAcquiring]      = useState(false);
 
   // Map / compass state
   const [isTracking, setIsTracking] = useState(false);
@@ -517,6 +519,7 @@ export default function MapView({
   const gpsPosRef               = useRef<[number, number] | null>(null);
   const hasCenteredOnStartRef   = useRef(false);
   const bottomPaddingRef        = useRef(bottomPadding);
+  const hasFirstFixRef          = useRef(false);
 
   // Keep offRoute refs in sync
   useEffect(() => {
@@ -659,7 +662,12 @@ export default function MapView({
   // ── GPS watch ────────────────────────────────────────────────────────────────
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
-    if (accuracy > GPS_ACCURACY_M) return; // skip imprecise fixes
+    const threshold = hasFirstFixRef.current ? GPS_ACCURACY_M : GPS_ACCURACY_FIRST_M;
+    if (accuracy > threshold) return;
+    if (!hasFirstFixRef.current) {
+      hasFirstFixRef.current = true;
+      setGpsAcquiring(false);
+    }
     const newPos: [number, number] = [lon, lat];
     setGpsPos(newPos);
     gpsPosRef.current = newPos;
@@ -701,12 +709,17 @@ export default function MapView({
     });
 
     if ("geolocation" in navigator) {
+      setGpsAcquiring(true);
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         handleGpsPos,
         (err) => {
-          console.warn("[GPS]", err.message);
+          console.warn("[GPS]", err.message, err.code);
+          setGpsAcquiring(false);
+          const ui = UI_STRINGS[locale] ?? UI_STRINGS.en;
           if (err.message.includes("secure origins") || err.code === 1) {
-            setGpsError((UI_STRINGS[locale] ?? UI_STRINGS.en).gpsHttps);
+            setGpsError(ui.gpsHttps);
+          } else if (err.code === 2 || err.code === 3) {
+            setGpsError("GPS unavailable — check location settings");
           }
         },
         { enableHighAccuracy: true, maximumAge: 3_000, timeout: 20_000 },
@@ -740,7 +753,7 @@ export default function MapView({
     }
   }, [bottomPadding, isMapLoaded]);
 
-  // Delayed GPS centering — fires when GPS fix arrives after hiking already started
+  // GPS centering — fires when Start Hiking is pressed but GPS fix hasn't arrived yet
   useEffect(() => {
     if (!gpsPos || !isMapLoaded || !mapRef.current) return;
     if (!isHikingRef.current || hasCenteredOnStartRef.current) return;
@@ -854,6 +867,16 @@ export default function MapView({
   }, []);
 
   // ── Compass toggle ──────────────────────────────────────────────────────────
+  const centerOnGps = useCallback(() => {
+    if (!gpsPos || !mapRef.current) return;
+    mapRef.current.easeTo({
+      center: gpsPos,
+      zoom: 16,
+      padding: { top: 0, left: 0, right: 0, bottom: bottomPaddingRef.current },
+      duration: 600,
+    });
+  }, [gpsPos]);
+
   const toggleTracking = useCallback(async () => {
     type DOEWithPerm = typeof DeviceOrientationEvent & {
       requestPermission?: () => Promise<PermissionState>;
@@ -1181,8 +1204,24 @@ export default function MapView({
 
       </Map>
 
-      {/* GPS Secure Origin (HTTPS) warning pill */}
-      {gpsError && isHiking && (
+      {/* GPS acquiring pill — shown while waiting for first fix */}
+      {gpsAcquiring && !gpsPos && !gpsError && (
+        <div
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-10
+                     flex items-center gap-1.5 px-3 py-1.5
+                     rounded-full text-white text-[12px] font-semibold
+                     pointer-events-none"
+          style={{
+            background: "rgba(17,17,22,0.72)",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          Acquiring GPS…
+        </div>
+      )}
+
+      {/* GPS error pill — shown whenever GPS fails, not just while hiking */}
+      {gpsError && (
         <div
           role="alert"
           className="absolute top-2 left-1/2 -translate-x-1/2 z-10
@@ -1225,6 +1264,23 @@ export default function MapView({
         );
       })()}
 
+      {/* My Location button — always visible once GPS fix acquired */}
+      {gpsPos && (
+        <button
+          onClick={centerOnGps}
+          aria-label="Center map on my location"
+          className="absolute right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
+          style={{
+            bottom: controlsBottomOffset + 52,
+            transition: controlsTransition,
+            background: "rgba(255,255,255,0.92)",
+            border: "1px solid rgba(0,0,0,0.1)",
+          }}
+        >
+          <Icon icon="ph:crosshair" width={18} height={18} color="#2E5E4A" />
+        </button>
+      )}
+
       {/* Off-route alert toggle — only visible while hiking */}
       {isHiking && (
         <button
@@ -1232,7 +1288,7 @@ export default function MapView({
           aria-label={offRouteEnabled ? "Off-route alert on — tap to disable" : "Off-route alert off — tap to enable"}
           className="absolute right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
           style={{
-            bottom: controlsBottomOffset + 52,
+            bottom: controlsBottomOffset + 96,
             transition: controlsTransition,
             background: offRouteEnabled ? "var(--color-primary)" : "rgba(255,255,255,0.92)",
             border: offRouteEnabled ? "none" : "1px solid rgba(0,0,0,0.1)",
