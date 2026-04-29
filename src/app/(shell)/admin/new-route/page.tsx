@@ -8,7 +8,27 @@ import { parseTrackFile, type TrackPoint } from "@/lib/parseGpx";
 import { trackDistanceKm } from "@/lib/geo";
 import StepWaypoints from "./StepWaypoints";
 import StepSegments from "./StepSegments";
-import type { PhotoItem, WaypointSlot, ExistingWaypoint, SegmentPreview } from "./types";
+import type { PhotoItem, WaypointSlot, WaypointType, ExistingWaypoint, SegmentPreview } from "./types";
+
+// ── Waypoint type labels / colors (Korean admin UI) ───────────────────────────
+
+const WP_TYPE_KO: Record<WaypointType, string> = {
+  STATION:   "역",
+  BUS_STOP:  "버스",
+  TRAILHEAD: "입구",
+  SUMMIT:    "정상",
+  JUNCTION:  "갈림길",
+  SHELTER:   "쉼터",
+};
+
+const WP_TYPE_BADGE: Record<WaypointType, string> = {
+  STATION:   "bg-blue-500/80 text-white",
+  BUS_STOP:  "bg-teal-500/80 text-white",
+  TRAILHEAD: "bg-green-500/80 text-white",
+  SUMMIT:    "bg-amber-500/80 text-white",
+  JUNCTION:  "bg-purple-500/80 text-white",
+  SHELTER:   "bg-gray-500/80 text-white",
+};
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
@@ -56,13 +76,13 @@ async function extractGps(file: File): Promise<{ lat: number; lon: number; ele?:
 // ── Step indicator ────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { label: "Mountain",  icon: Mountain },
-  { label: "GPS",       icon: Route },
-  { label: "Photos",    icon: Camera },
-  { label: "Waypoints", icon: Mountain },
-  { label: "Segments",  icon: Route },
-  { label: "Captions",  icon: Camera },
-  { label: "Save",      icon: Save },
+  { label: "산 선택", icon: Mountain },
+  { label: "GPS",    icon: Route },
+  { label: "사진",   icon: Camera },
+  { label: "지점",   icon: Mountain },
+  { label: "구간",   icon: Route },
+  { label: "캡션",   icon: Camera },
+  { label: "저장",   icon: Save },
 ];
 
 function StepBar({ current, onStepClick }: { current: number; onStepClick?: (step: number) => void }) {
@@ -214,6 +234,27 @@ export default function NewRoutePage() {
   async function next() {
     if (step === 0 && mountainId) {
       loadExistingWaypoints(mountainId);
+    }
+
+    // Step 2→3: 태깅된 사진으로 웨이포인트 슬롯 자동 생성 (슬롯이 비어있을 때만)
+    if (step === 2 && waypointSlots.length === 0) {
+      const tagged = photos.filter((p) => p.waypointType);
+      if (tagged.length > 0) {
+        setWaypointSlots(
+          tagged.map((p) => ({
+            source: "new" as const,
+            sourcePhotoIdx: photos.indexOf(p),
+            data: {
+              nameEn:      "",
+              nameKo:      "",
+              type:        p.waypointType!,
+              lat:         p.lat ?? 0,
+              lon:         p.lon ?? 0,
+              elevationM:  p.ele,
+            },
+          })),
+        );
+      }
     }
 
     // Moving from Waypoints (3) to Segments (4)
@@ -560,28 +601,69 @@ export default function NewRoutePage() {
           </div>
 
           {photos.length > 0 && (
-            <div className="grid grid-cols-4 gap-1.5">
-              {photos.map((p) => (
-                <div key={p.key} className="relative aspect-square rounded-lg overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.previewUrl} alt="" className="w-full h-full object-cover" />
-                  {p.lat != null && (
-                    <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold bg-black/60 text-white px-0.5 rounded">
-                      GPS
-                    </span>
-                  )}
-                  <button
-                    onClick={() => {
-                      URL.revokeObjectURL(p.previewUrl);
-                      setPhotos((prev) => prev.filter((x) => x.key !== p.key));
-                    }}
-                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center text-[10px] hover:bg-red-500"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
+            <>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                웨이포인트에 해당하는 사진은 아래 드롭다운에서 지점 유형을 선택하세요.
+                EXIF GPS가 있으면 좌표가 자동으로 채워집니다.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {photos.map((p) => (
+                  <div key={p.key} className="flex flex-col gap-1">
+                    <div className="relative aspect-square rounded-lg overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.previewUrl} alt="" className="w-full h-full object-cover" />
+                      {p.lat != null && (
+                        <span className="absolute top-0.5 left-0.5 text-[8px] font-bold bg-black/60 text-white px-0.5 rounded">
+                          GPS
+                        </span>
+                      )}
+                      {p.waypointType && (
+                        <div className={`absolute bottom-0 left-0 right-0 text-[9px] font-bold text-center py-0.5 ${WP_TYPE_BADGE[p.waypointType]}`}>
+                          {WP_TYPE_KO[p.waypointType]}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          URL.revokeObjectURL(p.previewUrl);
+                          setPhotos((prev) => prev.filter((x) => x.key !== p.key));
+                        }}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center text-[10px] hover:bg-red-500"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <select
+                      className="text-[10px] rounded-md border border-[var(--color-border)] bg-[var(--color-bg-light)] px-1 py-0.5 w-full"
+                      value={p.waypointType ?? ""}
+                      onChange={(e) => {
+                        const t = e.target.value as WaypointType | "";
+                        setPhotos((prev) =>
+                          prev.map((x) =>
+                            x.key === p.key
+                              ? { ...x, waypointType: t || undefined }
+                              : x,
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="">— 일반 사진</option>
+                      <option value="STATION">역 (Station)</option>
+                      <option value="BUS_STOP">버스 정류장</option>
+                      <option value="TRAILHEAD">등산로 입구</option>
+                      <option value="SUMMIT">정상</option>
+                      <option value="JUNCTION">갈림길</option>
+                      <option value="SHELTER">쉼터</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+              {photos.some((p) => p.waypointType) && (
+                <p className="text-xs text-primary font-medium">
+                  웨이포인트 {photos.filter((p) => p.waypointType).length}개 태깅됨 —
+                  다음 단계에서 이름을 확인·입력하세요
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

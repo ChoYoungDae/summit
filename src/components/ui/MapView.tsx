@@ -879,8 +879,7 @@ export default function MapView({
   const arrowRotation = isTracking ? 0 : gpsHeading - mapBearing;
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  // Transition duration matches HikingBottomSheet snap animation
-  const controlsTransition = "bottom 0.32s cubic-bezier(0.32,0.72,0,1)";
+  const controlsTransition = "bottom 0.22s ease-out";
 
   return (
     <div className="relative w-full h-full">
@@ -1099,19 +1098,19 @@ export default function MapView({
           />
         </Source>
 
-        {/* Waypoint markers */}
+        {/* Waypoint markers — BUS_STOP excluded (shown via bus chip label instead) */}
         {waypoints.map((wpt, idx) => {
+          if (wpt.type === "BUS_STOP") return null;
+
           // Calculate rotation for start/end points to point along the trail
           let rotation = 0;
           if (track && track.length >= 2) {
             const dStart = haversineM(wpt.lat, wpt.lon, track[0][1], track[0][0]);
             const dEnd = haversineM(wpt.lat, wpt.lon, track[track.length - 1][1], track[track.length - 1][0]);
-            
+
             if (dStart < 40) {
-              // Point directed towards the first segment
               rotation = getBearing(track[0][1], track[0][0], track[1][1], track[1][0]);
             } else if (dEnd < 40) {
-              // Point directed along the last segment
               rotation = getBearing(track[track.length - 2][1], track[track.length - 2][0], track[track.length - 1][1], track[track.length - 1][0]);
             }
           }
@@ -1134,35 +1133,25 @@ export default function MapView({
           );
         })}
 
-        {/* Bus stop markers — shown at the boarding/alighting point of bus segments */}
-        {approachIsBus && approachBusInfos.map((info, i) => info.stopCoord && (
-          <Marker
-            key={`approach-bus-${i}`}
-            longitude={info.stopCoord[0]}
-            latitude={info.stopCoord[1]}
-            anchor="bottom"
-          >
-            <BusChip 
-              busNumbers={info.busNumbers} 
-              color={info.color} 
-              chipTextColor={info.chipTextColor} 
-            />
-          </Marker>
-        ))}
-        {returnIsBus && returnBusInfos.map((info, i) => info.stopCoord && (
-          <Marker
-            key={`return-bus-${i}`}
-            longitude={info.stopCoord[0]}
-            latitude={info.stopCoord[1]}
-            anchor="bottom"
-          >
-            <BusChip 
-              busNumbers={info.busNumbers} 
-              color={info.color} 
-              chipTextColor={info.chipTextColor} 
-            />
-          </Marker>
-        ))}
+        {/* Bus route label chips — centered on each bus track */}
+        {approachBusTrack.length > 1 && approachBusInfos[0] && (() => {
+          const mid = approachBusTrack[Math.floor(approachBusTrack.length / 2)];
+          const info = approachBusInfos[0];
+          return (
+            <Marker key="approach-bus-chip" longitude={mid[0]} latitude={mid[1]} anchor="bottom">
+              <BusChip busNumbers={info.busNumbers} color={info.color} chipTextColor={info.chipTextColor} />
+            </Marker>
+          );
+        })()}
+        {returnBusTrack.length > 1 && returnBusInfos[0] && (() => {
+          const mid = returnBusTrack[Math.floor(returnBusTrack.length / 2)];
+          const info = returnBusInfos[0];
+          return (
+            <Marker key="return-bus-chip" longitude={mid[0]} latitude={mid[1]} anchor="bottom">
+              <BusChip busNumbers={info.busNumbers} color={info.color} chipTextColor={info.chipTextColor} />
+            </Marker>
+          );
+        })()}
 
         {/* Photo markers — amber camera dots */}
         {photos.filter(p => p.lat != null && p.lon != null).map(photo => (

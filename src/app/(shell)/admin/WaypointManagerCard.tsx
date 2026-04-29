@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { MapPin, Plus, Pencil, Trash2, CheckCircle, AlertCircle, X, ChevronDown, RefreshCw } from "lucide-react";
 import { toSlug } from "@/lib/slug";
 
+const SUBWAY_LINE_COLORS: Record<number, string> = {
+  1: "#0052A4", 2: "#00A84D", 3: "#EF7C1C", 4: "#00A5DE",
+  5: "#996CAC", 6: "#CD7C2F", 7: "#747F00", 8: "#E6186C", 9: "#BDB092",
+};
+
 const CARD          = "rounded-2xl bg-card border border-[var(--color-border)] p-5 flex flex-col gap-4";
 const INPUT         = "rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-bg-light)] focus:outline-none focus:ring-2 focus:ring-primary/40";
 const BTN_PRIMARY   = "flex items-center justify-center gap-2 rounded-xl bg-primary text-white px-4 py-2 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed";
@@ -469,11 +474,15 @@ export default function WaypointManagerCard() {
                           </span>
                           {w.type === "STATION" && (
                             <div className="flex gap-1 flex-wrap">
-                              {w.subway_line && w.subway_line.split(",").map(line => (
-                                <span key={line.trim()} className="text-[10px] bg-[#EEF5F1] text-[#2E5E4A] px-1.5 py-0.5 rounded-md font-black border border-[#2E5E4A]/30">
-                                  {line.trim()}
-                                </span>
-                              ))}
+                              {w.subway_line && w.subway_line.split(",").map(line => {
+                                const n = parseInt(line.trim(), 10);
+                                const bg = SUBWAY_LINE_COLORS[n] ?? "#888";
+                                return (
+                                  <span key={line.trim()} className="inline-flex items-center justify-center text-white font-black text-[11px] leading-none shrink-0" style={{ width: 20, height: 20, borderRadius: "50%", background: bg }}>
+                                    {line.trim()}
+                                  </span>
+                                );
+                              })}
                               {w.subway_station && (
                                 <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-md font-medium border border-[var(--color-border)]">
                                   {w.subway_station}

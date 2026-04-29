@@ -146,37 +146,27 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
   const approachBusInfos = approachSegs
     .filter(s => s.isBusCombined)
     .map(s => {
-      const style = seoulBusStyle(s.busDetails?.bus_numbers?.join(", "));
+      const busNumbers = s.busStopWaypoint?.busNumbers ?? s.busDetails?.bus_numbers?.join(", ");
+      const style = seoulBusStyle(busNumbers);
       const busStop = s.busStopWaypoint;
       const coords = s.busDetails?.bus_track_data?.coordinates;
-      // Bus stop is where you alight: waypoint coord if available, else last point of bus track
       const stopCoord: [number, number] | undefined = busStop
         ? [busStop.lon, busStop.lat]
         : coords ? [coords[coords.length - 1][0], coords[coords.length - 1][1]] : undefined;
-      return {
-        stopCoord,
-        busNumbers: s.busDetails?.bus_numbers?.join(", "),
-        color: style.color,
-        chipTextColor: style.chipTextColor,
-      };
+      return { stopCoord, busNumbers, color: style.color, chipTextColor: style.chipTextColor };
     });
 
   const returnBusInfos = returnSegs
     .filter(s => s.isBusCombined)
     .map(s => {
-      const style = seoulBusStyle(s.busDetails?.bus_numbers?.join(", "));
+      const busNumbers = s.busStopWaypoint?.busNumbers ?? s.busDetails?.bus_numbers?.join(", ");
+      const style = seoulBusStyle(busNumbers);
       const busStop = s.busStopWaypoint;
       const coords = s.busDetails?.bus_track_data?.coordinates;
-      // Bus stop is where you board: waypoint coord if available, else first point of bus track
       const stopCoord: [number, number] | undefined = busStop
         ? [busStop.lon, busStop.lat]
         : coords ? [coords[0][0], coords[0][1]] : undefined;
-      return {
-        stopCoord,
-        busNumbers: s.busDetails?.bus_numbers?.join(", "),
-        color: style.color,
-        chipTextColor: style.chipTextColor,
-      };
+      return { stopCoord, busNumbers, color: style.color, chipTextColor: style.chipTextColor };
     });
 
   return (

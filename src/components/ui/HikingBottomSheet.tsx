@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import ElevationChart from "./ElevationChart";
 import type { SegmentElevationInfo } from "./ElevationChart";
-import type { RoutePhoto, HikingPhase } from "@/types/trail";
+import type { HikingPhase } from "@/types/trail";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import type { HikingGPSState } from "@/lib/useHikingGPS";
 import { useLanguage } from "@/lib/useLanguage";
@@ -47,15 +47,15 @@ function phaseLabel(phase: HikingPhase, locale: string): string {
 interface Props {
   isHiking: boolean;
   hikingMode?: "preview" | "active";
+  isLocating?: boolean;
   onToggleHiking: () => void;
   gps: HikingGPSState;
   track: [number, number, number][];
   elevationSegments?: SegmentElevationInfo[];
+  summitElevationM?: number;
   onHover: (pt: [number, number, number] | null) => void;
   highlightIndex: number | null;
   onSheetHeightChange?: (heightPx: number) => void;
-  photos?: RoutePhoto[];
-  onPhotoClick?: (photo: RoutePhoto) => void;
   showOffRoutePrompt?: boolean;
   offRouteEnabled?: boolean;
   onToggleOffRoute?: () => void;
@@ -68,15 +68,15 @@ interface Props {
 export default function HikingBottomSheet({
   isHiking,
   hikingMode = "preview",
+  isLocating = false,
   onToggleHiking,
   gps,
   track,
   elevationSegments,
+  summitElevationM,
   onHover,
   highlightIndex,
   onSheetHeightChange,
-  photos = [],
-  onPhotoClick,
   showOffRoutePrompt = false,
   offRouteEnabled = true,
   onToggleOffRoute,
@@ -130,7 +130,7 @@ export default function HikingBottomSheet({
       ? `translateY(calc(100dvh - ${MIN_H}px))`
       : `translateY(calc(100dvh - min(45dvh, ${MID_MAX_H}px)))`;
 
-  const transition = "transform 0.32s cubic-bezier(0.32,0.72,0,1)";
+  const transition = "transform 0.22s ease-out";
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -297,10 +297,11 @@ export default function HikingBottomSheet({
 
               <button
                 onClick={onToggleHiking}
-                className="shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm active:scale-95 transition-transform"
+                disabled={isLocating}
+                className="shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm active:scale-95 transition-transform disabled:opacity-60"
                 style={{ background: "var(--color-primary)" }}
               >
-                {tUI("startHiking", locale)}
+                {isLocating ? "…" : tUI("startHiking", locale)}
               </button>
             </div>
           )}
@@ -320,10 +321,9 @@ export default function HikingBottomSheet({
                     ? elevationSegments
                     : [{ type: "ASCENT", isBus: false, points: track }]
                 }
+                summitElevationM={summitElevationM}
                 onHover={onHover}
                 highlightTrackIndex={highlightIndex}
-                photos={photos}
-                onPhotoClick={onPhotoClick}
               />
             </div>
           )}

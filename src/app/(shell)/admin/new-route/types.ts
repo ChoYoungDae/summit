@@ -10,6 +10,7 @@ export interface PhotoItem {
   ele?:        number;
   descEn:      string;
   descKo:      string;
+  waypointType?: WaypointType;
 }
 
 export interface WaypointData {

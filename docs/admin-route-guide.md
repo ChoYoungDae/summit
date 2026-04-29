@@ -1,154 +1,168 @@
-# 관리자 경로 설정 가이드 (Admin Route Configuration Guide)
+# 관리자 코스 등록 가이드
 
-이 문서는 Summit 애플리케이션의 관리자 화면에서 등산 코스를 등록하고 관리하는 방법을 설명합니다.
+Summit 앱의 관리자 화면에서 등산 코스를 등록하고 관리하는 방법을 설명합니다.
 
 ---
 
-## ✨ 신규: Guided Wizard (`/admin/new-route`)
+## 신규 코스 등록: Guided Wizard (`/admin/new-route`)
 
-기존 4단계 수동 작업 대신, **가이드 위저드**에서 한 번에 루트를 완성할 수 있습니다.
 Admin 홈(`/admin`) 상단의 **"Create New Route (Guided Wizard)"** 버튼으로 진입합니다.
 
-### 전체 흐름 (6단계)
+### 전체 흐름 (7단계)
 
 ```
-1. Mountain  →  2. GPS  →  3. Photos  →  4. Waypoints  →  5. Captions  →  6. Save
+1. 산 선택 → 2. GPS → 3. 사진 → 4. 지점 → 5. 구간 → 6. 캡션 → 7. 저장
 ```
 
 ---
 
 ### 1단계: 산 선택
-드롭다운에서 산을 선택합니다. (변경 없음)
+
+드롭다운에서 산을 선택합니다.
 
 ---
 
 ### 2단계: GPS 파일 업로드
 
-**구간별 분리 없이**, 전체 등산 코스 하나의 GPX 또는 GeoJSON 파일을 올립니다.
-- 역 출발 → 정상 → 역 도착까지 전체를 하나로 기록한 파일이어야 합니다.
-- 업로드 시 포인트 수와 총 거리가 미리 표시됩니다.
+전체 등산 코스를 **하나의** GPX 또는 GeoJSON 파일로 올립니다.
+
+- 역 출발 → 정상 → 역 도착까지 전 구간을 하나로 기록한 파일이어야 합니다.
+- 구간별 분리는 Step 4에서 웨이포인트 기준으로 자동 처리됩니다.
+- 업로드 시 포인트 수·총 거리가 미리 표시됩니다.
 
 ---
 
-### 3단계: 사진 업로드
+### 3단계: 사진 업로드 + 웨이포인트 태깅
 
 등산 중 찍은 사진을 한 번에 모두 업로드합니다.
-- 클라이언트에서 자동으로 EXIF GPS 추출 + WebP 변환 + 가로 최대 1200px 리사이즈
-- GPS 좌표가 있는 사진에는 "GPS" 뱃지 표시
-- 사진은 나중에 Step 5에서 설명을 입력하거나 삭제할 수 있습니다.
+
+**자동 처리:**
+- EXIF GPS 추출
+- WebP 변환 (가로 최대 1200px)
+
+**웨이포인트 태깅:**
+각 사진 아래의 드롭다운에서 지점 유형을 선택합니다.
+EXIF GPS가 있는 사진을 태깅하면, 다음 단계에서 좌표가 자동으로 채워집니다.
+
+| 유형 | 언제 사용 |
+|---|---|
+| 역 (Station) | 출발·도착 지하철역 |
+| 버스 정류장 (Bus Stop) | 버스 환승 지점 |
+| 등산로 입구 (Trailhead) | 산행 시작·종료 지점 |
+| 정상 (Summit) | 최고점 |
+| 갈림길 (Junction) | 분기점 |
+
+태깅한 사진 수는 하단에 표시됩니다. GPS가 없는 사진을 태깅한 경우 Step 4에서 좌표를 수동 입력합니다.
 
 ---
 
-### 4단계: Waypoint 지정
+### 4단계: 지점 확인 및 이름 입력
 
-GPS 트랙의 자동 분리 기준점이 되는 Waypoint를 **순서대로** 추가합니다.
+Step 3에서 태깅된 사진이 웨이포인트 슬롯으로 **자동 변환**됩니다.
+GPS 좌표는 이미 채워져 있으며, **이름(KO/EN)만 입력하면 됩니다.**
 
-#### 추가 순서 (일반적인 경우)
+#### 일반적인 웨이포인트 순서
 ```
-출발역 → [버스 정류장] → 상행 트레일헤드 → 정상 → 하행 트레일헤드 → [버스 정류장] → 도착역
+출발역 → [버스 정류장] → 상행 등산로 입구 → 정상 → 하행 등산로 입구 → [버스 정류장] → 도착역
 ```
 버스가 없는 경우 버스 정류장은 생략합니다.
 
-#### Waypoint 등록 방법 — 2가지
+#### 웨이포인트 등록 방법
 
-**① 이 산에 기존 등록된 Waypoint 선택**
-- "Existing" 탭 선택 후 드롭다운에서 고릅니다.
-- 해당 산에 등록된 Waypoint 목록이 자동으로 표시됩니다.
+**① 자동 (권장)** — Step 3 사진 태깅으로 슬롯이 미리 생성됩니다.
+이름만 입력하면 됩니다.
 
-**② 새로 등록**
-- "New waypoint" 탭 선택
-- **사진에서 GPS 좌표 추출**: "Pick a photo" 버튼으로 Step 3에서 올린 사진 중 해당 지점에서 찍은 사진을 선택하면 EXIF GPS가 좌표 필드에 자동 입력됩니다.
-- EXIF GPS가 없는 경우 좌표를 직접 입력합니다.
-- 타입, 이름(EN/KO), 고도를 입력합니다.
+**② 기존 웨이포인트 선택** — "Existing" 탭에서 해당 산에 등록된 웨이포인트를 선택합니다.
 
-#### 타입별 추가 입력 항목
+**③ 수동 등록** — "New waypoint" 탭에서 직접 입력합니다.
+GPS가 없는 경우 "Pick a photo"로 사진에서 좌표를 가져오거나 직접 입력합니다.
 
-| 타입 | 추가 항목 |
+#### 유형별 추가 입력 항목
+
+| 유형 | 추가 항목 |
 |---|---|
-| Station | 지하철 노선, 역 이름, 출구 번호 |
+| Station | 지하철 노선, 역 이름(KO/EN), 출구 번호 |
 | Bus Stop | ARS ID, 버스 번호, 버스 색상(간선/지선/광역/순환), 탑승 소요시간(분) |
-| Trailhead / Summit / Junction / Shelter | 없음 (기본 정보만) |
+| Trailhead / Summit / Junction | 없음 (기본 정보만) |
 
 #### 저장 시 자동 처리
-- GPS 트랙이 각 Waypoint 좌표를 기준으로 **자동 분리**됩니다.
-- 출발역·도착역 바깥 구간은 자동으로 제거됩니다.
-- Segment 타입이 자동 추론됩니다:
 
-| Waypoint 연결 패턴 | Segment 타입 |
+GPS 트랙이 각 웨이포인트 좌표 기준으로 **자동 분리**되며 Segment 타입이 추론됩니다.
+
+| 웨이포인트 연결 패턴 | Segment 타입 |
 |---|---|
 | Station → Trailhead | APPROACH |
-| Station → **Bus Stop** → Trailhead | APPROACH (is_bus_combined = true) |
+| Station → **Bus Stop** → Trailhead | APPROACH (버스 복합) |
 | Trailhead → Summit | ASCENT |
 | Summit → Trailhead | DESCENT |
 | Trailhead → Station | RETURN |
-| Trailhead → **Bus Stop** → Station | RETURN (is_bus_combined = true) |
+| Trailhead → **Bus Stop** → Station | RETURN (버스 복합) |
 
-버스 복합 Segment의 경우:
-- **bus_track_data** = Station→Bus Stop 구간 (버스 이동)
-- **track_data** = Bus Stop→Trailhead 구간 (도보 이동)
+버스 복합 Segment: `bus_track_data` = 역→버스정류장(버스), `track_data` = 버스정류장→등산로 입구(도보)
 
 ---
 
-### 5단계: 사진 캡션 (선택)
+### 5단계: 구간 확인
 
-업로드된 사진 각각에 EN/KO 설명을 입력합니다.
-- 이 단계는 건너뛰어도 됩니다. 저장 후 기존 Photo Upload 카드에서 편집 가능합니다.
+자동 추론된 구간(Segment) 목록이 표시됩니다.
+소요 시간은 Naismith 공식(경사 보정)으로 계산됩니다. 실제 표지판 기준으로 직접 수정 가능합니다.
 
 ---
 
-### 6단계: 루트 저장
+### 6단계: 사진 캡션 (선택)
 
-- **Route 이름 (EN/KO)**
-- **난이도 (1–5)** 선택
-- "Create Route" 버튼 클릭
+업로드된 사진 각각에 KO/EN 설명을 입력합니다.
+건너뛰어도 됩니다. 저장 후 기존 Photo Upload 카드에서 편집할 수 있습니다.
+
+---
+
+### 7단계: 코스 저장
+
+입력 항목:
+- **코스 이름 (KO/EN)**
+- **난이도 (1–5)**
+- 설명, 태그, 하이라이트 (선택)
 
 저장 순서:
-1. 신규 Waypoint 생성 → Segment 분리 생성 → Route 생성 (`POST /api/admin/create-route`)
+1. 신규 웨이포인트 생성 → Segment 분리 생성 → Route 생성 (`POST /api/admin/create-route`)
 2. 사진 업로드 + GPS 기반 Segment 자동 매핑 (`POST /api/admin/route-photos`)
 
 ---
 
-## 🛠 기존 방식: 수동 4단계 (`/admin`)
+## 기존 데이터 수정: 개별 카드 (`/admin`)
 
-개별 Waypoint / Segment / Route 를 직접 편집하거나 기존 루트를 수정할 때 사용합니다.
+기존 웨이포인트·구간·코스를 편집하거나 내용을 추가할 때 사용합니다.
 
-### Step 1: 거점 관리 (Manage Waypoints)
-- 타입: STATION, BUS_STOP, TRAILHEAD, SUMMIT, JUNCTION, SHELTER
-- EXIF가 있는 사진 업로드 시 위도/경도 자동 입력
-
-### Step 2: 구간 업로드 (Upload Segment)
-- GPX / GeoJSON 파일을 구간별로 업로드
-- 버스+도보 복합 경로: "Add Bus Route" 체크 → 버스 GPS / 도보 GPS 각각 업로드
-
-### Step 3: 루트 빌더 (Build Route)
-- 구간들을 순서대로 조합 (`Approach → Ascent → Descent → Return`)
-- 거리·시간·난이도 자동 합산
-
-### Step 4: 사진 업로드 (Photo Upload)
-- EXIF GPS 기반 100m 이내 Segment 자동 매핑
-- 설명 입력, 순서 조정, 삭제
+| 카드 | 역할 |
+|---|---|
+| Manage Waypoints | 웨이포인트 CRUD (산 선택 → 목록 확인·추가·수정·삭제) |
+| Upload Segment | 구간 GPX 업로드·수정·삭제. 버스+도보 복합 경로 지원 |
+| Build Route | 구간 조합으로 코스 구성. 이름·순서·방향 설정 |
+| Route Edit | 태그·설명·하이라이트 수정. GPS 트랙 교체(오류 수정용) |
+| Photo Upload | 사진 추가 업로드, 캡션 편집 |
+| Translation Sync | 번역 동기화 |
 
 ---
 
-## 💾 기술 참조 (Technical Reference)
+## 기술 참조
 
 ### 데이터베이스 테이블 (Supabase)
 
 | 테이블 | 설명 |
 |---|---|
-| `mountains` | 산의 기본 정보 |
-| `waypoints` | 7종 타입 지점 정보. `ars_id`는 버스 정류장용 |
+| `mountains` | 산 기본 정보 |
+| `waypoints` | 5종 타입 지점. `ars_id`는 버스 정류장용 |
 | `segments` | `is_bus_combined = true`이면 `bus_details.bus_track_data`에 버스 GPS 보관 |
 | `routes` | `segment_ids` 배열로 구간 순서 참조 |
 | `route_photos` | `route_id`(필수), `segment_id`(선택), GPS, URL, 설명, `order_index` |
 
 ### API 엔드포인트
 
-#### 신규 위저드용
+#### 위저드용
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| `POST` | `/api/admin/create-route` | Waypoint 생성 + GPS 자동 분리 + Segment + Route 원자적 생성 |
+| `POST` | `/api/admin/create-route` | 웨이포인트 생성 + GPS 자동 분리 + Segment + Route 원자적 생성 |
 
 **Request body (JSON):**
 ```json
@@ -157,7 +171,7 @@ GPS 트랙의 자동 분리 기준점이 되는 Waypoint를 **순서대로** 추
   "routeNameEn": "Bukhansan Baegundae Beginner",
   "routeNameKo": "북한산 백운대 초보 코스",
   "routeDifficulty": 3,
-  "trackPoints": [[lon, lat, ele], ...],
+  "trackPoints": [[lon, lat, ele], "..."],
   "waypointSpecs": [
     { "existingId": 42 },
     {
@@ -184,9 +198,9 @@ GPS 트랙의 자동 분리 기준점이 되는 Waypoint를 **순서대로** 추
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| `GET/POST/PATCH/DELETE` | `/api/admin/waypoints` | Waypoint CRUD |
-| `GET/POST/PATCH/DELETE` | `/api/admin/segments` | Segment CRUD + GPX 파싱 |
-| `GET/POST/PATCH/DELETE` | `/api/admin/routes` | Route CRUD |
+| `GET/POST/PATCH/DELETE` | `/api/admin/waypoints` | 웨이포인트 CRUD |
+| `GET/POST/PATCH/DELETE` | `/api/admin/segments` | 구간 CRUD + GPX 파싱 |
+| `GET/POST/PATCH/DELETE` | `/api/admin/routes` | 코스 CRUD |
 | `GET/POST/PATCH/DELETE` | `/api/admin/route-photos` | 사진 업로드 / 설명 수정 / 삭제 |
 
 ### bus_details JSONB 구조
@@ -196,7 +210,7 @@ GPS 트랙의 자동 분리 기준점이 되는 Waypoint를 **순서대로** 추
   "bus_stop_id_key": "42",
   "bus_numbers":     ["704", "34"],
   "route_color":     "#0068B7",
-  "bus_track_data":  { "type": "LineString", "coordinates": [[lon, lat, ele], ...] },
+  "bus_track_data":  { "type": "LineString", "coordinates": [[lon, lat, ele], "..."] },
   "bus_duration_min": 20
 }
 ```
@@ -211,7 +225,7 @@ GPS 트랙의 자동 분리 기준점이 되는 Waypoint를 **순서대로** 추
 
 | 조건 | 처리 |
 |---|---|
-| GPS 있음 + 경로 100m 이내 | 해당 Segment에 자동 매핑 (green "auto-mapped") |
+| GPS 있음 + 경로 100m 이내 | 해당 Segment에 자동 매핑 |
 | GPS 있음 + 경로 100m 초과 | Segment 미지정 — 드롭다운으로 수동 선택 |
 | GPS 없음 | Segment 미지정 — 드롭다운으로 수동 선택 |
 
