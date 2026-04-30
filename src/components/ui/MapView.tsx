@@ -419,7 +419,6 @@ export interface BusSegmentInfo {
 export interface MapViewProps {
   track: [number, number, number][];
   waypoints: Waypoint[];
-  hoveredPoint?: [number, number, number] | null;
   onWaypointClick?: (wpt: Waypoint) => void;
   onTrailPointClick?: (index: number | null) => void;
   isHiking?: boolean;
@@ -471,7 +470,6 @@ export interface MapViewProps {
 export default function MapView({
   track,
   waypoints,
-  hoveredPoint,
   onWaypointClick,
   onTrailPointClick,
   isHiking = false,
@@ -786,9 +784,14 @@ export default function MapView({
     }
   }, [isOffRoute, isHiking]);
 
-  // ── Device orientation (compass heading) ───────────────────────────────────
+  // ── Device orientation (compass heading) — throttled to 16 ms ─────────────
   useEffect(() => {
+    let lastTs = 0;
     function handleOrientation(e: DeviceOrientationEvent) {
+      const now = performance.now();
+      if (now - lastTs < 16) return; // ~60 fps cap; sensor fires faster
+      lastTs = now;
+
       type Extended = DeviceOrientationEvent & { webkitCompassHeading?: number };
       const ext = e as Extended;
       let heading: number | null = null;
@@ -817,19 +820,6 @@ export default function MapView({
       window.removeEventListener("deviceorientation", handleOrientation);
     };
   }, []);
-
-  // ── Sync Focus ─────────────────────────────────────────────────────────────
-  // Snap map to hovered point from elevation chart
-  useEffect(() => {
-    if (!hoveredPoint) return;
-    const [lon, lat] = hoveredPoint;
-    const map = mapRef.current;
-    if (!map) return;
-
-    // Snappy follow center — 450ms feels responsive
-    // This now works even when isHiking is true, prioritizing manual exploration
-    map.easeTo({ center: [lon, lat], duration: 450 });
-  }, [hoveredPoint]);
 
   // ── Gallery popup: fly to selected waypoint ────────────────────────────────
   // Modal is a fixed full-screen overlay — no padding needed, just center+zoom.
@@ -1188,13 +1178,6 @@ export default function MapView({
             <PhotoMarker onClick={() => onPhotoClick?.(photo)} />
           </Marker>
         ))}
-
-        {/* Elevation-chart hover sync marker */}
-        {hoveredPoint && (
-          <Marker longitude={hoveredPoint[0]} latitude={hoveredPoint[1]} anchor="center">
-            <HoverDot ele={hoveredPoint[2]} />
-          </Marker>
-        )}
 
         {/* GPS position — rendered only after first fix */}
         {gpsPos && (

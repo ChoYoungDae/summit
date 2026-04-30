@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Mountain, ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const KHAKI = "#4A6352";
 const currentMonth = new Date().toLocaleString("en-US", { month: "long" }).toUpperCase();
@@ -10,6 +11,13 @@ const currentMonth = new Date().toLocaleString("en-US", { month: "long" }).toUpp
 export function Header() {
   const pathname = usePathname();
   const isRouteContext = pathname.startsWith("/route/");
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   if (isRouteContext) {
     return (
@@ -31,7 +39,13 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-50 h-14 bg-white dark:bg-card-dark border-b border-gray-100 dark:border-white/[0.06] flex items-center px-4 shadow-sm transition-all">
+    <header
+      className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-50 h-14 flex items-center px-4 transition-all duration-300 ${
+        scrolled
+          ? "bg-white/95 dark:bg-card-dark/95 backdrop-blur-md border-b border-gray-100/60 shadow-sm"
+          : "bg-[#F7F7FA] dark:bg-card-dark"
+      }`}
+    >
       <Link
         href="/"
         className="inline-flex items-center gap-2 active:opacity-70 transition-opacity"

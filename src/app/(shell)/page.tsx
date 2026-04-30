@@ -40,8 +40,27 @@ export default function HomePage() {
   return (
     <div className="flex flex-col gap-6 p-4 pb-8">
       {/* ── Intro ─────────────────────────────────────────────── */}
-      <section className="pt-2 flex flex-col gap-6">
-        <div className="flex flex-col gap-3">
+      <section className="relative -mx-4 px-4 pt-5 pb-4 flex flex-col gap-6">
+        {/* Faint mountain background — starts below header, fades in from top and out at bottom */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+          <div className="absolute inset-0">
+            <img
+              src="/images/hero-mountain.jpg"
+              alt=""
+              className="w-full h-full object-cover"
+              style={{ objectPosition: "center 45%", opacity: 0.15 }}
+            />
+          </div>
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(247,247,250,1) 0%, rgba(247,247,250,0.65) 6%, rgba(247,247,250,0.05) 18%, rgba(247,247,250,0) 30%, rgba(247,247,250,0) 55%, rgba(247,247,250,0.55) 74%, rgba(247,247,250,0.93) 88%, rgba(247,247,250,1) 100%)",
+            }}
+          />
+        </div>
+
+        <div className="relative z-10 flex flex-col gap-3">
           <div>
             <h1
               className="text-[1.375rem] font-bold leading-tight text-[var(--color-text-primary)]"
@@ -65,7 +84,7 @@ export default function HomePage() {
         </div>
 
         {/* ── 1x4 Card Row ── */}
-        <div className="grid grid-cols-4 px-1">
+        <div className="relative z-10 grid grid-cols-4 px-1">
           {coreValues.map(({ Icon, title, color, bgColor }, index) => (
             <div 
               key={title} 

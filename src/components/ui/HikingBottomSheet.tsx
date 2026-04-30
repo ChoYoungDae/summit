@@ -53,7 +53,6 @@ interface Props {
   track: [number, number, number][];
   elevationSegments?: SegmentElevationInfo[];
   summitElevationM?: number;
-  onHover: (pt: [number, number, number] | null) => void;
   highlightIndex: number | null;
   onSheetHeightChange?: (heightPx: number) => void;
   showOffRoutePrompt?: boolean;
@@ -74,7 +73,6 @@ export default function HikingBottomSheet({
   track,
   elevationSegments,
   summitElevationM,
-  onHover,
   highlightIndex,
   onSheetHeightChange,
   showOffRoutePrompt = false,
@@ -322,7 +320,6 @@ export default function HikingBottomSheet({
                     : [{ type: "ASCENT", isBus: false, points: track }]
                 }
                 summitElevationM={summitElevationM}
-                onHover={onHover}
                 highlightTrackIndex={highlightIndex}
               />
             </div>

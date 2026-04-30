@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useRef, useEffect } from "react";
+import { useMemo, useCallback } from "react";
 import {
   AreaChart,
   Area,
@@ -258,10 +258,9 @@ function LegendDash({
 
 interface Props {
   segments: SegmentElevationInfo[];
-  onHover: (point: [number, number, number] | null) => void;
   /**
    * Index into the concatenated ASCENT+DESCENT track array.
-   * Built by gps.nearestTrackIndex or chart click.
+   * Driven by gps.nearestTrackIndex during active hiking.
    */
   highlightTrackIndex?: number | null;
   summitElevationM?: number;
@@ -269,47 +268,18 @@ interface Props {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ElevationChart({ segments, onHover, highlightTrackIndex, summitElevationM }: Props) {
+export default function ElevationChart({ segments, highlightTrackIndex, summitElevationM }: Props) {
   const nonBusSegments = useMemo(() => segments.filter((s) => !s.isBus), [segments]);
   const { data: rawData, trackIndexMap, boundaries } = useMemo(
     () => buildData(nonBusSegments),
     [nonBusSegments]
   );
   const data = useMemo(() => smoothElevations(rawData), [rawData]);
-  const rafRef = useRef<number | null>(null);
-
   const approachSeg = nonBusSegments.find((s) => s.type === "APPROACH");
   const returnSeg   = nonBusSegments.find((s) => s.type === "RETURN");
 
   const approachColor = COLOR_ASCENT;
   const returnColor   = COLOR_DESCENT;
-
-  useEffect(
-    () => () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    },
-    []
-  );
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handlePointSelect = useCallback((nextState: any) => {
-    const dataIndex: unknown = nextState?.activeTooltipIndex;
-    if (typeof dataIndex !== "number") return;
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const pt = data[dataIndex];
-      if (pt) onHover(pt.origPt);
-    });
-  }, [data, onHover]);
-
-  const handleLeave = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    onHover(null);
-  }, [onHover]);
 
   // Map GPS track index (ASCENT+DESCENT only) to global chart index
   const highlightGlobalIndex =
@@ -327,21 +297,17 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
   }, [data]);
 
   // Summit point: boundary where DESCENT starts (= peak reached)
-  const summitPt = useMemo(() => {
-    if (data.length === 0) return null;
+  const { summitPt, summitDataIndex } = useMemo(() => {
+    if (data.length === 0) return { summitPt: null, summitDataIndex: -1 };
     const summitBoundary = boundaries.find((b) => b.segType === "DESCENT" && !b.isBus);
-    if (summitBoundary) {
-      return data.reduce((best, pt) =>
-        Math.abs(pt.dist - summitBoundary.dist) < Math.abs(best.dist - summitBoundary.dist) ? pt : best
-      );
-    }
-    return data.reduce((best, pt) => (pt.ele > best.ele ? pt : best));
+    let bestIndex = 0;
+    data.forEach((pt, i) => {
+      if (summitBoundary
+        ? Math.abs(pt.dist - summitBoundary.dist) < Math.abs(data[bestIndex].dist - summitBoundary.dist)
+        : pt.ele > data[bestIndex].ele) bestIndex = i;
+    });
+    return { summitPt: data[bestIndex], summitDataIndex: bestIndex };
   }, [data, boundaries]);
-
-  const summitDataIndex = useMemo(
-    () => (summitPt ? data.indexOf(summitPt) : -1),
-    [summitPt, data]
-  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderAscentDot = useCallback((props: any) => {
@@ -409,7 +375,6 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
     <div
       className="px-2 pt-3 pb-1 rounded-xl"
       style={{ minHeight: "160px", background: "#F2F2F5" }}
-      onTouchEnd={handleLeave}
     >
       {/* Inline legend */}
       <div className="flex items-center justify-end gap-2.5 px-2 mb-1">
@@ -427,9 +392,6 @@ export default function ElevationChart({ segments, onHover, highlightTrackIndex,
             <AreaChart
               data={data}
               margin={{ top: 22, right: 8, bottom: 4, left: 4 }}
-              onMouseMove={handlePointSelect}
-              onClick={handlePointSelect}
-              onMouseLeave={handleLeave}
             >
               <defs />
 

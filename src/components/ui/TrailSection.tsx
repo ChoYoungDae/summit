@@ -109,7 +109,6 @@ export default function TrailSection({
   routeName,
   backHref,
 }: Props) {
-  const [hoveredPoint,          setHoveredPoint]          = useState<[number, number, number] | null>(null);
   const [chartHighlightIndex,   setChartHighlightIndex]   = useState<number | null>(null);
   const [selectedWaypointIndex, setSelectedWaypointIndex] = useState<number | null>(null);
   const [isHiking,              setIsHiking]              = useState(false);
@@ -292,16 +291,6 @@ export default function TrailSection({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleHover = useCallback((pt: [number, number, number] | null) => {
-    setHoveredPoint(pt);
-    if (pt !== null) setChartHighlightIndex(null);
-  }, []);
-
-  const handleTrailPointClick = useCallback((index: number | null) => {
-    setChartHighlightIndex(index);
-    setHoveredPoint(index !== null ? (track[index] ?? null) : null);
-  }, [track]);
-
   // Find the nearest track index to a waypoint and sync the elevation chart.
   const handleWaypointSelect = useCallback((idx: number) => {
     setSelectedWaypointIndex(idx);
@@ -367,9 +356,7 @@ export default function TrailSection({
       <MapViewLoader
         track={track}
         waypoints={waypoints}
-        hoveredPoint={hoveredPoint}
         onWaypointClick={handleWaypointClick}
-        onTrailPointClick={handleTrailPointClick}
         isHiking={isHiking}
         selectedWaypointIndex={selectedWaypointIndex}
         approachBusTrack={approachBusTrack}
@@ -500,7 +487,7 @@ export default function TrailSection({
                     <Icon icon="ph:map-pin-simple-slash" width={20} height={20} style={{ color: "var(--color-secondary)" }} />
                   </div>
                   <p className="text-sm font-bold" style={{ color: "var(--color-secondary)" }}>
-                    Not near the trailhead
+                    Not near the trail
                   </p>
                 </div>
                 <p className="text-sm mb-5" style={{ color: "var(--color-text-muted)" }}>
@@ -535,7 +522,6 @@ export default function TrailSection({
             track={track}
             elevationSegments={elevationSegments}
             summitElevationM={summitElevationM}
-            onHover={handleHover}
             highlightIndex={elevationHighlightIndex}
             onSheetHeightChange={setSheetHeightPx}
             showOffRoutePrompt={showOffRoutePrompt}
