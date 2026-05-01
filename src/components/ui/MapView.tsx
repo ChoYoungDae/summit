@@ -91,7 +91,7 @@ const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, strin
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GPS_ACCURACY_M         = 150;  // ongoing filter — reject fixes worse than this
-const GPS_ACCURACY_FIRST_M   = 50;  // strict first fix — rejects FLP/cell-tower coarse positions
+const GPS_ACCURACY_FIRST_M   = 150; // strict first fix — rejects FLP/cell-tower coarse positions (500m+)
 const WAYPOINT_ALERT_M = 40;
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
