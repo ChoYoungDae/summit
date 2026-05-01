@@ -90,11 +90,38 @@ const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, strin
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GPS_ACCURACY_M         = 150;  // ongoing filter — reject fixes worse than this
-const GPS_ACCURACY_FIRST_M   = 150; // strict first fix — rejects FLP/cell-tower coarse positions (500m+)
 const WAYPOINT_ALERT_M = 40;
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
+
+/**
+ * Build a GeoJSON Polygon approximating a circle of `radiusM` metres
+ * centred on [lon, lat]. Used to render the GPS accuracy ring on the map.
+ */
+function createAccuracyCircle(
+  lon: number,
+  lat: number,
+  radiusM: number,
+): GeoJSON.Feature<GeoJSON.Polygon> {
+  const POINTS = 64;
+  const kmPerDegLat = 111.32;
+  const kmPerDegLon = 111.32 * Math.cos((lat * Math.PI) / 180);
+  const radiusKm = radiusM / 1000;
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= POINTS; i++) {
+    const angle = (i / POINTS) * 2 * Math.PI;
+    coords.push([
+      lon + (radiusKm / kmPerDegLon) * Math.cos(angle),
+      lat + (radiusKm / kmPerDegLat) * Math.sin(angle),
+    ]);
+  }
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: { type: "Polygon", coordinates: [coords] },
+  };
+}
+
 function haversineM(
   lat1: number, lon1: number,
   lat2: number, lon2: number,
@@ -495,6 +522,7 @@ export default function MapView({
 
   // GPS state — React owns position, no manual DOM marker manipulation
   const [gpsPos,       setGpsPos]       = useState<[number, number] | null>(null);
+  const [gpsAccuracy,  setGpsAccuracy]  = useState<number | null>(null);
   const [gpsHeading,   setGpsHeading]   = useState(0);
   const [isOffRoute,   setIsOffRoute]   = useState(false);
   const [isMapLoaded,       setIsMapLoaded]       = useState(false);
@@ -660,14 +688,15 @@ export default function MapView({
   // ── GPS watch ────────────────────────────────────────────────────────────────
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
-    const threshold = hasFirstFixRef.current ? GPS_ACCURACY_M : GPS_ACCURACY_FIRST_M;
-    if (accuracy > threshold) return;
+    // No accuracy threshold for display — show any fix with an accuracy circle.
+    // Off-route alerts are gated separately via gpsAccuracyM in useOffRouteAlert.
     if (!hasFirstFixRef.current) {
       hasFirstFixRef.current = true;
       setGpsAcquiring(false);
     }
     const newPos: [number, number] = [lon, lat];
     setGpsPos(newPos);
+    setGpsAccuracy(accuracy);
     gpsPosRef.current = newPos;
     if (isHikingRef.current) {
       // Gate off-route detection on GPS accuracy ≤ user threshold
@@ -1182,7 +1211,27 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* GPS position — rendered only after first fix */}
+        {/* GPS accuracy circle — scales with zoom, shown behind the dot */}
+        {gpsPos && gpsAccuracy !== null && (
+          <Source
+            id="gps-accuracy"
+            type="geojson"
+            data={createAccuracyCircle(gpsPos[0], gpsPos[1], gpsAccuracy)}
+          >
+            <Layer
+              id="gps-accuracy-fill"
+              type="fill"
+              paint={{ "fill-color": "#2E5E4A", "fill-opacity": 0.12 }}
+            />
+            <Layer
+              id="gps-accuracy-stroke"
+              type="line"
+              paint={{ "line-color": "#2E5E4A", "line-width": 1, "line-opacity": 0.35 }}
+            />
+          </Source>
+        )}
+
+        {/* GPS position dot — rendered only after first fix */}
         {gpsPos && (
           <Marker longitude={gpsPos[0]} latitude={gpsPos[1]} anchor="center">
             <GpsArrow rotation={arrowRotation} isOffRoute={isOffRoute} />
