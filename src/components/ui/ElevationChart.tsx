@@ -564,6 +564,35 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
           No elevation data available
         </div>
       )}
+
+      {/* ── Viewport position indicator ── */}
+      {/* Shown only when zoomed in. Thin bar: gray = full route, green = visible window. */}
+      {visibleTrackRange && data.length > 0 && displayData.length > 0 && (() => {
+        const totalDist  = data[data.length - 1]!.dist;
+        const startDist  = displayData[0]!.dist;
+        const endDist    = displayData[displayData.length - 1]!.dist;
+        if (totalDist <= 0) return null;
+        const leftPct  = (startDist / totalDist) * 100;
+        const widthPct = ((endDist - startDist) / totalDist) * 100;
+        return (
+          <div className="px-3 pb-2 pt-0.5">
+            <div
+              className="relative h-1 rounded-full overflow-hidden"
+              style={{ background: "rgba(0,0,0,0.10)" }}
+            >
+              <div
+                className="absolute top-0 h-full rounded-full"
+                style={{
+                  left: `${leftPct}%`,
+                  width: `${Math.max(widthPct, 4)}%`,
+                  background: "var(--color-primary)",
+                  opacity: 0.7,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
