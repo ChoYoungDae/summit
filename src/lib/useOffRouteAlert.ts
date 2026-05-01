@@ -18,6 +18,8 @@ interface Options {
   enabled: boolean;
   /** Index of the nearest track point for the "ignore section" feature. */
   nearestTrackIndex: number;
+  /** Current GPS accuracy in metres. Alert is suppressed when accuracy > threshold. */
+  gpsAccuracyM?: number | null;
 }
 
 export interface OffRouteAlertState {
@@ -32,6 +34,7 @@ export function useOffRouteAlert({
   threshold,
   enabled,
   nearestTrackIndex,
+  gpsAccuracyM,
 }: Options): OffRouteAlertState {
   const [isAlertVisible, setIsAlertVisible] = useState(false);
 
@@ -42,6 +45,15 @@ export function useOffRouteAlert({
 
   useEffect(() => {
     if (!enabled || distanceToPathM === null) {
+      consecutiveRef.current  = 0;
+      firstOffTimeRef.current = null;
+      return;
+    }
+
+    // ── GPS accuracy gate ──────────────────────────────────────────────────
+    // If GPS accuracy is worse than the user's off-route threshold, the fix
+    // is too coarse to reliably detect off-route — suppress the alert.
+    if (gpsAccuracyM !== null && gpsAccuracyM !== undefined && gpsAccuracyM > threshold) {
       consecutiveRef.current  = 0;
       firstOffTimeRef.current = null;
       return;
@@ -89,7 +101,7 @@ export function useOffRouteAlert({
       firstOffTimeRef.current = null;
       setIsAlertVisible(false);
     }
-  }, [distanceToPathM, threshold, enabled, nearestTrackIndex]);
+  }, [distanceToPathM, threshold, enabled, nearestTrackIndex, gpsAccuracyM]);
 
   const handleMute5min = useCallback(() => {
     muteUntilRef.current    = Date.now() + 5 * 60 * 1_000;

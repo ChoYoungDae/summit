@@ -171,6 +171,7 @@ export default function TrailSection({
     threshold: offRouteThreshold,
     enabled: isHiking && hikingMode === "active" && offRouteEnabled,
     nearestTrackIndex: gps.nearestTrackIndex,
+    gpsAccuracyM: gps.gpsAccuracyM,
   });
 
   const summitElevationM = useMemo(

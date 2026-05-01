@@ -17,6 +17,8 @@ export interface HikingGPSState {
   nearestTrackIndex: number;
   /** Metres from current GPS position to the nearest track point (off-route distance) */
   distanceToPathM: number;
+  /** Current GPS accuracy in metres (null until first fix). Used to gate off-route alerts. */
+  gpsAccuracyM: number | null;
   /** Remaining vertical ascent (m) from current position to summit. 0 during descent. */
   remainingAscentElevM: number;
   /** Total horizontal distance of the descent portion (m) — constant per route. */
@@ -134,6 +136,7 @@ interface Options {
 
 export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
   const [pos, setPos] = useState<{ lat: number; lon: number } | null>(null);
+  const [gpsAccuracyM, setGpsAccuracyM] = useState<number | null>(null);
   const [phase, setPhase] = useState<HikingPhase>("ascent");
   const [error, setError] = useState<string | null>(null);
 
@@ -176,8 +179,9 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
 
     const id = navigator.geolocation.watchPosition(
       ({ coords }) => {
-        const { latitude, longitude } = coords;
+        const { latitude, longitude, accuracy } = coords;
         setPos({ lat: latitude, lon: longitude });
+        setGpsAccuracyM(accuracy);
         setError(null);
 
         // Phase auto-advance: once we pass the summit index, lock into descent
@@ -220,6 +224,7 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
         remainingM: phase === "ascent" ? (cumDist[summitTrackIdx] ?? totalM) : totalM,
         nearestTrackIndex: 0,
         distanceToPathM: 0,
+        gpsAccuracyM,
         remainingAscentElevM: phase === "ascent"
           ? calcRemainingAscent(track, 0, summitTrackIdx)
           : 0,
@@ -240,6 +245,7 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
         remainingM: Math.max(goalM - traversedM, 0),
         nearestTrackIndex,
         distanceToPathM,
+        gpsAccuracyM,
         remainingAscentElevM: calcRemainingAscent(track, nearestTrackIndex, summitTrackIdx),
         totalDescentM,
         error,
@@ -258,9 +264,10 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
       remainingM: Math.max(totalM - traversedM, 0),
       nearestTrackIndex,
       distanceToPathM,
+      gpsAccuracyM,
       remainingAscentElevM: 0,
       totalDescentM,
       error,
     };
-  }, [pos, phase, cumDist, summitTrackIdx, totalM, track, error]);
+  }, [pos, gpsAccuracyM, phase, cumDist, summitTrackIdx, totalM, track, error]);
 }

@@ -90,8 +90,8 @@ const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, strin
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GPS_ACCURACY_M         = 150;   // ongoing filter — reject fixes worse than this
-const GPS_ACCURACY_FIRST_M   = 5000; // permissive for mobile cold start (network/WiFi fix)
+const GPS_ACCURACY_M         = 150;  // ongoing filter — reject fixes worse than this
+const GPS_ACCURACY_FIRST_M   = 50;  // strict first fix — rejects FLP/cell-tower coarse positions
 const WAYPOINT_ALERT_M = 40;
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
@@ -670,7 +670,10 @@ export default function MapView({
     setGpsPos(newPos);
     gpsPosRef.current = newPos;
     if (isHikingRef.current) {
-      setIsOffRoute(offRouteEnabledRef.current && checkOffRoute(lat, lon, trackRef.current, offRouteThresholdRef.current));
+      // Gate off-route detection on GPS accuracy ≤ user threshold
+      // — avoids false alerts when coarse network fix is still active
+      const accuracyOk = accuracy <= offRouteThresholdRef.current;
+      setIsOffRoute(offRouteEnabledRef.current && accuracyOk && checkOffRoute(lat, lon, trackRef.current, offRouteThresholdRef.current));
     }
     if (heading !== null && speed !== null && speed > 0.5) {
       setGpsHeading(heading);
