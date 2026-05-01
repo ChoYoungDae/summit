@@ -466,8 +466,8 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
                         pointerEvents: "none",
                       }}
                     >
-                      <div style={{ fontWeight: 700 }}>{pt.ele} m</div>
-                      <div style={{ color: "#AAABB8", fontSize: 11 }}>
+                      <div style={{ fontWeight: 700, fontFamily: "var(--font-num)" }}>{Math.round(pt.ele)} m</div>
+                      <div style={{ color: "#AAABB8", fontSize: 11, fontFamily: "var(--font-num)" }}>
                         {pt.dist.toFixed(2)} km
                       </div>
                     </div>
