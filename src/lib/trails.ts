@@ -217,7 +217,7 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
     .select("id, mountain_id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, route_preview_img, hero_images, description, tags, highlights, is_oneway, hide_safe_start")
     .order("id");
 
-  if (error || !routeRows) return [];
+  if (error || !routeRows) throw new Error(error?.message ?? "Failed to fetch routes");
 
   // Collect unique mountain IDs and segment IDs from routes
   const mountainIds = [...new Set((routeRows as RouteRow[]).map((r) => r.mountain_id))];
