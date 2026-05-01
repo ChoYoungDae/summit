@@ -491,6 +491,12 @@ export interface MapViewProps {
   onToggleOffRoute?: () => void;
   /** Off-route threshold in metres — matches the Settings value. Defaults to 30. */
   offRouteThresholdM?: number;
+  /**
+   * Called on every accepted GPS fix with raw position + accuracy.
+   * Parent uses this as the single source of truth for GPS state so that
+   * no second watchPosition is needed elsewhere (e.g. useHikingGPS).
+   */
+  onGpsFix?: (fix: { lat: number; lon: number; accuracy: number } | null) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -517,6 +523,7 @@ export default function MapView({
   offRouteEnabled = true,
   onToggleOffRoute,
   offRouteThresholdM = 30,
+  onGpsFix,
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -546,6 +553,11 @@ export default function MapView({
   const hasCenteredOnStartRef   = useRef(false);
   const bottomPaddingRef        = useRef(bottomPadding);
   const hasFirstFixRef          = useRef(false);
+  // Stable ref for the onGpsFix callback — avoids re-creating handleGpsPos
+  const onGpsFixRef             = useRef(onGpsFix);
+
+  // Keep callback ref in sync so handleGpsPos closure is always current
+  useEffect(() => { onGpsFixRef.current = onGpsFix; }, [onGpsFix]);
 
   // Keep offRoute refs in sync
   useEffect(() => {
@@ -698,6 +710,9 @@ export default function MapView({
     setGpsPos(newPos);
     setGpsAccuracy(accuracy);
     gpsPosRef.current = newPos;
+    // Notify parent so it can share this fix with other consumers (e.g. useHikingGPS)
+    // — eliminates the need for a second watchPosition elsewhere.
+    onGpsFixRef.current?.({ lat, lon, accuracy });
     if (isHikingRef.current) {
       // Gate off-route detection on GPS accuracy ≤ user threshold
       // — avoids false alerts when coarse network fix is still active

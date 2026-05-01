@@ -7,6 +7,7 @@ import FloatingTrailHeader from "./FloatingTrailHeader";
 import HikingBottomSheet from "./HikingBottomSheet";
 import type { SegmentElevationInfo } from "./ElevationChart";
 import { useHikingGPS } from "@/lib/useHikingGPS";
+import type { ExternalGPSFix } from "@/lib/useHikingGPS";
 import { useHikingLevel } from "@/lib/useHikingLevel";
 import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
 import { useOffRouteAlert } from "@/lib/useOffRouteAlert";
@@ -113,6 +114,9 @@ export default function TrailSection({
   const [selectedWaypointIndex, setSelectedWaypointIndex] = useState<number | null>(null);
   const [isHiking,              setIsHiking]              = useState(false);
   const [isLocating,            setIsLocating]            = useState(false);
+  // Single GPS fix forwarded from MapView's watchPosition — shared with useHikingGPS
+  // so no second GPS watcher is needed.
+  const [mapGpsFix,             setMapGpsFix]             = useState<ExternalGPSFix | null>(null);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
   const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
@@ -141,7 +145,7 @@ export default function TrailSection({
   const { skill } = useHikingLevel();
   const skillMultiplier = skill.multiplier;
 
-  const gps = useHikingGPS({ segments: route.segments, enabled: isHiking });
+  const gps = useHikingGPS({ segments: route.segments, enabled: isHiking, fix: mapGpsFix });
   const { threshold: offRouteThreshold, enabled: offRouteEnabled, setEnabled: setOffRouteEnabled } = useOffRouteSettings();
 
   // ── Auto-detect Active Mode once near the trailhead ──────────────────────
@@ -382,6 +386,7 @@ export default function TrailSection({
         offRouteEnabled={offRouteEnabled}
         onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
         offRouteThresholdM={offRouteThreshold}
+        onGpsFix={setMapGpsFix}
       />
 
       <div

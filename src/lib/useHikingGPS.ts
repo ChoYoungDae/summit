@@ -26,14 +26,6 @@ export interface HikingGPSState {
   error: string | null;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const GPS_OPTIONS: PositionOptions = {
-  enableHighAccuracy: true,
-  maximumAge: 8_000,
-  timeout: 10_000,
-};
-
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 /**
@@ -127,18 +119,31 @@ function findNearest(
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
+/** External GPS fix forwarded from MapView — the single watchPosition source. */
+export interface ExternalGPSFix {
+  lat: number;
+  lon: number;
+  accuracy: number;
+}
+
 interface Options {
   /** Ordered segments for this route (APPROACH, ASCENT, DESCENT, RETURN) */
   segments: ResolvedSegment[];
-  /** Only activates watchPosition when true */
+  /**
+   * Controls SW waypoint registration / proximity alerts.
+   * Does NOT start a GPS watcher — position comes from `fix`.
+   */
   enabled: boolean;
+  /**
+   * Current GPS fix forwarded from MapView's single watchPosition.
+   * null until first fix arrives.
+   */
+  fix: ExternalGPSFix | null;
 }
 
-export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
-  const [pos, setPos] = useState<{ lat: number; lon: number } | null>(null);
-  const [gpsAccuracyM, setGpsAccuracyM] = useState<number | null>(null);
+export function useHikingGPS({ segments, enabled, fix }: Options): HikingGPSState {
   const [phase, setPhase] = useState<HikingPhase>("ascent");
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
 
   const phaseRef = useRef<HikingPhase>("ascent");
 
@@ -160,10 +165,11 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
   // All waypoints (for SW proximity registration)
   const allWaypoints = useMemo(() => collectWaypoints(segments), [segments]);
 
-  // ── GPS watcher ───────────────────────────────────────────────────────────
+  // ── SW waypoint registration ───────────────────────────────────────────────
+  // Runs once when hiking starts / stops; independent of GPS watcher.
 
   useEffect(() => {
-    if (!enabled || typeof navigator === "undefined" || !navigator.geolocation) return;
+    if (!enabled) return;
 
     if (navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage({
@@ -177,42 +183,38 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
       });
     }
 
-    const id = navigator.geolocation.watchPosition(
-      ({ coords }) => {
-        const { latitude, longitude, accuracy } = coords;
-        setPos({ lat: latitude, lon: longitude });
-        setGpsAccuracyM(accuracy);
-        setError(null);
-
-        // Phase auto-advance: once we pass the summit index, lock into descent
-        if (phaseRef.current === "ascent" && track.length > 0) {
-          const { idx } = findNearest(latitude, longitude, track);
-          if (idx >= summitTrackIdx) {
-            phaseRef.current = "descent";
-            setPhase("descent");
-          }
-        }
-
-        navigator.serviceWorker?.controller?.postMessage({
-          type: "CHECK_PROXIMITY",
-          lat: latitude,
-          lon: longitude,
-        });
-      },
-      (err) => setError(err.message),
-      GPS_OPTIONS
-    );
-
     return () => {
-      navigator.geolocation.clearWatch(id);
       navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_WAYPOINTS" });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, summitTrackIdx]);
+  }, [enabled, allWaypoints]);
+
+  // ── Phase auto-advance + SW proximity (runs on each new fix) ──────────────
+
+  useEffect(() => {
+    if (!enabled || !fix || track.length === 0) return;
+    const { lat, lon } = fix;
+
+    // Phase auto-advance: once we pass the summit index, lock into descent
+    if (phaseRef.current === "ascent") {
+      const { idx } = findNearest(lat, lon, track);
+      if (idx >= summitTrackIdx) {
+        phaseRef.current = "descent";
+        setPhase("descent");
+      }
+    }
+
+    navigator.serviceWorker?.controller?.postMessage({
+      type: "CHECK_PROXIMITY",
+      lat,
+      lon,
+    });
+  }, [enabled, fix, track, summitTrackIdx]);
 
   // ── Derived progress ──────────────────────────────────────────────────────
 
   return useMemo<HikingGPSState>(() => {
+    const pos = fix ? { lat: fix.lat, lon: fix.lon } : null;
+    const gpsAccuracyM = fix?.accuracy ?? null;
     const descentStartM = cumDist[summitTrackIdx] ?? totalM;
     const totalDescentM = totalM - descentStartM;
 
@@ -269,5 +271,5 @@ export function useHikingGPS({ segments, enabled }: Options): HikingGPSState {
       totalDescentM,
       error,
     };
-  }, [pos, gpsAccuracyM, phase, cumDist, summitTrackIdx, totalM, track, error]);
+  }, [fix, phase, cumDist, summitTrackIdx, totalM, track, error]);
 }
