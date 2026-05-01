@@ -336,45 +336,31 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
   }, [data, boundaries]);
 
   // When a visible range is active, recharts iterates displayData (0-based).
-  // Adjust indices so dot renderers and summit label still target the right point.
+  // Adjust indices so dot renderers target the right point.
   const sliceOffset = visibleTrackRange ? Math.max(0, visibleTrackRange.startIdx) : 0;
   const adjustedHighlightIndex =
     highlightGlobalIndex !== null ? highlightGlobalIndex - sliceOffset : null;
-  const adjustedSummitIndex = summitDataIndex - sliceOffset;
+
+  // Min / max elevation of visible data — shown as corner labels replacing the old summit badge
+  const { minEleDisplay, maxEleDisplay } = useMemo(() => {
+    const eles = displayData.map((d) => d.ele).filter((e) => isFinite(e) && e > 0);
+    if (eles.length === 0) return { minEleDisplay: null, maxEleDisplay: null };
+    return {
+      minEleDisplay: Math.round(Math.min(...eles)),
+      maxEleDisplay: Math.round(Math.max(...eles)),
+    };
+  }, [displayData]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderAscentDot = useCallback((props: any) => {
     const { cx, cy, index, value } = props;
     if (value === undefined || value === null || !isFinite(cy)) return <g key={index} />;
 
-    // Summit elevation label — rendered at the actual peak pixel position
-    if (summitElevationM && index === adjustedSummitIndex) {
-      const label = `${summitElevationM}m`;
-      const w = label.length * 7 + 12;
-      return (
-        <g key={`summit-label-${index}`}>
-          <rect x={cx - w / 2} y={cy - 19} width={w} height={15} rx={7.5} fill="rgba(17,17,22,0.82)" />
-          <text
-            x={cx}
-            y={cy - 11}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize={10}
-            fontFamily="var(--font-num)"
-            fontWeight="bold"
-            fill="white"
-          >
-            {label}
-          </text>
-        </g>
-      );
-    }
-
     if (index !== adjustedHighlightIndex) return <g key={index} />;
     return (
       <circle key={`dot-${index}`} cx={cx} cy={cy} r={7} fill={COLOR_ACTIVE} stroke="#fff" strokeWidth={2} />
     );
-  }, [adjustedHighlightIndex, adjustedSummitIndex, summitElevationM]);
+  }, [adjustedHighlightIndex]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderDescentDot = useCallback((props: any) => {
@@ -420,7 +406,29 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
       {data.length > 0 ? (
         // drop-shadow gives the strokes a subtle white glow — improves legibility
         // over complex map backgrounds when the sheet is partially transparent
-        <div style={{ filter: "drop-shadow(0 0 1px rgba(255,255,255,0.7)) drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
+        <div className="relative" style={{ filter: "drop-shadow(0 0 1px rgba(255,255,255,0.7)) drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
+          {/* Min / max elevation labels — replace the old summit badge */}
+          {maxEleDisplay !== null && (
+            <div
+              className="absolute left-3 top-5 flex flex-col justify-between pointer-events-none"
+              style={{ height: 118 }}
+            >
+              <span
+                className="font-num text-[10px] font-bold leading-none"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                {maxEleDisplay}m
+              </span>
+              {minEleDisplay !== null && minEleDisplay !== maxEleDisplay && (
+                <span
+                  className="font-num text-[10px] font-bold leading-none"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {minEleDisplay}m
+                </span>
+              )}
+            </div>
+          )}
           <ResponsiveContainer width="100%" height={152}>
             <AreaChart
               data={displayData}
