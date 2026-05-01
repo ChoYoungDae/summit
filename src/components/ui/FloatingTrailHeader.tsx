@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, AlertTriangle, Flag, Train, Moon } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, AlertTriangle, Flag, Train, Moon } from "lucide-react";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
 import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
@@ -39,6 +39,10 @@ interface Props {
   hikingPhase?: HikingPhase;
   hikingMode?: "preview" | "active";
   nightView?: boolean;
+  /** Collapse the station/ETA body, leaving only the route name row visible */
+  isCollapsed?: boolean;
+  /** Called when the user taps the collapse toggle button */
+  onToggleCollapse?: () => void;
 }
 
 export default function FloatingTrailHeader({
@@ -55,6 +59,8 @@ export default function FloatingTrailHeader({
   hikingPhase,
   hikingMode,
   nightView,
+  isCollapsed = false,
+  onToggleCollapse,
 }: Props) {
   const { locale: hookLocale } = useLanguage();
   const locale = propLocale || hookLocale;
@@ -103,20 +109,44 @@ export default function FloatingTrailHeader({
       className="absolute top-3 left-3 right-3 z-10 rounded-2xl overflow-hidden border border-white/30 pointer-events-auto"
       style={cardStyle}
     >
-      {/* ── Back link row ────────────────────────────────── */}
+      {/* ── Back link row (always visible) ───────────────── */}
       {routeName && (
-        <Link
-          href={backHref}
-          className="flex items-center gap-0.5 pl-1 pr-4 pt-2.5 pb-1"
-          style={{ color: "var(--color-primary)" }}
-        >
-          <ChevronLeft className="w-6 h-6 shrink-0" />
-          <span className="text-[20px] font-extrabold tracking-tight truncate">
-            {routeName}
-          </span>
-        </Link>
+        <div className="flex items-center pr-1">
+          <Link
+            href={backHref}
+            className="flex items-center gap-0.5 pl-1 pr-2 pt-2.5 pb-1 flex-1 min-w-0"
+            style={{ color: "var(--color-primary)" }}
+          >
+            <ChevronLeft className="w-6 h-6 shrink-0" />
+            <span className="text-[20px] font-extrabold tracking-tight truncate">
+              {routeName}
+            </span>
+          </Link>
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors active:bg-black/5"
+              aria-label={isCollapsed ? "Expand header" : "Collapse header"}
+            >
+              {isCollapsed
+                ? <ChevronDown className="w-4 h-4" style={{ color: "var(--color-text-muted)" }} />
+                : <ChevronUp className="w-4 h-4" style={{ color: "var(--color-text-muted)" }} />
+              }
+            </button>
+          )}
+        </div>
       )}
 
+      {/* ── Collapsible body: station info + ETA ─────────── */}
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: isCollapsed ? 0 : "200px",
+          opacity: isCollapsed ? 0 : 1,
+          transition: "max-height 0.22s ease-out, opacity 0.18s ease-out",
+          pointerEvents: isCollapsed ? "none" : "auto",
+        }}
+      >
       <div className={`flex justify-between gap-6 px-4 pb-3.5 pt-1 ${nightView && (!isHiking || hikingMode !== "active") ? "items-start" : "items-center"}`}>
         {/* Left: Station info section */}
         {stationInfo ? (
@@ -214,6 +244,7 @@ export default function FloatingTrailHeader({
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

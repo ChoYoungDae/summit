@@ -122,6 +122,8 @@ export default function TrailSection({
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
   const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
+  // Header collapsed state — auto-collapses when bottom sheet expands to "mid"
+  const [isHeaderCollapsed,     setIsHeaderCollapsed]     = useState(false);
 
   // ── Route photos ──────────────────────────────────────────────────────────
   const [photos,        setPhotos]        = useState<RoutePhoto[]>([]);
@@ -420,6 +422,8 @@ export default function TrailSection({
             hikingPhase={gps.phase}
             hikingMode={hikingMode}
             nightView={!!route.hideSafeStart}
+            isCollapsed={isHeaderCollapsed}
+            onToggleCollapse={() => setIsHeaderCollapsed((v) => !v)}
           />
 
           {/* ── Off-route alert overlay ──────────────────────────────────── */}
@@ -534,6 +538,7 @@ export default function TrailSection({
             highlightIndex={elevationHighlightIndex}
             visibleTrackRange={visibleTrackRange}
             onSheetHeightChange={setSheetHeightPx}
+            onSnapChange={(snap) => setIsHeaderCollapsed(snap === "mid")}
             showOffRoutePrompt={showOffRoutePrompt}
             offRouteEnabled={offRouteEnabled}
             onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}

@@ -62,6 +62,8 @@ interface Props {
   onCancelPrompt?: () => void;
   /** Track index range visible in the map viewport — syncs chart Y-axis scale. */
   visibleTrackRange?: { startIdx: number; endIdx: number } | null;
+  /** Fired whenever the sheet changes snap position. */
+  onSnapChange?: (snap: "min" | "mid") => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -83,6 +85,7 @@ export default function HikingBottomSheet({
   onConfirmStart,
   onCancelPrompt,
   visibleTrackRange,
+  onSnapChange,
 }: Props) {
   const [snap, setSnap] = useState<Snap>("min");
 
@@ -105,6 +108,7 @@ export default function HikingBottomSheet({
       const vh = window.innerHeight;
       setSnap("mid");
       onSheetHeightChange?.(snapVisibleH("mid", vh));
+      onSnapChange?.("mid");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightIndex]);
@@ -114,6 +118,7 @@ export default function HikingBottomSheet({
     const nextSnap: Snap = snap === "min" ? "mid" : "min";
     setSnap(nextSnap);
     onSheetHeightChange?.(snapVisibleH(nextSnap, vh));
+    onSnapChange?.(nextSnap);
   }
 
   // ── Transform ─────────────────────────────────────────────────────────────
