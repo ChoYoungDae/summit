@@ -94,15 +94,7 @@ export default function HikingBottomSheet({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-expand to mid when hiking starts
-  useEffect(() => {
-    if (isHiking) {
-      const vh = window.innerHeight;
-      setSnap("mid");
-      onSheetHeightChange?.(snapVisibleH("mid", vh));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking]);
+  // Sheet stays at "min" when hiking starts — user opens it manually by tapping the handle.
 
   // Auto-expand to mid when a trail point is selected (pre-hike only)
   useEffect(() => {
