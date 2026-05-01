@@ -60,6 +60,8 @@ interface Props {
   onToggleOffRoute?: () => void;
   onConfirmStart?: () => void;
   onCancelPrompt?: () => void;
+  /** Track index range visible in the map viewport — syncs chart Y-axis scale. */
+  visibleTrackRange?: { startIdx: number; endIdx: number } | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -80,6 +82,7 @@ export default function HikingBottomSheet({
   onToggleOffRoute,
   onConfirmStart,
   onCancelPrompt,
+  visibleTrackRange,
 }: Props) {
   const [snap, setSnap] = useState<Snap>("min");
 
@@ -313,6 +316,7 @@ export default function HikingBottomSheet({
                 }
                 summitElevationM={summitElevationM}
                 highlightTrackIndex={highlightIndex}
+                visibleTrackRange={visibleTrackRange}
               />
             </div>
           )}

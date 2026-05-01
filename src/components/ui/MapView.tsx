@@ -497,6 +497,12 @@ export interface MapViewProps {
    * no second watchPosition is needed elsewhere (e.g. useHikingGPS).
    */
   onGpsFix?: (fix: { lat: number; lon: number; accuracy: number } | null) => void;
+  /**
+   * Called after each map pan/zoom ends with the track indices visible
+   * in the current viewport. null when no track points are in view.
+   * Used to sync the elevation chart to the visible portion of the route.
+   */
+  onVisibleTrackRange?: (range: { startIdx: number; endIdx: number } | null) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -524,6 +530,7 @@ export default function MapView({
   onToggleOffRoute,
   offRouteThresholdM = 30,
   onGpsFix,
+  onVisibleTrackRange,
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
 
@@ -553,11 +560,13 @@ export default function MapView({
   const hasCenteredOnStartRef   = useRef(false);
   const bottomPaddingRef        = useRef(bottomPadding);
   const hasFirstFixRef          = useRef(false);
-  // Stable ref for the onGpsFix callback — avoids re-creating handleGpsPos
+  // Stable refs for callbacks — avoids re-creating handlers when props change
   const onGpsFixRef             = useRef(onGpsFix);
+  const onVisibleTrackRangeRef  = useRef(onVisibleTrackRange);
 
-  // Keep callback ref in sync so handleGpsPos closure is always current
+  // Keep callback refs in sync
   useEffect(() => { onGpsFixRef.current = onGpsFix; }, [onGpsFix]);
+  useEffect(() => { onVisibleTrackRangeRef.current = onVisibleTrackRange; }, [onVisibleTrackRange]);
 
   // Keep offRoute refs in sync
   useEffect(() => {
@@ -904,6 +913,35 @@ export default function MapView({
     setMapBearing(mapRef.current?.getBearing() ?? 0);
   }, []);
 
+  // ── Viewport → elevation chart sync ──────────────────────────────────────────
+  // Fires once after each pan/zoom ends (moveend). Finds which track points
+  // are inside the current map bounds and notifies the parent so the elevation
+  // chart can auto-scale its Y-axis to the visible elevation range.
+  const handleMoveEnd = useCallback(() => {
+    const cb = onVisibleTrackRangeRef.current;
+    if (!cb || track.length === 0 || !mapRef.current) return;
+
+    const bounds = mapRef.current.getBounds();
+    if (!bounds) return;
+
+    let startIdx = -1;
+    let endIdx   = -1;
+    for (let i = 0; i < track.length; i++) {
+      const [lon, lat] = track[i];
+      if (bounds.contains([lon, lat])) {
+        if (startIdx === -1) startIdx = i;
+        endIdx = i;
+      }
+    }
+
+    // Require at least 5 visible points to make a meaningful slice
+    if (startIdx === -1 || endIdx - startIdx < 4) {
+      cb(null);
+    } else {
+      cb({ startIdx, endIdx });
+    }
+  }, [track]); // track changes only when route changes
+
   // ── Compass toggle ──────────────────────────────────────────────────────────
   const centerOnGps = useCallback(() => {
     if (!gpsPos || !mapRef.current) return;
@@ -963,6 +1001,7 @@ export default function MapView({
         onDragStart={handleDragStart}
         onClick={handleMapClick}
         onRotate={handleRotate}
+        onMoveEnd={handleMoveEnd}
         style={{ width: "100%", height: "100%" }}
       >
         <AttributionControl compact position="bottom-right" />

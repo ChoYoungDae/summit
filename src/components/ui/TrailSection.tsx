@@ -117,6 +117,8 @@ export default function TrailSection({
   // Single GPS fix forwarded from MapView's watchPosition — shared with useHikingGPS
   // so no second GPS watcher is needed.
   const [mapGpsFix,             setMapGpsFix]             = useState<ExternalGPSFix | null>(null);
+  // Visible track range from MapView viewport — used to sync elevation chart Y-axis
+  const [visibleTrackRange, setVisibleTrackRange] = useState<{ startIdx: number; endIdx: number } | null>(null);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
   const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
@@ -387,6 +389,7 @@ export default function TrailSection({
         onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
         offRouteThresholdM={offRouteThreshold}
         onGpsFix={setMapGpsFix}
+        onVisibleTrackRange={setVisibleTrackRange}
       />
 
       <div
@@ -529,6 +532,7 @@ export default function TrailSection({
             elevationSegments={elevationSegments}
             summitElevationM={summitElevationM}
             highlightIndex={elevationHighlightIndex}
+            visibleTrackRange={visibleTrackRange}
             onSheetHeightChange={setSheetHeightPx}
             showOffRoutePrompt={showOffRoutePrompt}
             offRouteEnabled={offRouteEnabled}

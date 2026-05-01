@@ -264,11 +264,18 @@ interface Props {
    */
   highlightTrackIndex?: number | null;
   summitElevationM?: number;
+  /**
+   * Visible track index range forwarded from MapView's viewport.
+   * When set, the chart slices to this range and auto-scales the Y-axis
+   * to the visible elevation min/max — making local undulations visible.
+   * null = show full route (default).
+   */
+  visibleTrackRange?: { startIdx: number; endIdx: number } | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ElevationChart({ segments, highlightTrackIndex, summitElevationM }: Props) {
+export default function ElevationChart({ segments, highlightTrackIndex, summitElevationM, visibleTrackRange }: Props) {
   const nonBusSegments = useMemo(() => segments.filter((s) => !s.isBus), [segments]);
   const { data: rawData, trackIndexMap, boundaries } = useMemo(
     () => buildData(nonBusSegments),
@@ -289,12 +296,31 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
 
   const highlightPt = highlightGlobalIndex != null ? data[highlightGlobalIndex] : null;
 
+  // Slice to visible range when provided; otherwise use full data
+  const displayData = useMemo(() => {
+    if (!visibleTrackRange) return data;
+    const { startIdx, endIdx } = visibleTrackRange;
+    // Clamp to actual data length
+    const lo = Math.max(0, startIdx);
+    const hi = Math.min(data.length - 1, endIdx);
+    return lo <= hi ? data.slice(lo, hi + 1) : data;
+  }, [data, visibleTrackRange]);
+
   const yDomain = useMemo(() => {
-    const eles = data.map((d) => d.ele).filter((e) => isFinite(e) && e > 0);
+    const eles = displayData.map((d) => d.ele).filter((e) => isFinite(e) && e > 0);
     if (eles.length === 0) return ["auto", "auto"] as const;
+    if (!visibleTrackRange) {
+      // Full route view — start Y from 0 so approach flatness is visible
+      const maxEle = Math.max(...eles);
+      return [0, Math.ceil(maxEle * 1.05)] as const;
+    }
+    // Zoomed-in view — auto-scale to local min/max so undulations are visible
+    const minEle = Math.min(...eles);
     const maxEle = Math.max(...eles);
-    return [0, Math.ceil(maxEle * 1.05)] as const;
-  }, [data]);
+    const range = maxEle - minEle;
+    const pad = Math.max(range * 0.2, 8); // 20% padding, minimum 8 m
+    return [Math.max(0, Math.floor(minEle - pad)), Math.ceil(maxEle + pad)] as const;
+  }, [displayData, visibleTrackRange]);
 
   // Summit point: boundary where DESCENT starts (= peak reached)
   const { summitPt, summitDataIndex } = useMemo(() => {
@@ -309,13 +335,20 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
     return { summitPt: data[bestIndex], summitDataIndex: bestIndex };
   }, [data, boundaries]);
 
+  // When a visible range is active, recharts iterates displayData (0-based).
+  // Adjust indices so dot renderers and summit label still target the right point.
+  const sliceOffset = visibleTrackRange ? Math.max(0, visibleTrackRange.startIdx) : 0;
+  const adjustedHighlightIndex =
+    highlightGlobalIndex !== null ? highlightGlobalIndex - sliceOffset : null;
+  const adjustedSummitIndex = summitDataIndex - sliceOffset;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderAscentDot = useCallback((props: any) => {
     const { cx, cy, index, value } = props;
     if (value === undefined || value === null || !isFinite(cy)) return <g key={index} />;
 
     // Summit elevation label — rendered at the actual peak pixel position
-    if (summitElevationM && index === summitDataIndex) {
+    if (summitElevationM && index === adjustedSummitIndex) {
       const label = `${summitElevationM}m`;
       const w = label.length * 7 + 12;
       return (
@@ -337,21 +370,21 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
       );
     }
 
-    if (index !== highlightGlobalIndex) return <g key={index} />;
+    if (index !== adjustedHighlightIndex) return <g key={index} />;
     return (
       <circle key={`dot-${index}`} cx={cx} cy={cy} r={7} fill={COLOR_ACTIVE} stroke="#fff" strokeWidth={2} />
     );
-  }, [highlightGlobalIndex, summitDataIndex, summitElevationM]);
+  }, [adjustedHighlightIndex, adjustedSummitIndex, summitElevationM]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderDescentDot = useCallback((props: any) => {
     const { cx, cy, index, value } = props;
     if (value === undefined || value === null || !isFinite(cy)) return <g key={index} />;
-    if (index !== highlightGlobalIndex) return <g key={index} />;
+    if (index !== adjustedHighlightIndex) return <g key={index} />;
     return (
       <circle key={`dot-${index}`} cx={cx} cy={cy} r={7} fill={COLOR_ACTIVE} stroke="#fff" strokeWidth={2} />
     );
-  }, [highlightGlobalIndex]);
+  }, [adjustedHighlightIndex]);
 
   // X axis ticks: start, summit, end
   const xTicks = useMemo(() => {
@@ -390,7 +423,7 @@ export default function ElevationChart({ segments, highlightTrackIndex, summitEl
         <div style={{ filter: "drop-shadow(0 0 1px rgba(255,255,255,0.7)) drop-shadow(0 1px 2px rgba(0,0,0,0.10))" }}>
           <ResponsiveContainer width="100%" height={152}>
             <AreaChart
-              data={data}
+              data={displayData}
               margin={{ top: 22, right: 8, bottom: 4, left: 4 }}
             >
               <defs />
