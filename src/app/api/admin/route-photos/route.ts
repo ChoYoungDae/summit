@@ -108,14 +108,36 @@ function toPhoto(row: any) {
 }
 
 // ── GET /api/admin/route-photos?routeId=X ────────────────────────────────────
+// Photos are keyed by segment_id so that two routes sharing a segment
+// automatically share the same photos (no duplication needed).
+// Fallback: photos with no segment_id are still returned if they carry
+// the matching route_id (handles legacy rows uploaded before this change).
 export async function GET(req: NextRequest) {
   const routeId = req.nextUrl.searchParams.get("routeId");
   if (!routeId) return NextResponse.json({ error: "routeId required" }, { status: 400 });
 
+  const routeIdInt = parseInt(routeId);
+
+  // 1. Resolve segment_ids for this route
+  const { data: routeRow } = await supabaseAdmin
+    .from("routes")
+    .select("segment_ids")
+    .eq("id", routeIdInt)
+    .single();
+
+  const segIds: number[] = routeRow?.segment_ids ?? [];
+
+  // 2. Query photos:
+  //    a) segment_id IN route's segment_ids  (primary — segment-level sharing)
+  //    b) route_id = routeId AND segment_id IS NULL  (legacy fallback)
+  const orFilter = segIds.length > 0
+    ? `segment_id.in.(${segIds.join(",")}),and(route_id.eq.${routeIdInt},segment_id.is.null)`
+    : `route_id.eq.${routeIdInt}`;
+
   const { data, error } = await supabaseAdmin
     .from("route_photos")
     .select("*")
-    .eq("route_id", parseInt(routeId))
+    .or(orFilter)
     .order("order_index", { ascending: true })
     .order("id", { ascending: true });
 
