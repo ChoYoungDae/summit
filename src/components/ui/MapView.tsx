@@ -712,16 +712,8 @@ export default function MapView({
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
 
-    // ── Stale cache detection ─────────────────────────────────────────────────
-    // Android FLP sometimes fires watchPosition immediately with a "last known
-    // position" that is hours old (from a previous session at a different place).
-    // Rather than checking position jumps (which blocks valid GPS corrections),
-    // check the fix's own timestamp — a cached fix will have an old timestamp.
-    const posAgeMs = Date.now() - pos.timestamp;
-    if (posAgeMs > 30_000) {
-      console.warn(`[GPS] rejected stale fix (age ${Math.round(posAgeMs / 1000)}s)`);
-      return;
-    }
+    // maximumAge:0 on the watcher prevents the OS from returning stale cache.
+    // No client-side filtering — every fix from the watcher is accepted.
 
     if (!hasFirstFixRef.current) {
       hasFirstFixRef.current = true;
