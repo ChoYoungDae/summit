@@ -3,7 +3,7 @@ import { fetchRouteList } from "@/lib/trails";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://seoulsubwaytosummit.com");
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://hiking.seoulroutes.com");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const groups = await fetchRouteList();

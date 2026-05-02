@@ -6,7 +6,7 @@ import { getCachedRoute } from "@/lib/trails";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://seoulsubwaytosummit.com");
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://hiking.seoulroutes.com");
 
 type Props = { params: Promise<{ slug: string }> };
 
