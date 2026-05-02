@@ -538,7 +538,8 @@ export default function MapView({
   const [gpsPos,       setGpsPos]       = useState<[number, number] | null>(null);
   const [gpsAccuracy,  setGpsAccuracy]  = useState<number | null>(null);
   // Tracks the best accuracy seen so far — used to prefer sharper fixes
-  const bestAccuracyRef = useRef<number>(Infinity);
+  const bestAccuracyRef    = useRef<number>(Infinity);
+  const lastFixTimestampRef = useRef<number | null>(null);
   const [gpsHeading,   setGpsHeading]   = useState(0);
   const [isOffRoute,   setIsOffRoute]   = useState(false);
   const [isMapLoaded,       setIsMapLoaded]       = useState(false);
@@ -712,12 +713,25 @@ export default function MapView({
   // ── GPS watch ────────────────────────────────────────────────────────────────
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
-
-    // Two-stage accuracy filter:
-    // Accept any first fix (shows dot quickly). After that, only accept a fix if
-    // it improves on the best accuracy seen — prevents a coarse network fix from
-    // overwriting a sharp GPS fix once GPS has locked in.
     const isFirstFix = !hasFirstFixRef.current;
+
+    // ── Jump detection: reject stale "last known position" from Android FLP ──
+    // Android sometimes fires watchPosition with a hours-old cached location
+    // before real positioning starts. If the new fix would move the marker by
+    // more than what is physically reachable since the last fix (at 10 m/s =
+    // 36 km/h, generous for a hiking app), treat it as a stale cache hit and
+    // discard it. The first fix is always accepted so the dot appears quickly.
+    if (!isFirstFix && gpsPosRef.current && lastFixTimestampRef.current !== null) {
+      const jumpM = haversineM(gpsPosRef.current[1], gpsPosRef.current[0], lat, lon);
+      const elapsedS = Math.max(0, (pos.timestamp - lastFixTimestampRef.current) / 1000);
+      const maxReachableM = elapsedS * 10 + accuracy + bestAccuracyRef.current;
+      if (jumpM > maxReachableM + 50) {
+        console.warn(`[GPS] rejected jump ${Math.round(jumpM)}m (max ${Math.round(maxReachableM + 50)}m)`);
+        return;
+      }
+    }
+
+    // ── Accuracy filter: prefer sharper fixes, ignore degrading ones ──────────
     if (!isFirstFix && accuracy > bestAccuracyRef.current * 1.2) return;
     bestAccuracyRef.current = Math.min(bestAccuracyRef.current, accuracy);
 
@@ -729,6 +743,7 @@ export default function MapView({
     setGpsPos(newPos);
     setGpsAccuracy(accuracy);
     gpsPosRef.current = newPos;
+    lastFixTimestampRef.current = pos.timestamp;
     // Notify parent so it can share this fix with other consumers (e.g. useHikingGPS)
     // — eliminates the need for a second watchPosition elsewhere.
     onGpsFixRef.current?.({ lat, lon, accuracy });
