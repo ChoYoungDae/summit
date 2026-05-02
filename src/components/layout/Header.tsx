@@ -5,7 +5,7 @@ import { Mountain, ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const KHAKI = "#4A6352";
+const KHAKI = "#C8362A";
 const currentMonth = new Date().toLocaleString("en-US", { month: "long" }).toUpperCase();
 
 export function Header() {
