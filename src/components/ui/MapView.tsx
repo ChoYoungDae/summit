@@ -1357,8 +1357,8 @@ export default function MapView({
         >
           <LocateFixed size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
           <span>
-            GPS accuracy is low. Enable precise location:{" "}
-            <span className="opacity-75">Settings → Apps → Chrome → Permissions → Location → Use precise location</span>
+            GPS accuracy is low.{" "}
+            <span className="opacity-75">Tap the 🔒 in Chrome's address bar → Site settings → Location → reset and allow precise location.</span>
           </span>
         </div>
       )}
