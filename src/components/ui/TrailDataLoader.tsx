@@ -1,7 +1,7 @@
 import { getCachedRoute } from "@/lib/trails";
 import { fetchSunsetMin } from "@/lib/sunset";
 import { tDB, LANGUAGE_STORAGE_KEY, DEFAULT_LANGUAGE } from "@/lib/i18n";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import type { SupportedLocale } from "@/lib/i18n";
 import TrailSection from "./TrailSection";
 import type { ResolvedRoute, Waypoint } from "@/types/trail";
@@ -92,12 +92,12 @@ function seoulBusStyle(busNumbers: string | undefined): { color: string; chipTex
 
 export default async function TrailDataLoader({ routeId }: { routeId: number }) {
   const cookieStore = await cookies();
-  const headersList = await headers();
-  const acceptLanguage = headersList.get("accept-language");
-  const hasKoInHeaders = acceptLanguage?.toLowerCase().includes("ko");
 
+  // Locale is determined solely by the user's explicit in-app language setting
+  // (stored as a cookie). We intentionally ignore the browser's Accept-Language
+  // header — Korean phones would otherwise auto-switch to Korean even when the
+  // user has selected English in Settings.
   const locale = (cookieStore.get(LANGUAGE_STORAGE_KEY)?.value as SupportedLocale)
-    || (hasKoInHeaders ? "ko" : null)
     || DEFAULT_LANGUAGE;
 
   const [route, sunsetMin] = await Promise.all([
