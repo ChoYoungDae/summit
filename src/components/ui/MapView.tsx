@@ -526,6 +526,7 @@ export default function MapView({
   const [isMapLoaded,       setIsMapLoaded]       = useState(false);
   const [isFootprintReady,  setIsFootprintReady]  = useState(false);
   const [gpsAcquiring,      setGpsAcquiring]      = useState(false);
+  const [gpsApproxOnly,     setGpsApproxOnly]     = useState(false); // Android "approximate location" detected
 
   // Map / compass state
   const [isTracking, setIsTracking] = useState(false);
@@ -539,6 +540,7 @@ export default function MapView({
   const offRouteEnabledRef      = useRef(offRouteEnabled);
   const offRouteThresholdRef    = useRef(offRouteThresholdM);
   const gpsWatchRef             = useRef<number | null>(null);
+  const gpsFixCountRef          = useRef(0); // counts accepted fixes — detect approximate-only permission
 
   const trackRef                = useRef(track); // stable reference for interval closure
   const gpsPosRef               = useRef<[number, number] | null>(null);
@@ -709,6 +711,16 @@ export default function MapView({
       hasFirstFixRef.current = true;
       setGpsAcquiring(false);
     }
+
+    // Detect Android "approximate location" permission — accuracy stays ≥500 m
+    // across multiple fixes even outdoors, because the GPS chip is blocked.
+    gpsFixCountRef.current += 1;
+    if (gpsFixCountRef.current >= 3 && accuracy >= 500) {
+      setGpsApproxOnly(true);
+    } else if (accuracy < 200) {
+      setGpsApproxOnly(false); // precise permission confirmed — hide the warning
+    }
+
     const newPos: [number, number] = [lon, lat];
     setGpsPos(newPos);
     setGpsAccuracy(accuracy);
@@ -1326,6 +1338,28 @@ export default function MapView({
         >
           <LocateFixed size={11} strokeWidth={2.5} />
           <span>±{Math.round(gpsAccuracy)}m</span>
+        </div>
+      )}
+
+      {/* Approximate-only location warning — guides user to enable precise location */}
+      {gpsApproxOnly && !gpsError && (
+        <div
+          role="alert"
+          className="absolute left-3 right-3 z-10 px-3 py-2
+                     rounded-xl text-white text-[12px] font-semibold
+                     flex items-start gap-2"
+          style={{
+            bottom: controlsBottomOffset + 52,
+            transition: controlsTransition,
+            background: "rgba(17,17,22,0.88)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <LocateFixed size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+          <span>
+            GPS accuracy is low. Enable precise location:{" "}
+            <span className="opacity-75">Settings → Apps → Chrome → Permissions → Location → Use precise location</span>
+          </span>
         </div>
       )}
 
