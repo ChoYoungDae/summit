@@ -521,7 +521,6 @@ export default function MapView({
   // GPS state — React owns position, no manual DOM marker manipulation
   const [gpsPos,       setGpsPos]       = useState<[number, number] | null>(null);
   const [gpsAccuracy,  setGpsAccuracy]  = useState<number | null>(null);
-  const [gpsFixCount,  setGpsFixCount]  = useState(0);
   const [gpsHeading,   setGpsHeading]   = useState(0);
   const [isOffRoute,   setIsOffRoute]   = useState(false);
   const [isMapLoaded,       setIsMapLoaded]       = useState(false);
@@ -719,7 +718,6 @@ export default function MapView({
     const newPos: [number, number] = [lon, lat];
     setGpsPos(newPos);
     setGpsAccuracy(accuracy);
-    setGpsFixCount((n) => n + 1);
     gpsPosRef.current = newPos;
     // Notify parent so it can share this fix with other consumers (e.g. useHikingGPS)
     // — eliminates the need for a second watchPosition elsewhere.
@@ -1337,7 +1335,7 @@ export default function MapView({
           }}
         >
           <LocateFixed size={11} strokeWidth={2.5} />
-          <span>±{Math.round(gpsAccuracy)}m #{gpsFixCount}</span>
+          <span>±{Math.round(gpsAccuracy)}m</span>
         </div>
       )}
 
