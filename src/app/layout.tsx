@@ -13,10 +13,21 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Seoul Routes",
-  description: "Subway-accessible hiking guide for Seoul",
-  applicationName: "S3",
+  title: {
+    default: "Seoul Subway to Summit",
+    template: "%s | Seoul Subway to Summit",
+  },
+  description:
+    "Hike Seoul's mountains by subway — route maps, elevation profiles, and trail guides for Bukhansan, Gwanaksan, Dobongsan and more.",
+  applicationName: "Seoul Subway to Summit",
   manifest: "/manifest.json",
+  keywords: ["Seoul hiking", "Seoul subway hiking", "Bukhansan", "Gwanaksan", "Dobongsan", "Seoul trail map"],
+  openGraph: {
+    siteName: "Seoul Subway to Summit",
+    type: "website",
+    locale: "en_US",
+  },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
