@@ -19,19 +19,17 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
-  // Delete ALL caches (including old static caches from previous SW versions).
-  // Map tiles are also cleared — they'll be re-cached on next map use.
-  // Next.js chunks are content-hashed so the CDN serves them fast without SW cache.
   event.waitUntil(
     caches
       .keys()
       .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
-      .then(() => {
-        // Tell all open tabs to reload so they pick up the new JS immediately.
-        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-          clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }));
-        });
+      .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }))
+      .then((clients) => {
+        // Notify all tabs — they will force-reload to get fresh code
+        clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }));
+        // Self-destruct: unregister so this SW can never serve stale content again
+        return self.registration.unregister();
       }),
   );
 });
