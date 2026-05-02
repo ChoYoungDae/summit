@@ -1332,14 +1332,16 @@ export default function MapView({
         </div>
       )}
 
-      {/* GPS accuracy chip — shows ±Nm once position is known */}
+      {/* GPS accuracy chip — bottom-left, same row as the compass button */}
       {gpsPos && gpsAccuracy !== null && (
         <div
-          className="absolute top-2 left-1/2 -translate-x-1/2 z-20
+          className="absolute left-3 z-10
                      flex items-center gap-1 px-2.5 py-1
                      rounded-full text-white text-[11px] font-semibold font-num
                      pointer-events-none shadow-md"
           style={{
+            bottom: controlsBottomOffset + 8,
+            transition: controlsTransition,
             background: gpsAccuracy <= 20 ? "#16a34a" : gpsAccuracy <= 60 ? "#d97706" : "#dc2626",
           }}
         >
