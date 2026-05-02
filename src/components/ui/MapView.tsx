@@ -539,6 +539,12 @@ export default function MapView({
   const offRouteEnabledRef      = useRef(offRouteEnabled);
   const offRouteThresholdRef    = useRef(offRouteThresholdM);
   const gpsWatchRef             = useRef<number | null>(null);
+  /** Coarse (network/FLP) watcher — gives current location fast */
+  const coarseWatchRef          = useRef<number | null>(null);
+  /** Last position from the coarse (network) watcher — used to validate GPS fixes */
+  const coarsePosRef            = useRef<[number, number] | null>(null);
+  /** True once a GPS fix has passed the coarse-proximity check */
+  const hasFineFixRef           = useRef(false);
 
   const trackRef                = useRef(track); // stable reference for interval closure
   const gpsPosRef               = useRef<[number, number] | null>(null);
@@ -752,14 +758,58 @@ export default function MapView({
     if ("geolocation" in navigator) {
       setGpsAcquiring(true);
 
-      // Single high-accuracy watch — GPS hardware only.
-      // WiFi/cell-tower positioning (enableHighAccuracy:false) is fast but
-      // often returns wrong locations from stale database entries, so we skip
-      // the coarse stage entirely and wait for a real GPS fix.
-      gpsWatchRef.current = navigator.geolocation.watchPosition(
-        handleGpsPos,
+      // ── Two-stage GPS strategy ────────────────────────────────────────────────
+      //
+      // PROBLEM: On Android, watchPosition(enableHighAccuracy:true) may return
+      // the GPS chip's *cached last fix* as the very first result. That cached
+      // fix can be from a completely different location (e.g. yesterday's hike)
+      // yet have good accuracy (10–15 m), so it looks correct but is wrong.
+      //
+      // SOLUTION: Run a fast coarse watcher (FLP/network) in parallel.
+      //  • Coarse (enableHighAccuracy:false) — always gives the *current* network
+      //    position (WiFi + cell towers). Never stale. Shown immediately.
+      //  • Fine (enableHighAccuracy:true)  — GPS hardware. Accepted only when the
+      //    fix is within 2 km of the coarse position, ruling out stale fixes.
+      //    Once validated, fine positions are preferred (better accuracy).
+
+      // Stage 1 — network/FLP position (fast, always current)
+      coarseWatchRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          coarsePosRef.current = [lon, lat];
+          // Show the coarse position immediately while waiting for validated GPS
+          if (!hasFineFixRef.current) {
+            handleGpsPos(pos);
+          }
+        },
         (err) => {
-          console.warn("[GPS]", err.message, err.code);
+          console.warn("[GPS coarse]", err.message, err.code);
+          // Non-fatal — fine watcher may still succeed
+        },
+        { enableHighAccuracy: false, maximumAge: 0, timeout: 15_000 },
+      );
+
+      // Stage 2 — high-accuracy GPS hardware (slow, first fix may be stale)
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude: lat, longitude: lon } = pos.coords;
+
+          // Validate against coarse position before accepting
+          if (coarsePosRef.current) {
+            const dist = haversineM(lat, lon, coarsePosRef.current[1], coarsePosRef.current[0]);
+            if (dist > 2000) {
+              // > 2 km from current network position — almost certainly a stale
+              // GPS fix from a previous session. Discard it.
+              console.warn(`[GPS fine] Rejected stale fix — ${Math.round(dist)} m from network position`);
+              return;
+            }
+          }
+          // Fix validated (or no coarse fix yet after a long wait) — accept it
+          hasFineFixRef.current = true;
+          handleGpsPos(pos);
+        },
+        (err) => {
+          console.warn("[GPS fine]", err.message, err.code);
           setGpsAcquiring(false);
           const ui = UI_STRINGS[locale] ?? UI_STRINGS.en;
           if (err.code === 1) {
@@ -821,6 +871,10 @@ export default function MapView({
       if (gpsWatchRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchRef.current);
         gpsWatchRef.current = null;
+      }
+      if (coarseWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(coarseWatchRef.current);
+        coarseWatchRef.current = null;
       }
     };
   }, []);
