@@ -50,17 +50,75 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/** Convert minutes → ISO 8601 duration (e.g. 220 → "PT3H40M") */
+function toIsoDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `PT${h > 0 ? `${h}H` : ""}${m > 0 ? `${m}M` : ""}`;
+}
+
 export default async function RouteDetailPage({ params }: Props) {
   const { slug } = await params;
   const routeId = parseInt(slug, 10);
   if (isNaN(routeId)) notFound();
 
-  const route = await getCachedRoute(routeId);
-  if (!route) notFound();
+  const data = await getCachedRoute(routeId);
+  if (!data) notFound();
+
+  const name = data.name?.en ?? "Seoul Hiking Route";
+  const mountainName = data.mountain?.name?.en ?? "Seoul";
+  const description =
+    data.description?.en ??
+    `Hike ${name} on ${mountainName} — accessible by Seoul subway.`;
+  const pageUrl = `${SITE_URL}/route/${slug}`;
+  const image = data.heroImages?.[0] ?? data.routePreviewImg;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TouristAttraction",
+        name,
+        description,
+        url: pageUrl,
+        ...(image ? { image } : {}),
+        touristType: "Hikers",
+        isAccessibleForFree: true,
+        ...(data.totalDistanceM
+          ? { distance: `${(data.totalDistanceM / 1000).toFixed(1)} km` }
+          : {}),
+        ...(data.totalDurationMin
+          ? { timeRequired: toIsoDuration(data.totalDurationMin) }
+          : {}),
+        ...(data.mountain?.maxElevationM
+          ? { maximumAttendeeCapacity: data.mountain.maxElevationM } // elevation proxy
+          : {}),
+        containedInPlace: {
+          "@type": "LandmarksOrHistoricalBuildings",
+          name: mountainName,
+          address: { "@type": "PostalAddress", addressLocality: "Seoul", addressCountry: "KR" },
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "Routes", item: `${SITE_URL}/route` },
+          { "@type": "ListItem", position: 3, name, item: pageUrl },
+        ],
+      },
+    ],
+  };
 
   return (
-    <Suspense fallback={null}>
-      <TrailDataLoader routeId={routeId} />
-    </Suspense>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <Suspense fallback={null}>
+        <TrailDataLoader routeId={routeId} />
+      </Suspense>
+    </>
   );
 }
