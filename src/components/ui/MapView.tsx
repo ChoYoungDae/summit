@@ -804,17 +804,25 @@ export default function MapView({
         (pos) => {
           const { latitude: lat, longitude: lon } = pos.coords;
 
-          // Validate against coarse position before accepting
-          if (coarsePosRef.current) {
-            const dist = haversineM(lat, lon, coarsePosRef.current[1], coarsePosRef.current[0]);
-            if (dist > 2000) {
-              // > 2 km from current network position — almost certainly a stale
-              // GPS fix from a previous session. Discard it.
-              console.warn(`[GPS fine] Rejected stale fix — ${Math.round(dist)} m from network position`);
-              return;
-            }
+          // CRITICAL: wait for coarse position before accepting any GPS fix.
+          // On Samsung Galaxy, the GPS chip immediately returns a *cached* fix
+          // from a previous session. If coarse hasn't arrived yet we have no
+          // reference to compare against, so we discard the fix entirely.
+          // The coarse watcher fires within ~1 s via WiFi/cell — we'd rather
+          // show nothing briefly than show a wrong location.
+          if (!coarsePosRef.current) {
+            console.warn("[GPS fine] Discarded — waiting for coarse fix");
+            return;
           }
-          // Fix validated (or no coarse fix yet after a long wait) — accept it
+
+          // Validate: reject if > 2 km from current network position.
+          const dist = haversineM(lat, lon, coarsePosRef.current[1], coarsePosRef.current[0]);
+          if (dist > 2000) {
+            console.warn(`[GPS fine] Rejected stale fix — ${Math.round(dist)} m from network position`);
+            return;
+          }
+
+          // Fix validated — prefer GPS precision over coarse network position
           hasFineFixRef.current = true;
           handleGpsPos(pos);
         },
