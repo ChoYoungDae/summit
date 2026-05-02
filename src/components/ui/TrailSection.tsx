@@ -121,7 +121,6 @@ export default function TrailSection({
   const [visibleTrackRange, setVisibleTrackRange] = useState<{ startIdx: number; endIdx: number } | null>(null);
   const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
-  const [showOffRoutePrompt,    setShowOffRoutePrompt]    = useState(false);
   // Header collapsed state — auto-collapses when bottom sheet expands to "mid"
   const [isHeaderCollapsed,     setIsHeaderCollapsed]     = useState(false);
 
@@ -324,20 +323,6 @@ export default function TrailSection({
   function startHiking() {
     setIsHiking(true);
     setShowFarConfirm(false);
-    setShowOffRoutePrompt(false);
-  }
-
-  function checkDistAndPrompt(lat: number, lon: number) {
-    const trailhead = track[0]!;
-    const dist = getDistance(
-      { latitude: lat, longitude: lon },
-      { latitude: trailhead[1], longitude: trailhead[0] },
-    );
-    if (dist > TRAILHEAD_ACTIVE_M) {
-      setShowFarConfirm(true);
-    } else {
-      setShowOffRoutePrompt(true);
-    }
   }
 
   function handleToggleHiking() {
@@ -345,13 +330,19 @@ export default function TrailSection({
       setIsHiking(false);
       return;
     }
-    // MapView's GPS watch already has a fix — use it for distance check.
-    if (mapGpsFix) {
-      checkDistAndPrompt(mapGpsFix.lat, mapGpsFix.lon);
-      return;
+    // If GPS fix is available, check distance to trailhead.
+    // If far → show confirmation popup. If near (or no fix) → start immediately.
+    if (mapGpsFix && track.length > 0) {
+      const trailhead = track[0]!;
+      const dist = getDistance(
+        { latitude: mapGpsFix.lat, longitude: mapGpsFix.lon },
+        { latitude: trailhead[1], longitude: trailhead[0] },
+      );
+      if (dist > TRAILHEAD_ACTIVE_M) {
+        setShowFarConfirm(true);
+        return;
+      }
     }
-    // No GPS fix yet — start immediately without distance check.
-    // The map will center on the user once the first fix arrives.
     startHiking();
   }
 
@@ -537,11 +528,8 @@ export default function TrailSection({
             visibleTrackRange={visibleTrackRange}
             onSheetHeightChange={setSheetHeightPx}
             onSnapChange={(snap) => setIsHeaderCollapsed(snap === "mid")}
-            showOffRoutePrompt={showOffRoutePrompt}
             offRouteEnabled={offRouteEnabled}
             onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
-            onConfirmStart={startHiking}
-            onCancelPrompt={() => setShowOffRoutePrompt(false)}
           />
 
           {/* ── Photo description popup (Unified for Photos & Waypoints) ── */}
