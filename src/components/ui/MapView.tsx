@@ -374,22 +374,6 @@ function GpsArrow({
   const color = isOffRoute ? COLOR_GPS_OFF : COLOR_GPS;
   return (
     <div className="relative flex items-center justify-center" style={{ width: 44, height: 44 }}>
-      {/* Concentric ripple rings — 3 rings with staggered delays */}
-      {[0, 1.05, 2.1].map((delay) => (
-        <div
-          key={delay}
-          className="absolute rounded-full"
-          style={{
-            width: 20,
-            height: 20,
-            background: color,
-            opacity: 0,
-            animation: `gpsRipple 3.15s ease-out ${delay}s infinite`,
-            pointerEvents: "none",
-          }}
-        />
-      ))}
-
       {/* Solid center dot with white border */}
       <div
         className="absolute rounded-full"
