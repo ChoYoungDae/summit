@@ -537,6 +537,8 @@ export default function MapView({
   // GPS state — React owns position, no manual DOM marker manipulation
   const [gpsPos,       setGpsPos]       = useState<[number, number] | null>(null);
   const [gpsAccuracy,  setGpsAccuracy]  = useState<number | null>(null);
+  // Tracks the best accuracy seen so far — used to prefer sharper fixes
+  const bestAccuracyRef = useRef<number>(Infinity);
   const [gpsHeading,   setGpsHeading]   = useState(0);
   const [isOffRoute,   setIsOffRoute]   = useState(false);
   const [isMapLoaded,       setIsMapLoaded]       = useState(false);
@@ -555,6 +557,7 @@ export default function MapView({
   const offRouteEnabledRef      = useRef(offRouteEnabled);
   const offRouteThresholdRef    = useRef(offRouteThresholdM);
   const gpsWatchRef             = useRef<number | null>(null);
+  const gpsCoarseWatchRef       = useRef<number | null>(null);
   const trackRef                = useRef(track); // stable reference for interval closure
   const gpsPosRef               = useRef<[number, number] | null>(null);
   const hasCenteredOnStartRef   = useRef(false);
@@ -709,9 +712,16 @@ export default function MapView({
   // ── GPS watch ────────────────────────────────────────────────────────────────
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
-    // No accuracy threshold for display — show any fix with an accuracy circle.
-    // Off-route alerts are gated separately via gpsAccuracyM in useOffRouteAlert.
-    if (!hasFirstFixRef.current) {
+
+    // Two-stage accuracy filter:
+    // Accept any first fix (shows dot quickly). After that, only accept a fix if
+    // it improves on the best accuracy seen — prevents a coarse network fix from
+    // overwriting a sharp GPS fix once GPS has locked in.
+    const isFirstFix = !hasFirstFixRef.current;
+    if (!isFirstFix && accuracy > bestAccuracyRef.current * 1.2) return;
+    bestAccuracyRef.current = Math.min(bestAccuracyRef.current, accuracy);
+
+    if (isFirstFix) {
       hasFirstFixRef.current = true;
       setGpsAcquiring(false);
     }
@@ -764,6 +774,21 @@ export default function MapView({
 
     if ("geolocation" in navigator) {
       setGpsAcquiring(true);
+
+      // ── Stage 1: coarse watch (WiFi / cell-tower) ──────────────────────────
+      // enableHighAccuracy: false → OS uses WiFi positioning, fires in < 1 s.
+      // This gets a dot on the map quickly and is often MORE accurate indoors
+      // than forcing GPS hardware (which can't see satellites through ceilings).
+      // maximumAge: 0 → never return a stale OS-cached position.
+      gpsCoarseWatchRef.current = navigator.geolocation.watchPosition(
+        handleGpsPos,
+        () => { /* silent — stage 2 will handle permission errors */ },
+        { enableHighAccuracy: false, maximumAge: 0, timeout: 8_000 },
+      );
+
+      // ── Stage 2: high-accuracy watch (GPS hardware) ────────────────────────
+      // Fires once GPS has locked (seconds outdoors, may not fire indoors).
+      // handleGpsPos filters: only upgrades position when accuracy improves.
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         handleGpsPos,
         (err) => {
@@ -778,7 +803,7 @@ export default function MapView({
             setGpsError("GPS unavailable — check location settings");
           }
         },
-        { enableHighAccuracy: true, maximumAge: 3_000, timeout: 30_000 },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 },
       );
     }
   // bottomPadding is intentionally excluded — only matters at load time
@@ -823,9 +848,13 @@ export default function MapView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gpsPos, isMapLoaded]);
 
-  // Cleanup GPS watch on unmount
+  // Cleanup GPS watches on unmount
   useEffect(() => {
     return () => {
+      if (gpsCoarseWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsCoarseWatchRef.current);
+        gpsCoarseWatchRef.current = null;
+      }
       if (gpsWatchRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchRef.current);
         gpsWatchRef.current = null;
