@@ -18,16 +18,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getCachedRoute(routeId);
   if (!data) return {};
 
-  const { route, mountain } = data;
-  const name = route.name?.en ?? "Seoul Hiking Route";
-  const mountainName = mountain?.name?.en ?? "Seoul";
+  const name = data.name?.en ?? "Seoul Hiking Route";
+  const mountainName = data.mountain?.name?.en ?? "Seoul";
   const description =
-    route.description?.en ??
+    data.description?.en ??
     `Hike ${name} on ${mountainName} — accessible by Seoul subway. Trail details, map, and elevation profile.`;
 
-  const distKm = route.totalDistanceM ? (route.totalDistanceM / 1000).toFixed(1) : null;
+  const distKm = data.totalDistanceM ? (data.totalDistanceM / 1000).toFixed(1) : null;
   const title = `${name} · ${mountainName} | Seoul Subway to Summit`;
-  const ogImage = route.heroImages?.[0] ?? route.routePreviewImg ?? undefined;
+  const ogImage = data.heroImages?.[0] ?? data.routePreviewImg ?? undefined;
 
   return {
     title,
