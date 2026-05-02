@@ -9,7 +9,6 @@
  */
 
 const TILE_CACHE = "s3-tiles-v1";
-const STATIC_CACHE = "s3-static-v2"; // bump this on every deploy to bust stale JS
 const MAX_TILES = 500;
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -20,23 +19,16 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
-  // Keep map tile cache (expensive to re-download) but delete ALL static/page
-  // caches — Next.js chunk filenames are content-hashed so re-fetching is fast,
-  // and this guarantees users always get the latest JS after a deploy.
+  // Delete ALL caches (including old static caches from previous SW versions).
+  // Map tiles are also cleared — they'll be re-cached on next map use.
+  // Next.js chunks are content-hashed so the CDN serves them fast without SW cache.
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((k) => k !== TILE_CACHE)
-            .map((k) => caches.delete(k)),
-        ),
-      )
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(() => {
         // Tell all open tabs to reload so they pick up the new JS immediately.
-        // Without this, tabs opened before the SW update keep running old code.
         self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
           clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }));
         });
@@ -69,16 +61,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── Next.js immutable static assets ───────────────────────────────────────
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(cacheFirst(request, STATIC_CACHE, Infinity));
-    return;
-  }
-
-  // ── App page navigations ───────────────────────────────────────────────────
-  if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request, STATIC_CACHE));
-    return;
+  // ── Next.js static assets & page navigations → pass through ──────────────
+  // Next.js chunk filenames are content-hashed — the CDN handles caching.
+  // SW caching these would lock users on stale JS after deploys.
+  if (url.pathname.startsWith("/_next/") || request.mode === "navigate") {
+    return; // fall through to network
   }
 
   // All other requests (Supabase, API routes, etc.) fall through unmodified
@@ -104,23 +91,6 @@ async function cacheFirst(request, cacheName, maxEntries) {
       status: 503,
       statusText: "Service Unavailable",
     });
-  }
-}
-
-async function networkFirst(request, cacheName) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    const cached = await caches.match(request);
-    return (
-      cached ??
-      new Response("Offline", { status: 503, statusText: "Service Unavailable" })
-    );
   }
 }
 
