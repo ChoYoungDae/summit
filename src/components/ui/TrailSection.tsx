@@ -113,7 +113,7 @@ export default function TrailSection({
   const [chartHighlightIndex,   setChartHighlightIndex]   = useState<number | null>(null);
   const [selectedWaypointIndex, setSelectedWaypointIndex] = useState<number | null>(null);
   const [isHiking,              setIsHiking]              = useState(false);
-  const [isLocating,            setIsLocating]            = useState(false);
+  const [isLocating] = useState(false); // kept for HikingBottomSheet prop type
   // Single GPS fix forwarded from MapView's watchPosition — shared with useHikingGPS
   // so no second GPS watcher is needed.
   const [mapGpsFix,             setMapGpsFix]             = useState<ExternalGPSFix | null>(null);
@@ -345,30 +345,14 @@ export default function TrailSection({
       setIsHiking(false);
       return;
     }
-    if (isLocating) return;
-    if (track.length === 0) {
-      startHiking();
-      return;
-    }
-    // MapView's GPS watch already has a fix — use it instantly, no extra GPS call.
+    // MapView's GPS watch already has a fix — use it for distance check.
     if (mapGpsFix) {
       checkDistAndPrompt(mapGpsFix.lat, mapGpsFix.lon);
       return;
     }
-    // No fix yet — fall back to a one-shot getCurrentPosition.
-    if (!navigator.geolocation) {
-      startHiking();
-      return;
-    }
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        checkDistAndPrompt(pos.coords.latitude, pos.coords.longitude);
-      },
-      () => { setIsLocating(false); startHiking(); },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
-    );
+    // No GPS fix yet — start immediately without distance check.
+    // The map will center on the user once the first fix arrives.
+    startHiking();
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
