@@ -8,9 +8,8 @@
  *  • Everything else (Supabase API, analytics) → pass-through (no caching)
  */
 
-const VER = "v1";
-const TILE_CACHE = `s3-tiles-${VER}`;
-const STATIC_CACHE = `s3-static-${VER}`;
+const TILE_CACHE = "s3-tiles-v1";
+const STATIC_CACHE = "s3-static-v2"; // bump this on every deploy to bust stale JS
 const MAX_TILES = 500;
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -21,13 +20,16 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
+  // Keep map tile cache (expensive to re-download) but delete ALL static/page
+  // caches — Next.js chunk filenames are content-hashed so re-fetching is fast,
+  // and this guarantees users always get the latest JS after a deploy.
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k !== TILE_CACHE && k !== STATIC_CACHE)
+            .filter((k) => k !== TILE_CACHE)
             .map((k) => caches.delete(k)),
         ),
       )
