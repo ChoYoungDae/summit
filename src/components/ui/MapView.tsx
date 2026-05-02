@@ -539,7 +539,6 @@ export default function MapView({
   const offRouteEnabledRef      = useRef(offRouteEnabled);
   const offRouteThresholdRef    = useRef(offRouteThresholdM);
   const gpsWatchRef             = useRef<number | null>(null);
-  const gpsCoarseWatchRef       = useRef<number | null>(null);
 
   const trackRef                = useRef(track); // stable reference for interval closure
   const gpsPosRef               = useRef<[number, number] | null>(null);
@@ -753,20 +752,10 @@ export default function MapView({
     if ("geolocation" in navigator) {
       setGpsAcquiring(true);
 
-      // ── Stage 1: coarse watch (WiFi / cell-tower) ──────────────────────────
-      // enableHighAccuracy: false → OS uses WiFi positioning, fires in < 1 s.
-      // This gets a dot on the map quickly and is often MORE accurate indoors
-      // than forcing GPS hardware (which can't see satellites through ceilings).
-      // maximumAge: 0 → never return a stale OS-cached position.
-      gpsCoarseWatchRef.current = navigator.geolocation.watchPosition(
-        handleGpsPos,
-        () => { /* silent — stage 2 will handle permission errors */ },
-        { enableHighAccuracy: false, maximumAge: 0, timeout: 8_000 },
-      );
-
-      // ── Stage 2: high-accuracy watch (GPS hardware) ────────────────────────
-      // Fires once GPS has locked (seconds outdoors, may not fire indoors).
-      // handleGpsPos filters: only upgrades position when accuracy improves.
+      // Single high-accuracy watch — GPS hardware only.
+      // WiFi/cell-tower positioning (enableHighAccuracy:false) is fast but
+      // often returns wrong locations from stale database entries, so we skip
+      // the coarse stage entirely and wait for a real GPS fix.
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         handleGpsPos,
         (err) => {
@@ -781,7 +770,7 @@ export default function MapView({
             setGpsError("GPS unavailable — check location settings");
           }
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 60_000 },
       );
     }
   // bottomPadding is intentionally excluded — only matters at load time
@@ -829,10 +818,6 @@ export default function MapView({
   // Cleanup GPS watches on unmount
   useEffect(() => {
     return () => {
-      if (gpsCoarseWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(gpsCoarseWatchRef.current);
-        gpsCoarseWatchRef.current = null;
-      }
       if (gpsWatchRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchRef.current);
         gpsWatchRef.current = null;
