@@ -1335,14 +1335,12 @@ export default function MapView({
       {/* GPS accuracy chip — shows ±Nm once position is known */}
       {gpsPos && gpsAccuracy !== null && (
         <div
-          className="absolute top-2 left-1/2 -translate-x-1/2 z-10
-                     flex items-center gap-1 px-2 py-0.5
-                     rounded-full text-[11px] font-semibold font-num
-                     pointer-events-none"
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-20
+                     flex items-center gap-1 px-2.5 py-1
+                     rounded-full text-white text-[11px] font-semibold font-num
+                     pointer-events-none shadow-md"
           style={{
-            background: "rgba(17,17,22,0.55)",
-            color: gpsAccuracy <= 20 ? "#4ade80" : gpsAccuracy <= 60 ? "#fbbf24" : "#f87171",
-            backdropFilter: "blur(4px)",
+            background: gpsAccuracy <= 20 ? "#16a34a" : gpsAccuracy <= 60 ? "#d97706" : "#dc2626",
           }}
         >
           <LocateFixed size={11} strokeWidth={2.5} />
