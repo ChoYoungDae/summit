@@ -529,10 +529,11 @@ export default function MapView({
   const [gpsApproxOnly,     setGpsApproxOnly]     = useState(false); // Android "approximate location" detected
 
   // Map / compass state
-  const [isTracking, setIsTracking] = useState(false);
-  const [mapBearing, setMapBearing] = useState(0);
-  const [mapError,   setMapError]   = useState<string | null>(null);
-  const [gpsError,   setGpsError]   = useState<string | null>(null);
+  const [isTracking,       setIsTracking]       = useState(false);
+  const [mapBearing,       setMapBearing]       = useState(0);
+  const [mapError,         setMapError]         = useState<string | null>(null);
+  const [gpsError,         setGpsError]         = useState<string | null>(null);
+  const [accuracyTipOpen,  setAccuracyTipOpen]  = useState(false);
 
   // Refs for stable interval/closure access
   const isTrackingRef           = useRef(false);
@@ -1323,43 +1324,56 @@ export default function MapView({
         </div>
       )}
 
-      {/* GPS accuracy chip — bottom-left, same row as the compass button */}
+      {/* GPS accuracy chip + tooltip — bottom-left, same row as compass */}
       {gpsPos && gpsAccuracy !== null && (
         <div
-          className="absolute left-3 z-10
-                     flex items-center gap-1 px-2.5 py-1
-                     rounded-full text-white text-[11px] font-semibold font-num
-                     pointer-events-none shadow-md"
-          style={{
-            bottom: controlsBottomOffset + 8,
-            transition: controlsTransition,
-            background: gpsAccuracy <= 20 ? "#16a34a" : gpsAccuracy <= 60 ? "#d97706" : "#dc2626",
-          }}
+          className="absolute left-3 z-10 flex flex-col items-start"
+          style={{ bottom: controlsBottomOffset + 8, transition: controlsTransition }}
         >
-          <LocateFixed size={11} strokeWidth={2.5} />
-          <span>±{Math.round(gpsAccuracy)}m</span>
-        </div>
-      )}
+          {/* Tooltip — shown when chip is tapped */}
+          {accuracyTipOpen && (
+            <div
+              className="mb-2 rounded-xl text-white text-[12px] shadow-lg"
+              style={{
+                background: "rgba(17,17,22,0.92)",
+                backdropFilter: "blur(8px)",
+                width: 220,
+                padding: "10px 12px",
+              }}
+            >
+              <p className="font-semibold mb-1.5">GPS Accuracy</p>
+              {gpsApproxOnly ? (
+                <>
+                  <p className="opacity-75 mb-2 text-[11px]">Precise location is not enabled.</p>
+                  <ol className="flex flex-col gap-1 text-[11px] font-medium" style={{ paddingLeft: "1.1rem", listStyleType: "decimal" }}>
+                    <li>Tap the <strong>site settings icon</strong> before the URL in Chrome</li>
+                    <li><strong>Site settings → Location → Reset</strong></li>
+                    <li>Allow again → choose <strong>Precise</strong></li>
+                  </ol>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1 text-[11px] opacity-80">
+                  <span>🟢 &lt;20m · GPS chip active</span>
+                  <span>🟡 &lt;60m · WiFi + GPS mix</span>
+                  <span>🔴 ≥60m · WiFi / cell only</span>
+                </div>
+              )}
+            </div>
+          )}
 
-      {/* Approximate-only location warning — guides user to enable precise location */}
-      {gpsApproxOnly && !gpsError && (
-        <div
-          role="alert"
-          className="absolute left-3 right-3 z-10 px-3 py-2
-                     rounded-xl text-white text-[12px] font-semibold
-                     flex items-start gap-2"
-          style={{
-            bottom: controlsBottomOffset + 52,
-            transition: controlsTransition,
-            background: "rgba(17,17,22,0.88)",
-            backdropFilter: "blur(6px)",
-          }}
-        >
-          <LocateFixed size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
-          <span>
-            GPS accuracy is low.{" "}
-            <span className="opacity-75">Tap the 🔒 in Chrome's address bar → Site settings → Location → reset and allow precise location.</span>
-          </span>
+          {/* Chip — tappable */}
+          <button
+            onClick={() => setAccuracyTipOpen((v) => !v)}
+            aria-label="GPS accuracy info"
+            className="flex items-center gap-1 px-2.5 py-1
+                       rounded-full text-white text-[11px] font-semibold font-num shadow-md"
+            style={{
+              background: gpsAccuracy <= 20 ? "#16a34a" : gpsAccuracy <= 60 ? "#d97706" : "#dc2626",
+            }}
+          >
+            <LocateFixed size={11} strokeWidth={2.5} />
+            <span>±{Math.round(gpsAccuracy)}m</span>
+          </button>
         </div>
       )}
 
