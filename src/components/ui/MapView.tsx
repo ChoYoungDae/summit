@@ -539,12 +539,6 @@ export default function MapView({
   const offRouteEnabledRef      = useRef(offRouteEnabled);
   const offRouteThresholdRef    = useRef(offRouteThresholdM);
   const gpsWatchRef             = useRef<number | null>(null);
-  /** Coarse (network/FLP) watcher — gives current location fast */
-  const coarseWatchRef          = useRef<number | null>(null);
-  /** Last position from the coarse (network) watcher — used to validate GPS fixes */
-  const coarsePosRef            = useRef<[number, number] | null>(null);
-  /** True once a GPS fix has passed the coarse-proximity check */
-  const hasFineFixRef           = useRef(false);
 
   const trackRef                = useRef(track); // stable reference for interval closure
   const gpsPosRef               = useRef<[number, number] | null>(null);
@@ -835,10 +829,6 @@ export default function MapView({
       if (gpsWatchRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchRef.current);
         gpsWatchRef.current = null;
-      }
-      if (coarseWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(coarseWatchRef.current);
-        coarseWatchRef.current = null;
       }
     };
   }, []);
