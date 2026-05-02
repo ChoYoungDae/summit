@@ -110,16 +110,7 @@ export default function HikingBottomSheet({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHiking]);
 
-  // Auto-expand to mid when a trail point is selected (pre-hike only)
-  useEffect(() => {
-    if (!isHiking && highlightIndex != null) {
-      const vh = window.innerHeight;
-      setSnap("mid");
-      onSheetHeightChange?.(snapVisibleH("mid", vh));
-      onSnapChange?.("mid");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightIndex]);
+  // Sheet only moves via user tap on the handle — no auto-expand.
 
   function handleHandleTap() {
     const vh = window.innerHeight;
