@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     locale: "en_US",
   },
   robots: { index: true, follow: true },
+  verification: { google: "aIG69MSVW9CyElUlT2otZqJY3CE0YY__ouwhMqbyWWE" },
 };
 
 export const viewport: Viewport = {
