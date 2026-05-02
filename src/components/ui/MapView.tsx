@@ -10,7 +10,7 @@ import Map, {
 import type { MapRef } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Waypoint, RoutePhoto } from "@/types/trail";
-import { Footprints, GitFork, Camera, Flag, TrainFront, Bus } from "lucide-react";
+import { Footprints, GitFork, Camera, Flag, TrainFront, Bus, LocateFixed } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { tDB } from "@/lib/i18n";
 
@@ -711,8 +711,16 @@ export default function MapView({
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
 
-    // maximumAge:0 on the watcher prevents the OS from returning stale cache.
-    // No client-side filtering — every fix from the watcher is accepted.
+    // Samsung Galaxy (and some Android devices) return a stale GPS-chip cached
+    // fix immediately when watchPosition starts, even with maximumAge:0.  The
+    // OS attaches the original acquisition timestamp, so we can detect it:
+    // if the fix is older than 10 s it is almost certainly a cached position
+    // from a previous session — reject it and wait for a live fix.
+    const fixAgeMs = Date.now() - pos.timestamp;
+    if (fixAgeMs > 10_000) {
+      console.warn(`[GPS] stale fix rejected — age ${Math.round(fixAgeMs / 1000)}s, acc ${Math.round(accuracy)}m`);
+      return;
+    }
 
     if (!hasFirstFixRef.current) {
       hasFirstFixRef.current = true;
@@ -768,9 +776,11 @@ export default function MapView({
     if ("geolocation" in navigator) {
       setGpsAcquiring(true);
 
-      // Single watcher — let the browser/OS decide the best source.
-      // enableHighAccuracy:false uses FLP (WiFi+cell) which is fast, always
-      // current, and avoids the stale GPS-chip-cache problem on Samsung Galaxy.
+      // enableHighAccuracy:true → GPS chip (<20 m).  The timestamp filter above
+      // catches Samsung's stale-cache fix that arrives before the chip has a lock.
+      // maximumAge:0 prevents the OS from serving a cached position from a previous
+      // session (honoured by most browsers; Samsung sometimes ignores it —
+      // the timestamp guard handles that case).
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         handleGpsPos,
         (err) => {
@@ -785,7 +795,7 @@ export default function MapView({
             setGpsError("GPS unavailable — check location settings");
           }
         },
-        { enableHighAccuracy: false, maximumAge: 0, timeout: 30_000 },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 },
       );
     }
   // bottomPadding is intentionally excluded — only matters at load time
@@ -1286,12 +1296,12 @@ export default function MapView({
             <Layer
               id="gps-accuracy-fill"
               type="fill"
-              paint={{ "fill-color": "#2E5E4A", "fill-opacity": 0.12 }}
+              paint={{ "fill-color": "#2E5E4A", "fill-opacity": 0.18 }}
             />
             <Layer
               id="gps-accuracy-stroke"
               type="line"
-              paint={{ "line-color": "#2E5E4A", "line-width": 1, "line-opacity": 0.35 }}
+              paint={{ "line-color": "#2E5E4A", "line-width": 1.5, "line-opacity": 0.55 }}
             />
           </Source>
         )}
@@ -1317,7 +1327,26 @@ export default function MapView({
             backdropFilter: "blur(4px)",
           }}
         >
-          📍 Locating…
+          <LocateFixed size={12} strokeWidth={2.5} />
+          Locating…
+        </div>
+      )}
+
+      {/* GPS accuracy chip — shows ±Nm once position is known */}
+      {gpsPos && gpsAccuracy !== null && (
+        <div
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-10
+                     flex items-center gap-1 px-2 py-0.5
+                     rounded-full text-[11px] font-semibold font-num
+                     pointer-events-none"
+          style={{
+            background: "rgba(17,17,22,0.55)",
+            color: gpsAccuracy <= 20 ? "#4ade80" : gpsAccuracy <= 60 ? "#fbbf24" : "#f87171",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <LocateFixed size={11} strokeWidth={2.5} />
+          <span>±{Math.round(gpsAccuracy)}m</span>
         </div>
       )}
 
