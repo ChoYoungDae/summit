@@ -589,7 +589,17 @@ export default function MapView({
       }
       return;
     }
-    // Centering handled by bottomPadding effect to avoid animation conflict
+    // Hiking just started — if GPS position is already known, center immediately.
+    // Don't wait for bottomPadding or gpsPos to change (they may already be stable).
+    if (isMapLoaded && mapRef.current && gpsPosRef.current && !hasCenteredOnStartRef.current) {
+      hasCenteredOnStartRef.current = true;
+      mapRef.current.easeTo({
+        center: gpsPosRef.current,
+        zoom: 16,
+        padding: { top: 0, left: 0, right: 0, bottom: bottomPaddingRef.current },
+        duration: 700,
+      });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHiking, isMapLoaded]);
 
