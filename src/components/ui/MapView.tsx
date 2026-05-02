@@ -768,66 +768,13 @@ export default function MapView({
     if ("geolocation" in navigator) {
       setGpsAcquiring(true);
 
-      // ── Two-stage GPS strategy ────────────────────────────────────────────────
-      //
-      // PROBLEM: On Android, watchPosition(enableHighAccuracy:true) may return
-      // the GPS chip's *cached last fix* as the very first result. That cached
-      // fix can be from a completely different location (e.g. yesterday's hike)
-      // yet have good accuracy (10–15 m), so it looks correct but is wrong.
-      //
-      // SOLUTION: Run a fast coarse watcher (FLP/network) in parallel.
-      //  • Coarse (enableHighAccuracy:false) — always gives the *current* network
-      //    position (WiFi + cell towers). Never stale. Shown immediately.
-      //  • Fine (enableHighAccuracy:true)  — GPS hardware. Accepted only when the
-      //    fix is within 2 km of the coarse position, ruling out stale fixes.
-      //    Once validated, fine positions are preferred (better accuracy).
-
-      // Stage 1 — network/FLP position (fast, always current)
-      coarseWatchRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude: lat, longitude: lon } = pos.coords;
-          coarsePosRef.current = [lon, lat];
-          // Show the coarse position immediately while waiting for validated GPS
-          if (!hasFineFixRef.current) {
-            handleGpsPos(pos);
-          }
-        },
-        (err) => {
-          console.warn("[GPS coarse]", err.message, err.code);
-          // Non-fatal — fine watcher may still succeed
-        },
-        { enableHighAccuracy: false, maximumAge: 0, timeout: 15_000 },
-      );
-
-      // Stage 2 — high-accuracy GPS hardware (slow, first fix may be stale)
+      // Single watcher — let the browser/OS decide the best source.
+      // enableHighAccuracy:false uses FLP (WiFi+cell) which is fast, always
+      // current, and avoids the stale GPS-chip-cache problem on Samsung Galaxy.
       gpsWatchRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude: lat, longitude: lon } = pos.coords;
-
-          // CRITICAL: wait for coarse position before accepting any GPS fix.
-          // On Samsung Galaxy, the GPS chip immediately returns a *cached* fix
-          // from a previous session. If coarse hasn't arrived yet we have no
-          // reference to compare against, so we discard the fix entirely.
-          // The coarse watcher fires within ~1 s via WiFi/cell — we'd rather
-          // show nothing briefly than show a wrong location.
-          if (!coarsePosRef.current) {
-            console.warn("[GPS fine] Discarded — waiting for coarse fix");
-            return;
-          }
-
-          // Validate: reject if > 2 km from current network position.
-          const dist = haversineM(lat, lon, coarsePosRef.current[1], coarsePosRef.current[0]);
-          if (dist > 2000) {
-            console.warn(`[GPS fine] Rejected stale fix — ${Math.round(dist)} m from network position`);
-            return;
-          }
-
-          // Fix validated — prefer GPS precision over coarse network position
-          hasFineFixRef.current = true;
-          handleGpsPos(pos);
-        },
+        handleGpsPos,
         (err) => {
-          console.warn("[GPS fine]", err.message, err.code);
+          console.warn("[GPS]", err.message, err.code);
           setGpsAcquiring(false);
           const ui = UI_STRINGS[locale] ?? UI_STRINGS.en;
           if (err.code === 1) {
@@ -838,7 +785,7 @@ export default function MapView({
             setGpsError("GPS unavailable — check location settings");
           }
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 60_000 },
+        { enableHighAccuracy: false, maximumAge: 0, timeout: 30_000 },
       );
     }
   // bottomPadding is intentionally excluded — only matters at load time
@@ -1370,7 +1317,7 @@ export default function MapView({
             backdropFilter: "blur(4px)",
           }}
         >
-          Acquiring GPS…
+          📍 Locating…
         </div>
       )}
 
