@@ -711,17 +711,6 @@ export default function MapView({
   const handleGpsPos = useCallback((pos: GeolocationPosition) => {
     const { latitude: lat, longitude: lon, heading, speed, accuracy } = pos.coords;
 
-    // Samsung Galaxy (and some Android devices) return a stale GPS-chip cached
-    // fix immediately when watchPosition starts, even with maximumAge:0.  The
-    // OS attaches the original acquisition timestamp, so we can detect it:
-    // if the fix is older than 10 s it is almost certainly a cached position
-    // from a previous session — reject it and wait for a live fix.
-    const fixAgeMs = Date.now() - pos.timestamp;
-    if (fixAgeMs > 10_000) {
-      console.warn(`[GPS] stale fix rejected — age ${Math.round(fixAgeMs / 1000)}s, acc ${Math.round(accuracy)}m`);
-      return;
-    }
-
     if (!hasFirstFixRef.current) {
       hasFirstFixRef.current = true;
       setGpsAcquiring(false);
