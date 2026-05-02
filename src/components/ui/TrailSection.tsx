@@ -327,13 +327,36 @@ export default function TrailSection({
     setShowOffRoutePrompt(false);
   }
 
+  function checkDistAndPrompt(lat: number, lon: number) {
+    const trailhead = track[0]!;
+    const dist = getDistance(
+      { latitude: lat, longitude: lon },
+      { latitude: trailhead[1], longitude: trailhead[0] },
+    );
+    if (dist > TRAILHEAD_ACTIVE_M) {
+      setShowFarConfirm(true);
+    } else {
+      setShowOffRoutePrompt(true);
+    }
+  }
+
   function handleToggleHiking() {
     if (isHiking) {
       setIsHiking(false);
       return;
     }
     if (isLocating) return;
-    if (!navigator.geolocation || track.length === 0) {
+    if (track.length === 0) {
+      startHiking();
+      return;
+    }
+    // MapView's GPS watch already has a fix — use it instantly, no extra GPS call.
+    if (mapGpsFix) {
+      checkDistAndPrompt(mapGpsFix.lat, mapGpsFix.lon);
+      return;
+    }
+    // No fix yet — fall back to a one-shot getCurrentPosition.
+    if (!navigator.geolocation) {
       startHiking();
       return;
     }
@@ -341,16 +364,7 @@ export default function TrailSection({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setIsLocating(false);
-        const trailhead = track[0]!;
-        const dist = getDistance(
-          { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
-          { latitude: trailhead[1], longitude: trailhead[0] },
-        );
-        if (dist > TRAILHEAD_ACTIVE_M) {
-          setShowFarConfirm(true);
-        } else {
-          setShowOffRoutePrompt(true);
-        }
+        checkDistAndPrompt(pos.coords.latitude, pos.coords.longitude);
       },
       () => { setIsLocating(false); startHiking(); },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },

@@ -100,7 +100,15 @@ export default function HikingBottomSheet({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sheet stays at "min" when hiking starts — user opens it manually by tapping the handle.
+  // Snap back to "min" when hiking starts so the map stays unobscured.
+  useEffect(() => {
+    if (isHiking) {
+      setSnap("min");
+      onSheetHeightChange?.(MIN_H);
+      onSnapChange?.("min");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHiking]);
 
   // Auto-expand to mid when a trail point is selected (pre-hike only)
   useEffect(() => {
