@@ -216,10 +216,8 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const { revalidateTag } = await import("next/cache");
-    // @ts-ignore
-    revalidateTag("route-detail");
-    // @ts-ignore
-    revalidateTag("route-list");
+    revalidateTag("route-detail", {});
+    revalidateTag("route-list", {});
   } catch (e) {
     console.error("[segments] Revalidation failed", e);
   }
@@ -237,10 +235,8 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const { revalidateTag } = await import("next/cache");
-    // @ts-ignore
-    revalidateTag("route-detail");
-    // @ts-ignore
-    revalidateTag("route-list");
+    revalidateTag("route-detail", {});
+    revalidateTag("route-list", {});
   } catch (e) {
     console.error("[segments] Revalidation failed", e);
   }
@@ -363,10 +359,8 @@ export async function POST(req: NextRequest) {
 
     try {
       const { revalidateTag } = await import("next/cache");
-      // @ts-ignore
-      revalidateTag("route-detail");
-      // @ts-ignore
-      revalidateTag("route-list");
+      revalidateTag("route-detail", {});
+      revalidateTag("route-list", {});
     } catch (e) {
       console.error("[segments] Revalidation failed", e);
     }

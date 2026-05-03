@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+async function revalidate(...tags: string[]) {
+  try {
+    const { revalidateTag } = await import("next/cache");
+    for (const tag of tags) revalidateTag(tag, {});
+  } catch (e) {
+    console.error("[routes] Revalidation failed", e);
+  }
+}
 
 // GET /api/admin/routes?mountainId=X
 export async function GET(req: NextRequest) {
@@ -54,10 +62,7 @@ export async function POST(req: NextRequest) {
   }).select("id").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  // @ts-ignore
-  revalidateTag("route-list");
-  // @ts-ignore
-  revalidateTag("route-detail");
+  await revalidate("route-list", "route-detail");
   return NextResponse.json({ id: data.id });
 }
 
@@ -95,12 +100,7 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("routes").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  // @ts-ignore
-  revalidateTag("route-list");
-  // @ts-ignore
-  revalidateTag("route-detail");
-  // @ts-ignore
-  revalidateTag(`route-detail-${id}`);
+  await revalidate("route-list", "route-detail", `route-detail-${id}`);
   return NextResponse.json({ ok: true });
 }
 
@@ -111,11 +111,6 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("routes").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  // @ts-ignore
-  revalidateTag("route-list");
-  // @ts-ignore
-  revalidateTag("route-detail");
-  // @ts-ignore
-  revalidateTag(`route-detail-${id}`);
+  await revalidate("route-list", "route-detail", `route-detail-${id}`);
   return NextResponse.json({ ok: true });
 }

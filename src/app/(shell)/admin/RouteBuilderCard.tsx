@@ -64,7 +64,7 @@ const SEG_TYPE_COLORS: Record<string, string> = {
   APPROACH: "bg-blue-100 text-blue-700",
   ASCENT:   "bg-green-100 text-green-700",
   DESCENT:  "bg-orange-100 text-orange-700",
-  RETURN:   "bg-gray-100 text-gray-600",
+  RETURN:   "bg-purple-100 text-purple-700",
 };
 
 function Alert({ type, message }: { type: "success" | "error" | "loading"; message: string }) {
