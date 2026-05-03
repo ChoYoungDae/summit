@@ -555,8 +555,8 @@ export async function POST(req: NextRequest) {
     // ── Step 7: Revalidate cache ──────────────────────────────────────────────
     try {
       const { revalidatePath, revalidateTag: rvTag } = await import("next/cache");
-      rvTag("route-list");
-      rvTag("route-detail");
+      rvTag("route-list", {});
+      rvTag("route-detail", {});
       revalidatePath("/route");
     } catch (e) {
       console.error("Revalidation failed:", e);
