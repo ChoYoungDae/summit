@@ -23,8 +23,12 @@ export type WaypointType =
   | "STATION"
   | "TRAILHEAD"
   | "SUMMIT"
+  | "PEAK"
   | "JUNCTION"
   | "SHELTER"
+  | "VIEW"
+  | "LANDMARK"
+  | "CAUTION"
   | "BUS_STOP";
 
 /** Turn direction used at JUNCTION waypoints. */
@@ -131,6 +135,8 @@ export interface RoutePhoto {
   description?: Record<string, string> | null;
   orderIndex: number;
   createdAt?: string;
+  /** WaypointType tag manually assigned in admin — shown as chip in photo viewer */
+  waypointType?: WaypointType | null;
 }
 
 // ── Station info (for FloatingTrailHeader subway chip) ───────────────────────

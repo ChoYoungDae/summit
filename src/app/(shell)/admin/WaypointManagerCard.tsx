@@ -17,7 +17,7 @@ const BTN_DANGER    = "flex items-center justify-center gap-1 rounded-lg border 
 
 type Mountain = { id: number; name: { en?: string; ko?: string } };
 
-type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "JUNCTION" | "SHELTER" | "BUS_STOP";
+type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "PEAK" | "JUNCTION" | "SHELTER" | "VIEW" | "LANDMARK" | "CAUTION" | "BUS_STOP";
 
 type Waypoint = {
   id: number;
@@ -62,21 +62,29 @@ const EMPTY_FORM: FormState = {
 };
 
 const TYPE_LABELS: Record<WaypointType, string> = {
-  STATION:  "Station",
+  STATION:   "Station",
   TRAILHEAD: "Trailhead",
-  SUMMIT:   "Summit",
-  JUNCTION: "Junction",
-  SHELTER:  "Shelter",
-  BUS_STOP: "Bus Stop",
+  SUMMIT:    "Summit",
+  PEAK:      "Peak",
+  JUNCTION:  "Junction",
+  SHELTER:   "Shelter",
+  VIEW:      "View",
+  LANDMARK:  "Landmark",
+  CAUTION:   "Caution",
+  BUS_STOP:  "Bus Stop",
 };
 
 const TYPE_COLORS: Record<WaypointType, string> = {
-  STATION:  "bg-blue-100 text-blue-700",
+  STATION:   "bg-blue-100 text-blue-700",
   TRAILHEAD: "bg-green-100 text-green-700",
-  SUMMIT:   "bg-amber-100 text-amber-700",
-  JUNCTION: "bg-purple-100 text-purple-700",
-  SHELTER:  "bg-gray-100 text-gray-600",
-  BUS_STOP: "bg-teal-100 text-teal-700",
+  SUMMIT:    "bg-amber-100 text-amber-700",
+  PEAK:      "bg-orange-100 text-orange-700",
+  JUNCTION:  "bg-purple-100 text-purple-700",
+  SHELTER:   "bg-gray-100 text-gray-600",
+  VIEW:      "bg-cyan-100 text-cyan-700",
+  LANDMARK:  "bg-indigo-100 text-indigo-700",
+  CAUTION:   "bg-red-100 text-red-700",
+  BUS_STOP:  "bg-teal-100 text-teal-700",
 };
 
 function Alert({ type, message }: { type: "success" | "error" | "loading"; message: string }) {
@@ -105,25 +113,39 @@ function WaypointForm({
   error: string;
 }) {
   const [f, setF] = useState<FormState>(initial);
+  // Track whether the slug has been manually edited so we don't overwrite it
+  const [slugManual, setSlugManual] = useState(!!initial.slug);
 
   const set = (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setF(prev => ({ ...prev, [k]: e.target.value }));
 
+  function setNameEn(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setF(prev => ({
+      ...prev,
+      nameEn: val,
+      // Auto-update slug only when it hasn't been manually edited
+      ...(slugManual ? {} : { slug: toSlug(val) }),
+    }));
+  }
+
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg-light)]">
-      {/* Name */}
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-[var(--color-text-muted)]">Name (KO)</span>
-          <input type="text" placeholder="정상" value={f.nameKo} onChange={set("nameKo")}
-            className={INPUT} style={{ fontFamily: "var(--font-ko)" }} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
-          <input type="text" placeholder="Summit" value={f.nameEn} onChange={set("nameEn")} className={INPUT} />
-        </label>
-      </div>
+      {/* Name — hidden for unnamed trail points */}
+      {!["JUNCTION", "PEAK", "VIEW", "LANDMARK", "SHELTER", "CAUTION"].includes(f.type) && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">Name (KO)</span>
+            <input type="text" placeholder="정상" value={f.nameKo} onChange={set("nameKo")}
+              className={INPUT} style={{ fontFamily: "var(--font-ko)" }} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
+            <input type="text" placeholder="Summit" value={f.nameEn} onChange={setNameEn} className={INPUT} />
+          </label>
+        </div>
+      )}
 
       {/* Slug */}
       <div className="flex flex-col gap-1">
@@ -133,17 +155,20 @@ function WaypointForm({
             type="text"
             placeholder="sadang-station"
             value={f.slug}
-            onChange={e => setF(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-") }))}
+            onChange={e => {
+              setSlugManual(true);
+              setF(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-") }));
+            }}
             className={`${INPUT} flex-1 font-mono text-xs`}
           />
           <button
             type="button"
-            title="Auto-generate from English name"
-            onClick={() => setF(prev => ({ ...prev, slug: toSlug(prev.nameEn) }))}
+            title="Reset to auto-generated slug"
+            onClick={() => { setSlugManual(false); setF(prev => ({ ...prev, slug: toSlug(prev.nameEn) })); }}
             disabled={!f.nameEn}
             className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-2 text-xs text-[var(--color-text-muted)] hover:text-primary hover:border-primary transition-colors disabled:opacity-30"
           >
-            <RefreshCw className="w-3 h-3" /> Auto
+            <RefreshCw className="w-3 h-3" /> Reset
           </button>
         </div>
       </div>
@@ -155,8 +180,12 @@ function WaypointForm({
           <option value="STATION">Station</option>
           <option value="TRAILHEAD">Trailhead</option>
           <option value="SUMMIT">Summit</option>
+          <option value="PEAK">Peak</option>
           <option value="JUNCTION">Junction</option>
           <option value="SHELTER">Shelter</option>
+          <option value="VIEW">View</option>
+          <option value="LANDMARK">Landmark</option>
+          <option value="CAUTION">Caution</option>
           <option value="BUS_STOP">Bus Stop</option>
         </select>
       </label>
@@ -246,7 +275,7 @@ function WaypointForm({
           <X className="w-4 h-4" /> Cancel
         </button>
         <button onClick={() => onSave(f)}
-          disabled={saving || !f.nameEn || !f.lat || !f.lon || !f.slug || (f.type === "SUMMIT" && !f.elevation_m)}
+          disabled={saving || (!["JUNCTION","VIEW","LANDMARK","CAUTION"].includes(f.type) && !f.nameEn) || !f.lat || !f.lon || !f.slug || (f.type === "SUMMIT" && !f.elevation_m)}
           className={BTN_PRIMARY}>
           {saving
             ? <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />

@@ -8,14 +8,18 @@ import type { PhotoItem, WaypointSlot, ExistingWaypoint } from "./types";
 const INPUT = "rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-bg-light)] focus:outline-none focus:ring-2 focus:ring-primary/40 w-full";
 const LABEL = "text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]";
 
-type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "JUNCTION" | "SHELTER" | "BUS_STOP";
+type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "PEAK" | "JUNCTION" | "SHELTER" | "VIEW" | "LANDMARK" | "CAUTION" | "BUS_STOP";
 
 const TYPE_LABELS: Record<WaypointType, string> = {
   STATION:   "Station",
   TRAILHEAD: "Trailhead",
   SUMMIT:    "Summit",
+  PEAK:      "Peak",
   JUNCTION:  "Junction",
   SHELTER:   "Shelter",
+  VIEW:      "View",
+  LANDMARK:  "Landmark",
+  CAUTION:   "Caution",
   BUS_STOP:  "Bus Stop",
 };
 
@@ -23,8 +27,12 @@ const TYPE_COLORS: Record<WaypointType, string> = {
   STATION:   "bg-blue-100 text-blue-700",
   TRAILHEAD: "bg-green-100 text-green-700",
   SUMMIT:    "bg-amber-100 text-amber-700",
+  PEAK:      "bg-orange-100 text-orange-700",
   JUNCTION:  "bg-purple-100 text-purple-700",
   SHELTER:   "bg-gray-100 text-gray-600",
+  VIEW:      "bg-cyan-100 text-cyan-700",
+  LANDMARK:  "bg-indigo-100 text-indigo-700",
+  CAUTION:   "bg-red-100 text-red-700",
   BUS_STOP:  "bg-teal-100 text-teal-700",
 };
 
@@ -268,8 +276,8 @@ function WaypointSlotCard({
               </select>
             </div>
 
-            {/* Name — hidden for STATION (derived from subwayStation) */}
-            {data.type !== "STATION" && (
+            {/* Name — hidden for types that are unnamed trail points */}
+            {!["STATION", "JUNCTION", "PEAK", "VIEW", "LANDMARK", "SHELTER", "CAUTION"].includes(data.type) && (
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className={LABEL}>Name (KO)</p>

@@ -17,7 +17,7 @@ export default function ShellLayout({
       {!isAdmin && <Header />}
       <main className={`flex-1 overflow-y-auto ${!isAdmin ? "pt-14 pb-16" : "py-4"} ${
         isAdmin 
-          ? "w-full px-4 md:px-8 max-w-[1200px] mx-auto" 
+          ? "w-full px-4 md:px-12 lg:px-20 max-w-[2400px] mx-auto"
           : "w-full max-w-[480px] mx-auto shadow-2xl bg-[var(--bg)] min-h-screen"
       }`}>
         {children}

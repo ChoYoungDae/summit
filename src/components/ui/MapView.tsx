@@ -24,10 +24,12 @@ const COLOR_GPS          = "#2E5E4A";
 const COLOR_GPS_OFF      = "#C8362A";
 const COLOR_CASING       = "#FFFFFF";
 
-// ── Waypoint marker config (Lucide icon-based) ────────────────────────────────
+// ── Waypoint marker config (Lucide or Iconify icon-based) ────────────────────
 type MarkerStyle = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  IconComponent: React.ComponentType<any>;
+  IconComponent?: React.ComponentType<any>;
+  /** Iconify icon ID — used when IconComponent is absent */
+  iconifyId?: string;
   bg: string;
   iconColor: string;
   size: number;
@@ -37,8 +39,12 @@ type MarkerStyle = {
 const MARKER_STYLE: Record<string, MarkerStyle> = {
   TRAILHEAD: { IconComponent: Footprints, bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 30, border: `2px solid ${COLOR_PRIMARY}` },
   SUMMIT:    { IconComponent: Flag,       bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 40, border: `2px solid ${COLOR_PRIMARY}` },
+  PEAK:      { iconifyId: "ph:triangle",  bg: "#ffffff", iconColor: "#EA580C",     size: 32, border: "2px solid #EA580C" },
   JUNCTION:  { IconComponent: GitFork,    bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 28, border: `2px solid ${COLOR_PRIMARY}` },
   SHELTER:   { IconComponent: Camera,     bg: "#ffffff", iconColor: COLOR_PRIMARY, size: 28, border: `2px solid ${COLOR_PRIMARY}` },
+  VIEW:      { iconifyId: "ph:binoculars", bg: "#ffffff", iconColor: "#0891B2",    size: 30, border: "2px solid #0891B2" },
+  LANDMARK:  { iconifyId: "ph:flag-banner", bg: "#ffffff", iconColor: "#4338CA",  size: 30, border: "2px solid #4338CA" },
+  CAUTION:   { iconifyId: "ph:warning",   bg: "#FEF3C7", iconColor: "#D97706",     size: 28, border: "2px solid #D97706" },
   BUS_STOP:  { IconComponent: Bus,        bg: COLOR_BUS, iconColor: "#ffffff",     size: 30, border: "none" },
 };
 
@@ -242,7 +248,7 @@ function WaypointDot({
   const baseSize = s.size;
   const size = isSelected ? baseSize + 8 : baseSize;
   const iconSize = Math.round(size * 0.52);
-  const Icon = s.IconComponent;
+  const LucideIcon = s.IconComponent;
   return (
     <div
       title={tDB(wpt.name, locale)}
@@ -266,7 +272,12 @@ function WaypointDot({
       }}
     >
       <div style={{ transform: `rotate(${rotation}deg)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={iconSize} color={s.iconColor} strokeWidth={2} />
+        {s.iconifyId
+          ? <Icon icon={s.iconifyId} width={iconSize} height={iconSize} style={{ color: s.iconColor }} />
+          : LucideIcon
+            ? <LucideIcon size={iconSize} color={s.iconColor} strokeWidth={2} />
+            : null
+        }
       </div>
     </div>
   );
@@ -1400,7 +1411,7 @@ export default function MapView({
       {/* Waypoint proximity alert pill — only while hiking, rest type excluded */}
       {nearAlertWaypoint && !isOffRoute && (() => {
         const ms = MARKER_STYLE[nearAlertWaypoint.type] ?? MARKER_STYLE.JUNCTION;
-        const AlertIcon = ms.IconComponent;
+        const AlertLucideIcon = ms.IconComponent;
         const pillBg = ms.bg === "#ffffff" ? COLOR_PRIMARY : ms.bg;
         return (
           <div
@@ -1415,7 +1426,12 @@ export default function MapView({
               boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
             }}
           >
-            <AlertIcon size={14} color="#fff" strokeWidth={2} aria-hidden />
+            {ms.iconifyId
+              ? <Icon icon={ms.iconifyId} width={14} height={14} style={{ color: "#fff" }} aria-hidden />
+              : AlertLucideIcon
+                ? <AlertLucideIcon size={14} color="#fff" strokeWidth={2} aria-hidden />
+                : null
+            }
             {waypointAlertMessage(nearAlertWaypoint, locale)}
           </div>
         );

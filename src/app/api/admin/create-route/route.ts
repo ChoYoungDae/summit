@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { toSlug, buildSegmentSlug } from "@/lib/slug";
 
@@ -116,10 +115,21 @@ export async function POST(req: NextRequest) {
       highlights?: { type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[];
       description?: { en: string; ko: string };
       preview?:      boolean;
-      segmentSpecs?: { estimated_time_min: number }[];
+      segmentSpecs?: {
+        estimated_time_min?: number;
+        is_bus_combined?:      boolean;
+        bus_duration_min?:     number;
+        bus_color?:            string;
+        bus_numbers?:          string;
+        station_bus_stop_name?: string;
+      }[];
+      /** Per final-segment override: null = create new, number = use existing segment ID */
+      segmentOverrides?: (number | null)[];
+      /** Per final-segment waypoint boundary override: override start/end resolved[] indices */
+      segmentWpOverrides?: ({ startWpIdx: number; endWpIdx: number } | null)[];
     };
 
-    const { mountainId, routeNameEn, routeNameKo, routeDifficulty, trackPoints, waypointSpecs, tags, highlights, description, preview, segmentSpecs } = body;
+    const { mountainId, routeNameEn, routeNameKo, routeDifficulty, trackPoints, waypointSpecs, tags, highlights, description, preview, segmentSpecs, segmentOverrides, segmentWpOverrides } = body;
 
     if (!mountainId || !routeNameEn || !trackPoints?.length || !waypointSpecs?.length) {
       return NextResponse.json(
@@ -161,7 +171,11 @@ export async function POST(req: NextRequest) {
           nameKo: (wp.name as any)?.ko,
         });
       } else {
-        const slug = toSlug(spec.nameEn);
+        // Build a slug that is unique even for unnamed/Korean-only waypoints
+        const baseSlug = toSlug(spec.nameEn);
+        const slug = baseSlug ||
+          `${spec.type.toLowerCase()}-${mountainId}-${Math.round(spec.lat * 10000)}-${Math.round(spec.lon * 10000)}`;
+
         let waypointId = 0;
 
         if (!preview) {
@@ -183,10 +197,26 @@ export async function POST(req: NextRequest) {
             })
             .select("id")
             .single();
+
           if (wpErr) {
-            return NextResponse.json({ error: `Create waypoint failed: ${wpErr.message}` }, { status: 500 });
+            // On slug conflict (e.g. retry after partial failure), reuse the existing waypoint
+            if (wpErr.code === "23505") {
+              const { data: existing } = await supabaseAdmin
+                .from("waypoints")
+                .select("id")
+                .eq("slug", slug)
+                .single();
+              if (existing) {
+                waypointId = existing.id;
+              } else {
+                return NextResponse.json({ error: `Create waypoint failed: ${wpErr.message}` }, { status: 500 });
+              }
+            } else {
+              return NextResponse.json({ error: `Create waypoint failed: ${wpErr.message}` }, { status: 500 });
+            }
+          } else {
+            waypointId = wp.id;
           }
-          waypointId = wp.id;
         }
 
         resolved.push({
@@ -322,6 +352,39 @@ export async function POST(req: NextRequest) {
       i++;
     }
 
+    // ── Step 4b: Apply waypoint boundary overrides ───────────────────────────
+    // If the client specifies explicit start/end waypoint indices for a segment,
+    // re-slice the GPS track between those waypoints instead of the auto-inferred ones.
+
+    if (segmentWpOverrides) {
+      for (let si = 0; si < finalSegs.length; si++) {
+        const ov = segmentWpOverrides[si];
+        if (!ov) continue;
+        const { startWpIdx: ovStart, endWpIdx: ovEnd } = ov;
+        if (ovStart < 0 || ovEnd >= resolved.length || ovStart >= ovEnd) continue;
+
+        const startWp = resolved[ovStart];
+        const endWp   = resolved[ovEnd];
+        const a = Math.min(indices[ovStart], indices[ovEnd]);
+        const b = Math.max(indices[ovStart], indices[ovEnd]);
+        const newTrack = b > a
+          ? trimmed.slice(a, b + 1)
+          : [trimmed[a], trimmed[Math.min(a + 1, trimmed.length - 1)]];
+
+        finalSegs[si] = {
+          ...finalSegs[si],
+          startWaypointId: startWp.id,
+          startWpSlug:     startWp.slug,
+          startWpIdx:      ovStart,
+          endWaypointId:   endWp.id,
+          endWpSlug:       endWp.slug,
+          endWpIdx:        ovEnd,
+          track:           newTrack,
+          segType:         inferSegmentType(startWp.type, endWp.type),
+        };
+      }
+    }
+
     // ── Step 5: Insert segments ───────────────────────────────────────────────
 
     const segmentIds: number[] = [];
@@ -346,16 +409,33 @@ export async function POST(req: NextRequest) {
         const swp = resolved[seg.startWpIdx];
         const ewp = resolved[seg.endWpIdx];
         previewSegments.push({
-          segType:            seg.segType,
-          startWpName:        swp.nameEn || swp.slug,
-          startWpNameKo:      swp.nameKo,
-          endWpName:          ewp.nameEn || ewp.slug,
-          endWpNameKo:        ewp.nameKo,
-          distanceM:          stats.distance_m,
-          durationMin:        estTime,
+          segType:       seg.segType,
+          source:        "new",
+          isBusCombined: seg.isBusCombined,
+          startWpName:   swp.nameEn || swp.slug,
+          startWpNameKo: swp.nameKo,
+          endWpName:     ewp.nameEn || ewp.slug,
+          endWpNameKo:   ewp.nameKo,
+          distanceM:     stats.distance_m,
+          durationMin:   estTime,
         });
         totalDurationMin += estTime;
         totalDistanceM   += stats.distance_m;
+        continue;
+      }
+
+      // If an existing segment ID is provided for this slot, skip creation
+      const existingOverrideId = segmentOverrides?.[idx];
+      if (existingOverrideId != null) {
+        // Fetch existing segment's stats for route totals
+        const { data: existingSeg } = await supabaseAdmin
+          .from("segments")
+          .select("id, estimated_time_min, distance_m")
+          .eq("id", existingOverrideId)
+          .single();
+        segmentIds.push(existingOverrideId);
+        totalDurationMin += existingSeg?.estimated_time_min ?? 0;
+        totalDistanceM   += existingSeg?.distance_m ?? 0;
         continue;
       }
 
@@ -364,22 +444,41 @@ export async function POST(req: NextRequest) {
       let busDetails  = null;
       let subSegments = null;
 
-      if (seg.isBusCombined && seg.busTrack && seg.busStopWaypoint) {
-        const bsWp = seg.busStopWaypoint;
-        busDetails = {
-          bus_stop_id_key:  String(bsWp.id),
-          bus_numbers:      bsWp.busNumbers
-            ? bsWp.busNumbers.split(",").map((s) => s.trim()).filter(Boolean)
-            : [],
-          route_color:      bsWp.busColor ?? null,
-          bus_track_data:   { type: "LineString", coordinates: seg.busTrack },
-          ...(bsWp.busDurationMin != null ? { bus_duration_min: bsWp.busDurationMin } : {}),
-        };
+      const spec = segmentSpecs?.[idx];
+      // Bus-combined: either auto-detected (BUS_STOP waypoint) or manually specified via segmentSpecs
+      const isBusCombined = seg.isBusCombined || (spec?.is_bus_combined ?? false);
+
+      if (isBusCombined) {
+        if (seg.busStopWaypoint) {
+          // Auto-detected path: BUS_STOP waypoint exists
+          const bsWp = seg.busStopWaypoint;
+          busDetails = {
+            bus_stop_id_key:       String(bsWp.id),
+            bus_numbers:           spec?.bus_numbers
+              ? spec.bus_numbers.split(",").map((s) => s.trim()).filter(Boolean)
+              : (bsWp.busNumbers ? bsWp.busNumbers.split(",").map((s) => s.trim()).filter(Boolean) : []),
+            route_color:           spec?.bus_color ?? bsWp.busColor ?? null,
+            bus_track_data:        seg.busTrack ? { type: "LineString", coordinates: seg.busTrack } : null,
+            bus_duration_min:      spec?.bus_duration_min ?? bsWp.busDurationMin ?? null,
+            ...(spec?.station_bus_stop_name ? { station_bus_stop_name: spec.station_bus_stop_name } : {}),
+          };
+        } else if (spec?.is_bus_combined) {
+          // Manual path: no BUS_STOP waypoint, bus details from segmentSpecs
+          busDetails = {
+            bus_numbers:      spec.bus_numbers
+              ? spec.bus_numbers.split(",").map((s) => s.trim()).filter(Boolean)
+              : [],
+            route_color:      spec.bus_color ?? null,
+            bus_duration_min: spec.bus_duration_min ?? null,
+            ...(spec.station_bus_stop_name ? { station_bus_stop_name: spec.station_bus_stop_name } : {}),
+          };
+        }
         subSegments = seg.segType === "APPROACH"
           ? [{ mode: "bus" }, { mode: "walk" }]
           : [{ mode: "walk" }, { mode: "bus" }];
       }
 
+      let insertedId: number;
       const { data: inserted, error: segErr } = await supabaseAdmin
         .from("segments")
         .insert({
@@ -388,7 +487,7 @@ export async function POST(req: NextRequest) {
           start_waypoint_id: seg.startWaypointId,
           end_waypoint_id:   seg.endWaypointId,
           track_data:        { type: "LineString", coordinates: seg.track },
-          is_bus_combined:   seg.isBusCombined,
+          is_bus_combined:   isBusCombined,
           bus_details:       busDetails,
           sub_segments:      subSegments,
           slug:              segSlug,
@@ -400,10 +499,25 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (segErr) {
+        // On slug conflict (retry after partial failure), reuse the existing segment
+        if (segErr.code === "23505") {
+          const { data: existing } = await supabaseAdmin
+            .from("segments")
+            .select("id, estimated_time_min, distance_m")
+            .eq("slug", segSlug)
+            .single();
+          if (existing) {
+            insertedId = existing.id;
+            totalDurationMin += existing.estimated_time_min ?? estTime;
+            totalDistanceM   += existing.distance_m ?? stats.distance_m;
+            segmentIds.push(insertedId);
+            continue;
+          }
+        }
         return NextResponse.json({ error: `Segment insert failed: ${segErr.message}` }, { status: 500 });
       }
-
-      segmentIds.push(inserted.id);
+      insertedId = inserted.id;
+      segmentIds.push(insertedId);
       totalDurationMin += estTime;
       totalDistanceM   += stats.distance_m;
     }
@@ -440,10 +554,10 @@ export async function POST(req: NextRequest) {
 
     // ── Step 7: Revalidate cache ──────────────────────────────────────────────
     try {
-      const { revalidatePath } = await import("next/cache");
+      const { revalidatePath, revalidateTag: rvTag } = await import("next/cache");
+      rvTag("route-list");
+      rvTag("route-detail");
       revalidatePath("/route");
-      // @ts-ignore - Next.js type mismatch in this file
-      revalidateTag("route-list");
     } catch (e) {
       console.error("Revalidation failed:", e);
     }

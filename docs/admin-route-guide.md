@@ -102,10 +102,27 @@ GPS 트랙이 각 웨이포인트 좌표 기준으로 **자동 분리**되며 Se
 
 ---
 
-### 5단계: 구간 확인
+### 5단계: 구간 확인 및 편집
 
-자동 추론된 구간(Segment) 목록이 표시됩니다.
-소요 시간은 Naismith 공식(경사 보정)으로 계산됩니다. 실제 표지판 기준으로 직접 수정 가능합니다.
+4개 고정 슬롯(APPROACH · ASCENT · DESCENT · RETURN)이 표시됩니다.
+각 슬롯마다 **New (GPS)** 또는 **Existing** 중 하나를 선택합니다.
+
+#### New (GPS) 모드
+- GPS 트랙 기반 자동 추론. Naismith 공식(경사 보정)으로 소요 시간 계산.
+- 소요 시간 직접 수정 가능 (표지판 기준).
+- APPROACH·RETURN은 **버스 복합 구간** 추가 가능:
+  - 체크박스 ON → 버스 색상·번호·정류장 이름·버스 탑승시간·도보 시간 입력
+- **GPS 분할 경계 편집** (연필 버튼): 시작/종료 웨이포인트를 직접 선택해 GPS 트랙 재분할
+  - 선택 가능 타입: TRAILHEAD · SUMMIT · BUS_STOP · STATION
+  - 이번 route에 포함되지 않은 같은 산의 기존 waypoint도 선택 가능
+
+#### Existing 모드
+- 같은 산의 기존 segment 재사용 (다른 trail과 공유).
+- 드롭다운에서 같은 타입의 segment 선택.
+- GPS 트랙·사진 위치 그대로 재사용됨.
+- 소요 시간·거리는 기존 값 자동 반영.
+
+> New ↔ Existing 언제든 전환 가능.
 
 ---
 
@@ -162,7 +179,7 @@ GPS 트랙이 각 웨이포인트 좌표 기준으로 **자동 분리**되며 Se
 
 | Method | Endpoint | 설명 |
 |---|---|---|
-| `POST` | `/api/admin/create-route` | 웨이포인트 생성 + GPS 자동 분리 + Segment + Route 원자적 생성 |
+| `POST` | `/api/admin/create-route` | 웨이포인트 생성 + GPS 자동 분리 + Segment + Route 생성 (멱등성 보장) |
 
 **Request body (JSON):**
 ```json
@@ -185,14 +202,28 @@ GPS 트랙이 각 웨이포인트 좌표 기준으로 **자동 분리**되며 Se
       "busColor": "#0068B7",
       "busDurationMin": 20
     }
-  ]
+  ],
+  "segmentSpecs": [
+    { "estimated_time_min": 30, "is_bus_combined": true, "bus_duration_min": 20, "bus_numbers": "704", "bus_color": "#0068B7", "station_bus_stop_name": "불광역" },
+    { "estimated_time_min": 90 },
+    { "estimated_time_min": 80 },
+    { "estimated_time_min": 25 }
+  ],
+  "segmentOverrides": [null, 13, null, null],
+  "segmentWpOverrides": [null, { "startWpIdx": 2, "endWpIdx": 4 }, null, null]
 }
 ```
+
+- `segmentSpecs` — 슬롯별 시간·버스 정보 오버라이드 (4개 고정 슬롯 순서)
+- `segmentOverrides` — `null` = GPS 신규 생성, `number` = 기존 segment ID 재사용
+- `segmentWpOverrides` — GPS 분할 경계 명시 오버라이드 (resolved[] 배열 인덱스 기준)
 
 **Response:**
 ```json
 { "routeId": 7, "segmentIds": [12, 13, 14, 15] }
 ```
+
+**멱등성:** 재시도 시 waypoint/segment slug 충돌(`23505`)이 발생하면 기존 레코드를 자동 재사용. 부분 실패 후 재시도 안전.
 
 #### 기존 CRUD
 

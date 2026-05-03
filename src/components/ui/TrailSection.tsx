@@ -579,29 +579,48 @@ export default function TrailSection({
                       style={{ objectPosition: "center 65%" }}
                     />
 
-                    {/* Waypoint Indicator Overlay */}
-                    {linkedWpt && (
-                      <div className="absolute top-4 left-4 right-4 flex flex-col items-start gap-1 pointer-events-none">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-md shadow-lg">
-                          <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-[var(--color-primary)] uppercase tracking-tighter">
-                            {tUI(`wpt_${linkedWpt.type.toLowerCase()}` as any, locale) || linkedWpt.type}
-                          </span>
-                          <span className="text-[15px] font-black text-[var(--color-text-primary)] tracking-tight">
-                            {tDB(linkedWpt.name, locale)}
-                          </span>
-                          {linkedWpt.elevationM && (
-                            <span className="text-[12px] font-bold text-[var(--color-text-muted)] ml-0.5">
-                              {linkedWpt.elevationM}m
-                            </span>
+                    {/* Top-left: type chip (from photo tag OR linked waypoint) */}
+                    {(() => {
+                      // Priority: explicit waypointType tag > GPS-linked waypoint type
+                      const chipType = activePhoto.waypointType ?? linkedWpt?.type ?? null;
+                      if (!chipType) return null;
+
+                      const CHIP_STYLE: Record<string, { bg: string; icon: string }> = {
+                        SUMMIT:   { bg: "rgba(217,119,6,0.88)",  icon: "ph:flag" },
+                        PEAK:     { bg: "rgba(234,88,12,0.88)",  icon: "ph:triangle" },
+                        VIEW:     { bg: "rgba(8,145,178,0.88)",  icon: "ph:binoculars" },
+                        LANDMARK: { bg: "rgba(67,56,202,0.88)",  icon: "ph:flag-banner" },
+                        TRAILHEAD:{ bg: "rgba(22,163,74,0.88)",  icon: "ph:person-simple-walk" },
+                        JUNCTION: { bg: "rgba(109,40,217,0.88)", icon: "ph:git-fork" },
+                        SHELTER:  { bg: "rgba(75,85,99,0.88)",   icon: "ph:house-simple" },
+                        CAUTION:  { bg: "rgba(220,38,38,0.88)",  icon: "ph:warning" },
+                        STATION:  { bg: "rgba(37,99,235,0.88)",  icon: "ph:train" },
+                        BUS_STOP: { bg: "rgba(13,148,136,0.88)", icon: "ph:bus" },
+                      };
+                      const style = CHIP_STYLE[chipType] ?? { bg: "rgba(46,94,74,0.88)", icon: "ph:map-pin" };
+
+                      // Name: from linked waypoint if available, else just the type label
+                      const chipName = linkedWpt
+                        ? tDB(linkedWpt.name, locale)
+                        : chipType.charAt(0) + chipType.slice(1).toLowerCase().replace("_", " ");
+                      const elevation = linkedWpt?.elevationM;
+
+                      return (
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 pointer-events-none"
+                             style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", background: style.bg, borderRadius: 9999, paddingLeft: 8, paddingRight: elevation ? 10 : 10, paddingTop: 5, paddingBottom: 5 }}>
+                          <Icon icon={style.icon} width={13} height={13} style={{ color: "#fff", flexShrink: 0 }} />
+                          <span className="text-white text-[12px] font-bold leading-none">{chipName}</span>
+                          {elevation && (
+                            <span className="text-white/80 text-[11px] font-num leading-none">{elevation}m</span>
                           )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Close Button */}
                     <button
                       onClick={() => setActivePhoto(null)}
-                      className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center
+                      className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center
                                  bg-black/35 backdrop-blur-md text-white hover:bg-black/55 transition-colors z-10"
                       aria-label="Close"
                     >

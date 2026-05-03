@@ -1,14 +1,25 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, ChevronLeft, CheckCircle, AlertCircle, Mountain, Upload, Camera, Route, Save, Trash2 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { parseTrackFile, type TrackPoint } from "@/lib/parseGpx";
 import { trackDistanceKm } from "@/lib/geo";
+
+/** Find nearest track-point index for a GPS coord — used to sort photos by trail order */
+function trackIndexForCoord(lat: number, lon: number, track: TrackPoint[]): number {
+  let best = 0, bestDist = Infinity;
+  for (let i = 0; i < track.length; i++) {
+    const [tLon, tLat] = track[i];
+    const d = (tLat - lat) ** 2 + (tLon - lon) ** 2; // squared OK for comparison
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
 import StepWaypoints from "./StepWaypoints";
 import StepSegments from "./StepSegments";
-import type { PhotoItem, WaypointSlot, WaypointType, ExistingWaypoint, SegmentPreview } from "./types";
+import type { PhotoItem, WaypointSlot, WaypointType, ExistingWaypoint, SegmentPreview, ExistingSegment } from "./types";
 
 // ── Waypoint type labels / colors (Korean admin UI) ───────────────────────────
 
@@ -17,8 +28,12 @@ const WP_TYPE_KO: Record<WaypointType, string> = {
   BUS_STOP:  "버스",
   TRAILHEAD: "입구",
   SUMMIT:    "정상",
+  PEAK:      "봉우리",
   JUNCTION:  "갈림길",
   SHELTER:   "쉼터",
+  VIEW:      "전망",
+  LANDMARK:  "랜드마크",
+  CAUTION:   "주의",
 };
 
 const WP_TYPE_BADGE: Record<WaypointType, string> = {
@@ -26,8 +41,12 @@ const WP_TYPE_BADGE: Record<WaypointType, string> = {
   BUS_STOP:  "bg-teal-500/80 text-white",
   TRAILHEAD: "bg-green-500/80 text-white",
   SUMMIT:    "bg-amber-500/80 text-white",
+  PEAK:      "bg-orange-500/80 text-white",
   JUNCTION:  "bg-purple-500/80 text-white",
   SHELTER:   "bg-gray-500/80 text-white",
+  VIEW:      "bg-cyan-500/80 text-white",
+  LANDMARK:  "bg-indigo-500/80 text-white",
+  CAUTION:   "bg-red-500/80 text-white",
 };
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
@@ -35,7 +54,7 @@ const WP_TYPE_BADGE: Record<WaypointType, string> = {
 const INPUT       = "rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-bg-light)] focus:outline-none focus:ring-2 focus:ring-primary/40 w-full";
 const BTN_PRIMARY = "flex items-center justify-center gap-2 rounded-xl bg-primary text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed";
 const BTN_GHOST   = "flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-muted)] hover:bg-[var(--color-bg-light)] transition-colors";
-const LABEL       = "text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]";
+const LABEL       = "text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]";
 const CARD        = "rounded-2xl bg-white border border-[var(--color-border)] p-5 flex flex-col gap-4";
 
 // ── Client-side image helpers (reused from PhotoUploadCard) ───────────────────
@@ -81,46 +100,76 @@ const STEPS = [
   { label: "사진",   icon: Camera },
   { label: "지점",   icon: Mountain },
   { label: "구간",   icon: Route },
-  { label: "캡션",   icon: Camera },
   { label: "저장",   icon: Save },
 ];
 
 function StepBar({ current, onStepClick }: { current: number; onStepClick?: (step: number) => void }) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar">
+    <div className="flex items-center gap-1.5 flex-nowrap">
       {STEPS.map((s, i) => {
         const isPast = i < current;
         const isCurrent = i === current;
         const isClickable = isPast && onStepClick;
 
         return (
-          <div key={i} className="flex items-center gap-1 flex-none">
+          <div key={i} className="flex items-center gap-1.5 flex-none">
             <button
               onClick={() => isClickable && onStepClick(i)}
               disabled={!isClickable}
-              className={`flex items-center gap-1 transition-all group ${isClickable ? "cursor-pointer" : "cursor-default"}`}
+              className={`flex items-center gap-1.5 transition-all group ${isClickable ? "cursor-pointer" : "cursor-default"}`}
             >
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors ${
-                isPast  ? "bg-primary text-white group-hover:bg-primary/80" :
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold transition-colors ${
+                isPast    ? "bg-primary text-white group-hover:bg-primary/80" :
                 isCurrent ? "bg-primary text-white ring-2 ring-primary/30" :
                 "bg-[var(--color-bg-light)] text-[var(--color-text-muted)] border border-[var(--color-border)]"
               }`}>
-                {isPast ? <CheckCircle size={12} /> : i + 1}
+                {isPast ? <CheckCircle size={13} /> : i + 1}
               </div>
-              <span className={`text-[10px] font-medium hidden sm:inline ${
-                isCurrent ? "text-primary" : 
-                isPast ? "text-[var(--color-text-body)] group-hover:text-primary" : 
+              <span className={`text-[13px] font-medium ${
+                isCurrent ? "text-primary" :
+                isPast    ? "text-[var(--color-text-body)] group-hover:text-primary" :
                 "text-[var(--color-text-muted)]"
               }`}>
                 {s.label}
               </span>
             </button>
-            {i < STEPS.length - 1 && <ChevronRight size={10} className="text-[var(--color-border)] flex-none" />}
+            {i < STEPS.length - 1 && <ChevronRight size={12} className="text-[var(--color-border)] flex-none" />}
           </div>
         );
       })}
     </div>
   );
+}
+
+// ── localStorage persistence ──────────────────────────────────────────────────
+
+const STORAGE_KEY = "summit-new-route-wizard-v1";
+
+type SavedState = {
+  step: number;
+  mountainId: number | null;
+  trackPoints: TrackPoint[] | null;
+  trackName: string;
+  waypointSlots: WaypointSlot[];
+  segments: SegmentPreview[];
+  routeNameEn: string;
+  routeNameKo: string;
+  routeDifficulty: number;
+  tags: { en: string; ko: string }[];
+  highlights: { type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[];
+  routeDescriptionEn: string;
+  routeDescriptionKo: string;
+};
+
+function loadDraft(): Partial<SavedState> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Partial<SavedState>) : {};
+  } catch { return {}; }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
 }
 
 // ── Main page component ───────────────────────────────────────────────────────
@@ -130,44 +179,82 @@ type Mountain = { id: number; name: { en?: string; ko?: string }; slug?: string 
 export default function NewRoutePage() {
   const router = useRouter();
 
-  // ── Global wizard state ───────────────────────────────────────────────────
-  const [step, setStep] = useState(0);
+  // ── Restore from localStorage on first render ────────────────────────────
+  const [draft] = useState<Partial<SavedState>>(loadDraft);
+
+  // ── Global wizard state (initialised from draft if available) ────────────
+  const [step, setStep] = useState(draft.step ?? 0);
 
   // Step 0: Mountain
   const [mountains,    setMountains]    = useState<Mountain[]>([]);
-  const [mountainId,   setMountainId]   = useState<number | null>(null);
+  const [mountainId,   setMountainId]   = useState<number | null>(draft.mountainId ?? null);
   const [mountainsLoaded, setMountainsLoaded] = useState(false);
 
   // Step 1: GPS
-  const [trackPoints,  setTrackPoints]  = useState<TrackPoint[] | null>(null);
-  const [trackName,    setTrackName]    = useState("");
+  const [trackPoints,  setTrackPoints]  = useState<TrackPoint[] | null>(draft.trackPoints ?? null);
+  const [trackName,    setTrackName]    = useState(draft.trackName ?? "");
 
-  // Step 2: Photos
+  // Step 2: Photos  (File objects can't be serialised — photos always start empty)
   const [photos,       setPhotos]       = useState<PhotoItem[]>([]);
   const [photoLoading, setPhotoLoading] = useState(false);
 
   // Step 3: Waypoints
-  const [waypointSlots,     setWaypointSlots]     = useState<WaypointSlot[]>([]);
+  const [waypointSlots,     setWaypointSlots]     = useState<WaypointSlot[]>(draft.waypointSlots ?? []);
   const [existingWaypoints, setExistingWaypoints] = useState<ExistingWaypoint[]>([]);
 
   // Step 4: Segments
-  const [segments,       setSegments]       = useState<SegmentPreview[]>([]);
-  const [segmentLoading, setSegmentLoading] = useState(false);
-
-  // Step 5: Captions — use photos state (descEn/descKo fields)
+  const [segments,         setSegments]         = useState<SegmentPreview[]>(draft.segments ?? []);
+  const [existingSegments, setExistingSegments] = useState<ExistingSegment[]>([]);
+  const [segmentLoading,   setSegmentLoading]   = useState(false);
 
   // Step 5: Route meta + save
-  const [routeNameEn,   setRouteNameEn]   = useState("");
-  const [routeNameKo,   setRouteNameKo]   = useState("");
-  const [routeDifficulty, setRouteDifficulty] = useState<number>(3);
-  const [tags,       setTags]       = useState<{ en: string; ko: string }[]>([{ en: "", ko: "" }]);
-  const [highlights, setHighlights] = useState<{ type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[]>([{ type: "highlight", en: "", ko: "" }]);
-  const [routeDescriptionEn, setRouteDescriptionEn] = useState("");
-  const [routeDescriptionKo, setRouteDescriptionKo] = useState("");
+  const [routeNameEn,   setRouteNameEn]   = useState(draft.routeNameEn ?? "");
+  const [routeNameKo,   setRouteNameKo]   = useState(draft.routeNameKo ?? "");
+  const [routeDifficulty, setRouteDifficulty] = useState<number>(draft.routeDifficulty ?? 3);
+  const [tags,       setTags]       = useState<{ en: string; ko: string }[]>(draft.tags ?? [{ en: "", ko: "" }]);
+  const [highlights, setHighlights] = useState<{ type: "highlight" | "pro_tip" | "warning"; en: string; ko: string }[]>(draft.highlights ?? [{ type: "highlight", en: "", ko: "" }]);
+  const [routeDescriptionEn, setRouteDescriptionEn] = useState(draft.routeDescriptionEn ?? "");
+  const [routeDescriptionKo, setRouteDescriptionKo] = useState(draft.routeDescriptionKo ?? "");
 
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState(false);
+
+  // ── Load existing waypoints + segments if mountainId is already set (e.g. from localStorage) ──
+  useEffect(() => {
+    if (mountainId) {
+      loadExistingWaypoints(mountainId);
+      loadExistingSegments(mountainId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once on mount
+
+  // ── Auto-save all serialisable state to localStorage ─────────────────────
+  useEffect(() => {
+    if (success) { clearDraft(); return; }
+    const toSave: SavedState = {
+      step, mountainId, trackPoints, trackName,
+      waypointSlots, segments,
+      routeNameEn, routeNameKo, routeDifficulty,
+      tags, highlights, routeDescriptionEn, routeDescriptionKo,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)); } catch { /* quota */ }
+  }, [
+    step, mountainId, trackPoints, trackName,
+    waypointSlots, segments,
+    routeNameEn, routeNameKo, routeDifficulty,
+    tags, highlights, routeDescriptionEn, routeDescriptionKo,
+    success,
+  ]);
+
+  // ── Prevent accidental data loss ─────────────────────────────────────────
+  useEffect(() => {
+    const hasData = step > 0 || mountainId != null || waypointSlots.length > 0;
+    if (!hasData || success) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [step, mountainId, waypointSlots.length, success]);
 
   const [isDraggingGpx,   setIsDraggingGpx]   = useState(false);
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
@@ -189,6 +276,13 @@ export default function NewRoutePage() {
     const res  = await fetch(`/api/admin/waypoints?mountainId=${mid}`);
     const data = await res.json();
     setExistingWaypoints(data ?? []);
+  }
+
+  // ── Load existing segments for this mountain ──────────────────────────────
+  async function loadExistingSegments(mid: number) {
+    const res  = await fetch(`/api/admin/segments?mountainId=${mid}`);
+    const data = await res.json();
+    setExistingSegments(Array.isArray(data) ? data : []);
   }
 
   // ── GPX parsing ──────────────────────────────────────────────────────────
@@ -234,6 +328,7 @@ export default function NewRoutePage() {
   async function next() {
     if (step === 0 && mountainId) {
       loadExistingWaypoints(mountainId);
+      loadExistingSegments(mountainId);
     }
 
     // Step 2→3: 태깅된 사진으로 웨이포인트 슬롯 자동 생성 (슬롯이 비어있을 때만)
@@ -308,11 +403,13 @@ export default function NewRoutePage() {
       case 2: return photos.length > 0;
       case 3: return waypointSlots.length >= 2 && waypointSlots.every((s) => {
         if (s.source === "existing") return !!s.existingId;
-        return !!(s.data.nameEn && s.data.type && s.data.lat && s.data.lon);
+        // Types where nameEn is hidden in the UI — name is optional or auto-derived
+        const noNameTypes = ["STATION", "JUNCTION", "PEAK", "VIEW", "LANDMARK", "SHELTER", "CAUTION"];
+        const needsName = !noNameTypes.includes(s.data.type);
+        return !!(s.data.type && s.data.lat && s.data.lon && (!needsName || s.data.nameEn));
       });
       case 4: return segments.length > 0;
-      case 5: return true;
-      case 6: return !!routeNameEn;
+      case 5: return !!routeNameEn;
       default: return true;
     }
   }
@@ -347,7 +444,24 @@ export default function NewRoutePage() {
         };
       });
 
-      const segmentSpecs = segments.map((s) => ({ estimated_time_min: s.durationMin }));
+      const segmentSpecs = segments.map((s) => ({
+        estimated_time_min:    s.durationMin,
+        is_bus_combined:       s.isBusCombined ?? false,
+        bus_duration_min:      s.busDurationMin,
+        bus_color:             s.busColor,
+        bus_numbers:           s.busNumbers,
+        station_bus_stop_name: s.stationBusStopName,
+      }));
+      // null = create new from GPS; number = reuse existing segment ID
+      const segmentOverrides = segments.map((s) =>
+        s.source === "existing" && s.existingId ? s.existingId : null
+      );
+      // Waypoint boundary overrides for GPS re-slicing
+      const segmentWpOverrides = segments.map((s) =>
+        s.source === "new" && s.startWpIdx != null && s.endWpIdx != null
+          ? { startWpIdx: s.startWpIdx, endWpIdx: s.endWpIdx }
+          : null
+      );
 
       // 1. Create waypoints + segments + route
       const createRes = await fetch("/api/admin/create-route", {
@@ -356,11 +470,13 @@ export default function NewRoutePage() {
         body: JSON.stringify({
           mountainId,
           routeNameEn,
-          routeNameKo:     routeNameKo || undefined,
-          routeDifficulty: routeDifficulty || undefined,
+          routeNameKo:      routeNameKo || undefined,
+          routeDifficulty:  routeDifficulty || undefined,
           trackPoints,
           waypointSpecs,
           segmentSpecs,
+          segmentOverrides,
+          segmentWpOverrides,
           tags:       tags.filter((t) => t.en || t.ko),
           highlights: highlights.filter((h) => h.en || h.ko),
           description: (routeDescriptionEn || routeDescriptionKo)
@@ -426,7 +542,7 @@ export default function NewRoutePage() {
           <button onClick={() => router.push("/admin")} className={BTN_GHOST}>
             Back to Admin
           </button>
-          <button onClick={() => { setSuccess(false); setStep(0); setTrackPoints(null); setPhotos([]); setWaypointSlots([]); }} className={BTN_PRIMARY}>
+          <button onClick={() => { clearDraft(); setSuccess(false); setStep(0); setMountainId(null); setTrackPoints(null); setTrackName(""); setPhotos([]); setWaypointSlots([]); setSegments([]); setRouteNameEn(""); setRouteNameKo(""); setRouteDifficulty(3); setTags([{ en: "", ko: "" }]); setHighlights([{ type: "highlight", en: "", ko: "" }]); setRouteDescriptionEn(""); setRouteDescriptionKo(""); }} className={BTN_PRIMARY}>
             Create another
           </button>
         </div>
@@ -439,7 +555,7 @@ export default function NewRoutePage() {
       {/* Header */}
       <div className="rounded-2xl bg-primary p-5 text-white">
         <p className="font-semibold text-[1.125rem]">New Route</p>
-        <p className="text-white/70 text-xs mt-1">GPS → Photos → Waypoints → Segments → Save</p>
+        <p className="text-white/70 text-sm mt-1">GPS → Photos → Waypoints → Segments → Save</p>
       </div>
 
       {/* Step bar */}
@@ -465,7 +581,7 @@ export default function NewRoutePage() {
           >
             <option value="">— pick a mountain —</option>
             {mountains.map((m) => (
-              <option key={m.id} value={m.id}>{m.name.en ?? m.name.ko}</option>
+              <option key={m.id} value={m.id}>{m.name.ko ?? m.name.en}{m.name.ko && m.name.en ? ` (${m.name.en})` : ""}</option>
             ))}
           </select>
         </div>
@@ -475,7 +591,7 @@ export default function NewRoutePage() {
       {step === 1 && (
         <div className={CARD}>
           <p className="text-sm font-semibold text-[var(--color-text-body)]">Upload full GPS track</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
+          <p className="text-sm text-[var(--color-text-muted)]">
             One GPX or GeoJSON file covering the entire hike — from station to station.
           </p>
 
@@ -508,7 +624,7 @@ export default function NewRoutePage() {
                 <CheckCircle size={16} className="text-green-500" />
                 {trackName}
               </div>
-              <p className="text-xs text-[var(--color-text-muted)] font-num">
+              <p className="text-sm text-[var(--color-text-muted)] font-num">
                 {trackPoints.length.toLocaleString()} points · {trackDistanceKm(trackPoints)} km
               </p>
               <button
@@ -549,7 +665,7 @@ export default function NewRoutePage() {
       {step === 2 && (
         <div className={CARD}>
           <p className="text-sm font-semibold text-[var(--color-text-body)]">Upload trail photos</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
+          <p className="text-sm text-[var(--color-text-muted)]">
             All photos from this hike. EXIF GPS is extracted automatically.
             Photos will be resized and saved as WebP.
           </p>
@@ -602,65 +718,89 @@ export default function NewRoutePage() {
 
           {photos.length > 0 && (
             <>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                웨이포인트에 해당하는 사진은 아래 드롭다운에서 지점 유형을 선택하세요.
-                EXIF GPS가 있으면 좌표가 자동으로 채워집니다.
+              <p className="text-sm text-[var(--color-text-muted)]">
+                웨이포인트 사진은 유형을 선택하세요. 설명은 하이커 화면에 표시됩니다.
+                {trackPoints && <span className="ml-1 text-primary font-medium">· GPS 기준 경로 순 정렬</span>}
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((p) => (
-                  <div key={p.key} className="flex flex-col gap-1">
-                    <div className="relative aspect-square rounded-lg overflow-hidden">
+              <div className="flex flex-col gap-2">
+                {[...photos]
+                  .map((p) => ({
+                    p,
+                    order: (p.lat != null && p.lon != null && trackPoints)
+                      ? trackIndexForCoord(p.lat, p.lon, trackPoints)
+                      : Infinity,
+                  }))
+                  .sort((a, b) => a.order - b.order)
+                  .map(({ p }) => {
+                  const idx = photos.indexOf(p);
+                  return (
+                  <div key={p.key} className="flex gap-3 items-start rounded-xl border border-[var(--color-border)] p-2 bg-white">
+                    {/* Thumbnail */}
+                    <div className="relative w-36 h-36 rounded-lg overflow-hidden flex-none">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={p.previewUrl} alt="" className="w-full h-full object-cover" />
                       {p.lat != null && (
-                        <span className="absolute top-0.5 left-0.5 text-[8px] font-bold bg-black/60 text-white px-0.5 rounded">
-                          GPS
-                        </span>
+                        <span className="absolute top-0.5 left-0.5 text-[8px] font-bold bg-black/60 text-white px-0.5 rounded">GPS</span>
                       )}
                       {p.waypointType && (
                         <div className={`absolute bottom-0 left-0 right-0 text-[9px] font-bold text-center py-0.5 ${WP_TYPE_BADGE[p.waypointType]}`}>
                           {WP_TYPE_KO[p.waypointType]}
                         </div>
                       )}
-                      <button
-                        onClick={() => {
-                          URL.revokeObjectURL(p.previewUrl);
-                          setPhotos((prev) => prev.filter((x) => x.key !== p.key));
-                        }}
-                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center text-[10px] hover:bg-red-500"
-                      >
-                        ×
-                      </button>
                     </div>
-                    <select
-                      className="text-[10px] rounded-md border border-[var(--color-border)] bg-[var(--color-bg-light)] px-1 py-0.5 w-full"
-                      value={p.waypointType ?? ""}
-                      onChange={(e) => {
-                        const t = e.target.value as WaypointType | "";
-                        setPhotos((prev) =>
-                          prev.map((x) =>
-                            x.key === p.key
-                              ? { ...x, waypointType: t || undefined }
-                              : x,
-                          ),
-                        );
-                      }}
+
+                    {/* Fields */}
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      <select
+                        className={INPUT}
+                        value={p.waypointType ?? ""}
+                        onChange={(e) => {
+                          const t = e.target.value as WaypointType | "";
+                          setPhotos((prev) => prev.map((x) => x.key === p.key ? { ...x, waypointType: t || undefined } : x));
+                        }}
+                      >
+                        <option value="">— 일반 사진</option>
+                        <option value="STATION">역 (Station)</option>
+                        <option value="BUS_STOP">버스 (Bus Stop)</option>
+                        <option value="TRAILHEAD">등산로 입구 (Trailhead)</option>
+                        <option value="SUMMIT">정상 (Summit)</option>
+                        <option value="PEAK">봉우리 (Peak)</option>
+                        <option value="JUNCTION">갈림길 (Junction)</option>
+                        <option value="SHELTER">쉼터 (Shelter)</option>
+                        <option value="VIEW">전망 (View)</option>
+                        <option value="LANDMARK">랜드마크·바위 (Landmark)</option>
+                        <option value="CAUTION">주의구간 (Caution)</option>
+                      </select>
+                      <textarea
+                        rows={3}
+                        className={INPUT + " resize-none"}
+                        placeholder="설명 (KO)"
+                        value={p.descKo}
+                        onChange={(e) => { const next = [...photos]; next[idx] = { ...next[idx], descKo: e.target.value }; setPhotos(next); }}
+                      />
+                      <textarea
+                        rows={3}
+                        className={INPUT + " resize-none"}
+                        placeholder="Description (EN)"
+                        value={p.descEn}
+                        onChange={(e) => { const next = [...photos]; next[idx] = { ...next[idx], descEn: e.target.value }; setPhotos(next); }}
+                      />
+                    </div>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => { URL.revokeObjectURL(p.previewUrl); setPhotos((prev) => prev.filter((x) => x.key !== p.key)); }}
+                      className="p-1 text-[var(--color-text-muted)] hover:text-red-500 transition-colors flex-none mt-0.5"
                     >
-                      <option value="">— 일반 사진</option>
-                      <option value="STATION">역 (Station)</option>
-                      <option value="BUS_STOP">버스 정류장</option>
-                      <option value="TRAILHEAD">등산로 입구</option>
-                      <option value="SUMMIT">정상</option>
-                      <option value="JUNCTION">갈림길</option>
-                      <option value="SHELTER">쉼터</option>
-                    </select>
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {photos.some((p) => p.waypointType) && (
-                <p className="text-xs text-primary font-medium">
-                  웨이포인트 {photos.filter((p) => p.waypointType).length}개 태깅됨 —
-                  다음 단계에서 이름을 확인·입력하세요
+                <p className="text-sm text-primary font-medium">
+                  웨이포인트 {photos.filter((p) => p.waypointType).length}개 태깅됨 — 다음 단계에서 이름을 확인·입력하세요
                 </p>
               )}
             </>
@@ -689,66 +829,17 @@ export default function NewRoutePage() {
           ) : (
             <StepSegments
               segments={segments}
+              existingSegments={existingSegments}
+              waypointSlots={waypointSlots}
+              existingWaypoints={existingWaypoints}
               onChange={setSegments}
             />
           )}
         </>
       )}
 
-      {/* ── Step 5: Photo captions ── */}
+      {/* ── Step 5: Route meta + save ── */}
       {step === 5 && (
-        <div className={CARD}>
-          <p className="text-sm font-semibold text-[var(--color-text-body)]">
-            Photo captions <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Add EN/KO descriptions for photos that will appear in the hiker view.
-            You can skip and edit later.
-          </p>
-          <div className="flex flex-col gap-3">
-            {photos.map((p, idx) => (
-              <div key={p.key} className="flex gap-3 items-start">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.previewUrl} alt="" className="w-16 h-16 rounded-xl object-cover flex-none" />
-                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                  <input
-                    className={INPUT}
-                    placeholder="설명 (KO)"
-                    value={p.descKo}
-                    onChange={(e) => {
-                      const next = [...photos];
-                      next[idx] = { ...next[idx], descKo: e.target.value };
-                      setPhotos(next);
-                    }}
-                  />
-                  <input
-                    className={INPUT}
-                    placeholder="Description (EN)"
-                    value={p.descEn}
-                    onChange={(e) => {
-                      const next = [...photos];
-                      next[idx] = { ...next[idx], descEn: e.target.value };
-                      setPhotos(next);
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={() => {
-                    URL.revokeObjectURL(p.previewUrl);
-                    setPhotos((prev) => prev.filter((x) => x.key !== p.key));
-                  }}
-                  className="mt-1 p-1.5 text-[var(--color-text-muted)] hover:text-red-500 transition-colors flex-none"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 6: Route meta + save ── */}
-      {step === 6 && (
         <div className={CARD}>
           <p className="text-sm font-semibold text-[var(--color-text-body)]">Route details</p>
 
@@ -814,7 +905,7 @@ export default function NewRoutePage() {
               {tags.length < 3 && (
                 <button
                   onClick={() => setTags((prev) => [...prev, { en: "", ko: "" }])}
-                  className="text-[11px] text-primary font-semibold"
+                  className="text-sm text-primary font-semibold"
                 >
                   + Add
                 </button>
@@ -860,7 +951,7 @@ export default function NewRoutePage() {
               <p className={LABEL}>Highlights (optional)</p>
               <button
                 onClick={() => setHighlights((prev) => [...prev, { type: "highlight", en: "", ko: "" }])}
-                className="text-[11px] text-primary font-semibold"
+                className="text-sm text-primary font-semibold"
               >
                 + Add
               </button>
@@ -869,7 +960,7 @@ export default function NewRoutePage() {
               <div key={i} className="flex flex-col gap-1.5 rounded-xl border border-[var(--color-border)] p-3">
                 <div className="flex items-center gap-2">
                   <select
-                    className="rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs bg-[var(--color-bg-light)] focus:outline-none flex-none"
+                    className="rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-sm bg-[var(--color-bg-light)] focus:outline-none flex-none"
                     value={h.type}
                     onChange={(e) => {
                       const next = [...highlights];
@@ -915,7 +1006,7 @@ export default function NewRoutePage() {
           </div>
 
           {/* Summary */}
-          <div className="rounded-xl bg-[var(--color-bg-light)] p-3 text-xs text-[var(--color-text-muted)] flex flex-col gap-1">
+          <div className="rounded-xl bg-[var(--color-bg-light)] p-3 text-sm text-[var(--color-text-muted)] flex flex-col gap-1">
             <p>
               <span className="font-semibold text-[var(--color-text-body)]">Track:</span>{" "}
               <span className="font-num">{trackPoints ? `${trackDistanceKm(trackPoints)} km · ${trackPoints.length.toLocaleString()} pts` : "—"}</span>

@@ -91,19 +91,41 @@ function computeStats(points: TrackPoint[]) {
   };
 }
 
-// GET /api/admin/segments?mountainId=X
+// GET /api/admin/segments?mountainId=X[&type=APPROACH]
 export async function GET(req: NextRequest) {
-  const mountainId = req.nextUrl.searchParams.get("mountainId");
+  const mountainId  = req.nextUrl.searchParams.get("mountainId");
+  const segmentType = req.nextUrl.searchParams.get("type");
   if (!mountainId) return NextResponse.json({ error: "mountainId is required" }, { status: 400 });
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("segments")
-    .select("id, slug, name, segment_type, start_waypoint_id, end_waypoint_id, distance_m, total_ascent_m, total_descent_m, estimated_time_min, difficulty, is_bus_combined, bus_details")
+    .select(`
+      id, slug, name, segment_type,
+      start_waypoint_id, end_waypoint_id,
+      distance_m, total_ascent_m, total_descent_m,
+      estimated_time_min, difficulty,
+      is_bus_combined, bus_details,
+      start_wp:start_waypoint_id(name),
+      end_wp:end_waypoint_id(name)
+    `)
     .eq("mountain_id", mountainId)
     .order("id");
 
+  if (segmentType) query = query.eq("segment_type", segmentType.toUpperCase()) as typeof query;
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // Flatten waypoint names for convenience
+  const result = (data ?? []).map((seg: any) => ({
+    ...seg,
+    start_wp_name:    seg.start_wp?.name?.en ?? null,
+    start_wp_name_ko: seg.start_wp?.name?.ko ?? null,
+    end_wp_name:      seg.end_wp?.name?.en ?? null,
+    end_wp_name_ko:   seg.end_wp?.name?.ko ?? null,
+  }));
+
+  return NextResponse.json(result);
 }
 
 // PATCH /api/admin/segments — FormData; all fields optional except id

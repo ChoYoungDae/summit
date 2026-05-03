@@ -15,6 +15,34 @@ type Mountain = { id: number; name: { en?: string; ko?: string } };
 type RouteItem = { id: number; name: { en?: string; ko?: string } };
 type Segment   = { id: number; segment_type: string };
 
+type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "PEAK" | "JUNCTION" | "SHELTER" | "VIEW" | "LANDMARK" | "CAUTION" | "BUS_STOP";
+
+const WP_TYPE_OPTIONS: { value: WaypointType; label: string }[] = [
+  { value: "SUMMIT",    label: "Summit (정상)" },
+  { value: "PEAK",      label: "Peak (봉우리)" },
+  { value: "VIEW",      label: "View (전망)" },
+  { value: "LANDMARK",  label: "Landmark (랜드마크·바위)" },
+  { value: "TRAILHEAD", label: "Trailhead (입구)" },
+  { value: "JUNCTION",  label: "Junction (갈림길)" },
+  { value: "SHELTER",   label: "Shelter (쉼터)" },
+  { value: "CAUTION",   label: "Caution (주의)" },
+  { value: "STATION",   label: "Station (역)" },
+  { value: "BUS_STOP",  label: "Bus Stop (버스)" },
+];
+
+const WP_TYPE_CHIP: Record<WaypointType, string> = {
+  SUMMIT:    "bg-amber-100 text-amber-700",
+  PEAK:      "bg-orange-100 text-orange-700",
+  VIEW:      "bg-cyan-100 text-cyan-700",
+  LANDMARK:  "bg-indigo-100 text-indigo-700",
+  TRAILHEAD: "bg-green-100 text-green-700",
+  JUNCTION:  "bg-purple-100 text-purple-700",
+  SHELTER:   "bg-gray-100 text-gray-600",
+  CAUTION:   "bg-red-100 text-red-700",
+  STATION:   "bg-blue-100 text-blue-700",
+  BUS_STOP:  "bg-teal-100 text-teal-700",
+};
+
 interface PhotoEntry {
   /** Unique key within the upload session */
   key:           string;
@@ -34,6 +62,8 @@ interface PhotoEntry {
   orderIndex:    number;
   descriptionEn: string;
   descriptionKo: string;
+  /** Waypoint type classification shown as chip in the photo viewer */
+  waypointType:  WaypointType | "";
   state: "pending" | "uploading" | "uploaded" | "saving" | "saved" | "error";
   errorMsg?: string;
 }
@@ -257,6 +287,7 @@ export default function PhotoUploadCard() {
           id: number; url: string; lat: number | null; lon: number | null;
           segmentId: number | null; orderIndex: number | null;
           description: Record<string, string> | null;
+          waypointType: WaypointType | null;
         }) => ({
           key:           `existing-${p.id}`,
           file:          new File([], ""),
@@ -271,6 +302,7 @@ export default function PhotoUploadCard() {
           orderIndex:    p.orderIndex ?? 999_999,
           descriptionEn: p.description?.en ?? "",
           descriptionKo: p.description?.ko ?? "",
+          waypointType:  (p.waypointType ?? "") as WaypointType | "",
           state:         "saved" as const,
         }));
         setPhotos(existing); // API already returns them ordered by order_index
@@ -295,6 +327,7 @@ export default function PhotoUploadCard() {
       orderIndex:    999_999,
       descriptionEn: "",
       descriptionKo: "",
+      waypointType:  "",
       state:         "pending",
     }));
 
@@ -376,7 +409,8 @@ export default function PhotoUploadCard() {
             ...(entry.descriptionEn ? { en: entry.descriptionEn } : {}),
             ...(entry.descriptionKo ? { ko: entry.descriptionKo } : {}),
           } : null,
-          segment_id: entry.segmentId,
+          segment_id:   entry.segmentId,
+          waypoint_type: entry.waypointType || null,
         }),
       });
       if (!res.ok) {
@@ -415,7 +449,7 @@ export default function PhotoUploadCard() {
     }
   }
 
-  function updateField(key: string, field: "descriptionEn" | "descriptionKo" | "segmentId", value: string | number | null) {
+  function updateField(key: string, field: "descriptionEn" | "descriptionKo" | "segmentId" | "waypointType", value: string | number | null) {
     setPhotos(prev => prev.map(p =>
       p.key !== key ? p : { ...p, [field]: value, state: p.state === "saved" ? "uploaded" : p.state }
     ));
@@ -637,6 +671,31 @@ export default function PhotoUploadCard() {
                   {/* Description + segment — only shown once uploaded */}
                   {(entry.id != null) && (
                     <div className="border-t border-[var(--color-border)] p-3 flex flex-col gap-2.5">
+
+                      {/* Waypoint type */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                          Waypoint Type
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={entry.waypointType}
+                            onChange={e => updateField(entry.key, "waypointType", e.target.value)}
+                            className={INPUT + " text-xs py-1.5 flex-1"}
+                          >
+                            <option value="">— None —</option>
+                            {WP_TYPE_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                          {entry.waypointType && (
+                            <span className={`text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 ${WP_TYPE_CHIP[entry.waypointType as WaypointType] ?? ""}`}>
+                              {entry.waypointType}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Segment selector */}
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">

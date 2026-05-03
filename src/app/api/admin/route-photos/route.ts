@@ -101,9 +101,10 @@ function toPhoto(row: any) {
     lat:           row.lat ?? null,
     lon:           row.lon ?? null,
     url:           row.url,
-    description: row.description ?? null,
+    description:   row.description ?? null,
     orderIndex:    row.order_index ?? 0,
     createdAt:     row.created_at,
+    waypointType:  row.waypoint_type ?? null,
   };
 }
 
@@ -247,13 +248,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ photos: results });
     }
 
-    const { id, description, segment_id, order_index, recalculate } = body;
+    const { id, description, segment_id, order_index, recalculate, waypoint_type } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     const patch: Record<string, unknown> = {};
-    if (description  !== undefined) patch.description  = description;
-    if (segment_id   !== undefined) patch.segment_id   = segment_id;
-    if (order_index  !== undefined) patch.order_index  = order_index;
+    if (description   !== undefined) patch.description   = description;
+    if (segment_id    !== undefined) patch.segment_id    = segment_id;
+    if (order_index   !== undefined) patch.order_index   = order_index;
+    if (waypoint_type !== undefined) patch.waypoint_type = waypoint_type;
 
     // Handle recalculation request
     if (recalculate) {

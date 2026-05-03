@@ -1,4 +1,4 @@
-export type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "JUNCTION" | "SHELTER" | "BUS_STOP";
+export type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "PEAK" | "JUNCTION" | "SHELTER" | "VIEW" | "LANDMARK" | "CAUTION" | "BUS_STOP";
 
 export interface PhotoItem {
   key:         string;
@@ -54,11 +54,35 @@ export interface ExistingWaypoint {
 }
 
 export interface SegmentPreview {
-  segType:       string;
-  startWpName:   string;
+  segType:        string;
+  source:         "new" | "existing";
+  existingId?:    number;
+  startWpName:    string;
   startWpNameKo?: string;
-  endWpName:     string;
+  endWpName:      string;
   endWpNameKo?:   string;
-  distanceM:     number;
-  durationMin:   number;
+  distanceM:      number;
+  durationMin:    number;
+  // Bus sub-segment (APPROACH / RETURN only)
+  isBusCombined?:      boolean;
+  busDurationMin?:     number;
+  busColor?:           string;
+  busNumbers?:         string;
+  stationBusStopName?: string;
+  // Waypoint boundary overrides (index into waypointSpecs / resolved[])
+  startWpIdx?: number;
+  endWpIdx?:   number;
+}
+
+export interface ExistingSegment {
+  id:                 number;
+  slug:               string;
+  segment_type:       string;
+  distance_m?:        number;
+  estimated_time_min?: number;
+  is_bus_combined?:   boolean;
+  start_wp_name?:     string;
+  start_wp_name_ko?:  string;
+  end_wp_name?:       string;
+  end_wp_name_ko?:    string;
 }
