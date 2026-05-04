@@ -171,31 +171,21 @@ export default function HomePage() {
         className="rounded-[var(--radius-card)] overflow-hidden active:opacity-80 transition-opacity"
         style={{ border: "1px solid rgba(229,52,42,0.25)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", display: "block" }}
       >
-        <div className="flex items-center gap-3 px-4 py-3.5 bg-white">
-          {/* S logo — red rounded square, white S */}
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: "#E5342A" }}
-          >
-            <span
-              className="text-[17px] font-black leading-none text-white"
-              style={{ fontFamily: "var(--font-en)" }}
-            >
-              S
-            </span>
-          </div>
+        <div className="flex items-center gap-3 px-4 py-3.5 bg-white" style={{ fontFamily: "var(--font-en)" }}>
+          <img
+            src="/images/stepfree-icon.png"
+            alt="Step-Free Seoul Subway"
+            className="w-11 h-11 rounded-xl shrink-0"
+          />
           <div className="flex-1 min-w-0">
-            <p
-              className="text-[13px] font-bold leading-tight"
-              style={{ color: "#E5342A", fontFamily: "var(--font-en)" }}
-            >
+            <p className="text-base font-bold leading-tight" style={{ color: "#E5342A" }}>
               Step-Free Seoul Subway
             </p>
-            <p className="text-[11px] leading-tight mt-0.5 text-[var(--color-text-muted)]">
+            <p className="text-sm leading-tight mt-0.5 text-[var(--color-text-muted)]">
               No More Stairs. Elevator-to-Elevator.
             </p>
           </div>
-          <ExternalLink size={15} style={{ color: "#E5342A" }} className="shrink-0" />
+          <ExternalLink size={16} style={{ color: "#E5342A" }} className="shrink-0 opacity-70" />
         </div>
       </Link>
 
