@@ -105,14 +105,53 @@ function extractCoords(geojson: any): GeoCoord[] {
   const type: string = geojson?.type;
 
   if (type === "FeatureCollection") {
-    let bestCoords: GeoCoord[] = [];
+    // Collect all LineString coordinate arrays (skip Points, etc.)
+    const lines: GeoCoord[][] = [];
     for (const f of geojson.features ?? []) {
-      const coords = extractCoords(f);
-      if (coords.length > bestCoords.length) {
-        bestCoords = coords;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const geom: any = f?.geometry ?? f;
+      if (!geom) continue;
+      if (geom.type === "LineString" && Array.isArray(geom.coordinates) && geom.coordinates.length > 0) {
+        lines.push(geom.coordinates as GeoCoord[]);
+      } else if (geom.type === "MultiLineString" && Array.isArray(geom.coordinates)) {
+        lines.push((geom.coordinates as GeoCoord[][]).flat());
       }
+      // Skip Points and other geometry types
     }
-    return bestCoords;
+
+    if (lines.length === 0) return [];
+    if (lines.length === 1) return lines[0]!;
+
+    // Greedily chain LineStrings that connect end-to-end (within ~20 m ≈ 0.0002°).
+    // This handles multi-segment GeoJSON exports where each segment is a separate feature.
+    const CONN_TOL = 0.0002;
+    const d2d = (a: GeoCoord, b: GeoCoord) =>
+      Math.hypot((a[0] ?? 0) - (b[0] ?? 0), (a[1] ?? 0) - (b[1] ?? 0));
+
+    let best: GeoCoord[] = [];
+    for (let s = 0; s < lines.length; s++) {
+      if (!lines[s]?.length) continue;
+      const used = new Set([s]);
+      const chain: GeoCoord[] = [...lines[s]!];
+      for (;;) {
+        const tail = chain[chain.length - 1]!;
+        let ni = -1, nd = Infinity;
+        for (let j = 0; j < lines.length; j++) {
+          if (used.has(j) || !lines[j]?.length) continue;
+          const d = d2d(tail, lines[j]![0]!);
+          if (d < nd) { nd = d; ni = j; }
+        }
+        if (ni < 0 || nd > CONN_TOL) break;
+        chain.push(...lines[ni]!);
+        used.add(ni);
+      }
+      if (chain.length > best.length) best = chain;
+    }
+
+    // Fallback: if no chain found, return longest single line (old behaviour)
+    return best.length > 0
+      ? best
+      : lines.reduce((a, b) => b.length > a.length ? b : a, [] as GeoCoord[]);
   }
 
   if (type === "Feature") return extractCoords(geojson.geometry);

@@ -56,6 +56,11 @@ function renderUrl(url: string, width: number): string {
   return url.replace("/object/public/", "/render/image/public/") + `?width=${width}&quality=80`;
 }
 
+// ── Photo visibility rules ────────────────────────────────────────────────────
+// All photos must be within 30 m of this route's walking track to be visible.
+// Photos without GPS are shown only if they belong directly to this route.
+const PHOTO_PROXIMITY_KM = 0.03; // 30 metres
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface BusInfo {
@@ -130,15 +135,70 @@ export default function TrailSection({
 
   // Fetch route photos once on mount, then preload all into browser cache
   useEffect(() => {
-    fetch(`/api/admin/route-photos?routeId=${route.id}`)
+    fetch(`/api/admin/route-photos?routeId=${route.id}&includeSiblings=true`)
       .then(r => r.ok ? r.json() : [])
       .then((data: RoutePhoto[]) => {
         if (!Array.isArray(data)) return;
         setPhotos(data);
+        // Preload all candidate photos (even filtered ones) for instant display
         data.forEach(p => { const img = new window.Image(); img.src = renderUrl(p.url, 900); });
       })
       .catch(() => {});
   }, [route.id]);
+
+  // ── GPS proximity filter + route-relative sort ────────────────────────────
+  // Build a flat [lon, lat] point list covering walk/hiking sub-tracks ONLY.
+  // Bus tracks (city streets) are intentionally excluded — proximity to a bus
+  // route should NOT pull in urban photos that aren't on the hiking trail.
+  const routeTrackFlat = useMemo<Array<[number, number]>>(() => {
+    // track is [lon, lat, elev][]; approach/return sub-tracks are [lon, lat][]
+    const pts: Array<[number, number]> = [];
+    for (const pt of track)             pts.push([pt[0], pt[1]]);
+    for (const pt of approachWalkTrack) pts.push([pt[0], pt[1]]);
+    // approachBusTrack excluded — bus goes through city, not the trail
+    for (const pt of returnWalkTrack)   pts.push([pt[0], pt[1]]);
+    // returnBusTrack excluded — same reason
+    return pts;
+  }, [track, approachWalkTrack, returnWalkTrack]);
+
+  // Cumulative distance (km) along routeTrackFlat — used to sort photos in trail order.
+  const trackCumDist = useMemo<number[]>(() => {
+    const cum = [0];
+    for (let i = 1; i < routeTrackFlat.length; i++) {
+      const prev = routeTrackFlat[i - 1]!;
+      const curr = routeTrackFlat[i]!;
+      cum.push(cum[i - 1]! + haversineKm(prev[1], prev[0], curr[1], curr[0]));
+    }
+    return cum;
+  }, [routeTrackFlat]);
+
+  // Returns cumulative distance (km) from route start to the nearest track point.
+  // Photos without GPS get Infinity so they sort to the end.
+  function photoTrailDist(p: RoutePhoto): number {
+    if (p.lat == null || p.lon == null) return Infinity;
+    let bestIdx = 0, bestDist = Infinity;
+    for (let i = 0; i < routeTrackFlat.length; i++) {
+      const pt = routeTrackFlat[i]!;
+      const d = haversineKm(p.lat, p.lon, pt[1], pt[0]);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    return trackCumDist[bestIdx] ?? Infinity;
+  }
+
+  // visiblePhotos: filtered AND sorted by position along THIS route's track.
+  // Candidate pool is already scoped by the API (this route + sibling routes only).
+  // Client filter: infrastructure waypoints always show; everything else needs 30 m proximity.
+  const visiblePhotos = useMemo<RoutePhoto[]>(() => {
+    if (routeTrackFlat.length === 0) return photos;
+    const filtered = photos.filter(p => {
+      // No GPS: only show if it belongs directly to this route
+      if (p.lat == null || p.lon == null) return p.routeId === route.id;
+      // Has GPS: must be within 30 m of this route's walking track — no exceptions by type
+      return routeTrackFlat.some(pt => haversineKm(p.lat!, p.lon!, pt[1], pt[0]) < PHOTO_PROXIMITY_KM);
+    });
+    // Sort by distance along this route's track (ignores stored order_index)
+    return [...filtered].sort((a, b) => photoTrailDist(a) - photoTrailDist(b));
+  }, [photos, routeTrackFlat, trackCumDist]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Hiking mode: "preview" (far from trailhead) | "active" (within 500 m) ──
   const [hikingMode, setHikingMode] = useState<"preview" | "active">("preview");
@@ -369,7 +429,7 @@ export default function TrailSection({
         controlsBottomOffset={sheetHeightPx}
         locale={locale}
         // Unified Logic: Filter out photos that are already represented as Waypoints
-        photos={photos.filter(p => {
+        photos={visiblePhotos.filter(p => {
           if (p.lat == null || p.lon == null) return true;
           // If a waypoint is within 20m of this photo, don't show it as a separate camera icon
           const isAtWaypoint = waypoints.some(wpt => haversineKm(p.lat!, p.lon!, wpt.lat, wpt.lon) < 0.02);
@@ -534,9 +594,9 @@ export default function TrailSection({
 
           {/* ── Photo description popup (Unified for Photos & Waypoints) ── */}
           {activePhoto && (() => {
-            const photoIndex = photos.findIndex(p => p.id === activePhoto.id);
+            const photoIndex = visiblePhotos.findIndex(p => p.id === activePhoto.id);
             const canPrev    = photoIndex > 0;
-            const canNext    = photoIndex < photos.length - 1;
+            const canNext    = photoIndex < visiblePhotos.length - 1;
 
             // Find if this photo represents a Waypoint (increased threshold to 100m)
             let linkedWpt: Waypoint | null = null;
@@ -567,8 +627,8 @@ export default function TrailSection({
                     onTouchStart={e => { photoTouchStartX.current = e.touches[0].clientX; }}
                     onTouchEnd={e => {
                       const delta = e.changedTouches[0].clientX - photoTouchStartX.current;
-                      if (delta >  50 && canPrev) setActivePhoto(photos[photoIndex - 1]);
-                      if (delta < -50 && canNext) setActivePhoto(photos[photoIndex + 1]);
+                      if (delta >  50 && canPrev) setActivePhoto(visiblePhotos[photoIndex - 1]);
+                      if (delta < -50 && canNext) setActivePhoto(visiblePhotos[photoIndex + 1]);
                     }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -630,7 +690,7 @@ export default function TrailSection({
                     {/* Navigation Arrows */}
                     {canPrev && (
                       <button
-                        onClick={() => setActivePhoto(photos[photoIndex - 1])}
+                        onClick={() => setActivePhoto(visiblePhotos[photoIndex - 1])}
                         className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center
                                    bg-black/25 backdrop-blur-sm text-white hover:bg-black/45 transition-colors"
                         aria-label="Previous photo"
@@ -640,7 +700,7 @@ export default function TrailSection({
                     )}
                     {canNext && (
                       <button
-                        onClick={() => setActivePhoto(photos[photoIndex + 1])}
+                        onClick={() => setActivePhoto(visiblePhotos[photoIndex + 1])}
                         className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center
                                    bg-black/25 backdrop-blur-sm text-white hover:bg-black/45 transition-colors"
                         aria-label="Next photo"
@@ -650,9 +710,9 @@ export default function TrailSection({
                     )}
 
                     {/* Counter */}
-                    {photos.length > 1 && (
+                    {visiblePhotos.length > 1 && (
                       <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[12px] font-num text-white/90 bg-black/35 backdrop-blur-md px-3 py-1 rounded-full">
-                        {photoIndex + 1} / {photos.length}
+                        {photoIndex + 1} / {visiblePhotos.length}
                       </p>
                     )}
                   </div>

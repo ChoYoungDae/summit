@@ -758,7 +758,9 @@ export default function MapView({
     setIsMapLoaded(true);
     const map = mapRef.current?.getMap();
     if (map) {
-      const svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M9,13.25C9.21,11.23,10.61,9.75,12,8c1.39,1.75,2.79,3.23,3,5.25c0.16,1.46-0.67,2.75-2,2.75S9.84,14.71,9,13.25z M12,2C10.9,2,10,2.9,10,4s0.9,2,2,2s2-0.9,2-2S13.1,2,12,2z M12,18c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,18,12,18z"/></svg>`;
+      // Chevron icon — points UP (↑) in SVG coords so that symbol-placement:line
+      // auto-rotates it to face the travel direction (renders as › along the line).
+      const svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="5,17 12,7 19,17" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
       const img = new Image(24, 24);
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -1166,9 +1168,9 @@ export default function MapView({
               minzoom={14}
               layout={{
                 "icon-image": "footprint",
-                "icon-size": 0.45,
+                "icon-size": 0.65,
                 "symbol-placement": "line",
-                "symbol-spacing": 60,
+                "symbol-spacing": 80,
                 "icon-rotate": 90,
                 "icon-allow-overlap": true
               }}
@@ -1201,9 +1203,9 @@ export default function MapView({
                 minzoom={14}
                 layout={{
                   "icon-image": "footprint",
-                  "icon-size": 0.45,
+                  "icon-size": 0.65,
                   "symbol-placement": "line",
-                  "symbol-spacing": 60,
+                  "symbol-spacing": 80,
                   "icon-rotate": 90,
                   "icon-allow-overlap": true
                 }}
