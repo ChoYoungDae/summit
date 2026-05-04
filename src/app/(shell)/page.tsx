@@ -119,9 +119,12 @@ export default function HomePage() {
       <MountainDiscovery />
 
       {/* ── Step-Free Seoul Subway ──────────────────────────────── */}
-      <section
-        className="rounded-[var(--radius-card)] overflow-hidden"
-        style={{ border: "1px solid rgba(229,52,42,0.18)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}
+      <Link
+        href="https://subway.seoulroutes.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-[var(--radius-card)] overflow-hidden active:opacity-80 transition-opacity"
+        style={{ border: "1px solid rgba(229,52,42,0.18)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", display: "block" }}
       >
         {/* Brand header */}
         <div className="flex items-center gap-3 px-4 py-3" style={{ background: "#E5342A" }}>
@@ -146,42 +149,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Features + CTA */}
-        <div className="bg-white px-4 py-4 flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { icon: "ph:elevator", label: "Elevator Routes" },
-              { icon: "ph:suitcase-rolling", label: "Luggage Friendly" },
-              { icon: "ph:buildings", label: "Station Amenities" },
-            ].map(({ icon, label }) => (
-              <div key={label} className="flex flex-col items-center gap-1.5 text-center">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(229,52,42,0.08)" }}
-                >
-                  <Icon icon={icon} width={20} height={20} style={{ color: "#E5342A" }} />
-                </div>
-                <span
-                  className="text-[10px] font-semibold text-[#3A3A45] leading-tight uppercase tracking-wide"
-                  style={{ fontFamily: "var(--font-en)" }}
-                >
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <Link
-            href="https://subway.seoulroutes.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full py-2.5 rounded-full text-center text-[13px] font-bold text-white transition-opacity active:opacity-80"
-            style={{ background: "#E5342A" }}
-          >
-            Find Elevator Route →
-          </Link>
-        </div>
-      </section>
+      </Link>
 
       {/* ── Personal Note & Feedback ────────────────────────────── */}
       <section 
