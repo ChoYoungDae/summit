@@ -471,7 +471,7 @@ export const getCachedRoute = (id: number) =>
     ? fetchRoute(id)   // dev: 캐시 없이 항상 DB에서 직접 조회
     : unstable_cache(
         async (rid: number) => fetchRoute(rid),
-        ["route-detail", String(id)],
+        ["route-detail-v2", String(id)],  // v2: force cache refresh after full GPS track upload
         { revalidate: 60 * 60, tags: ["route-detail", `route-detail-${id}`] }
       )(id);
 
