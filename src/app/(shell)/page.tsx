@@ -171,28 +171,31 @@ export default function HomePage() {
         className="rounded-[var(--radius-card)] overflow-hidden active:opacity-80 transition-opacity"
         style={{ border: "1px solid rgba(229,52,42,0.25)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", display: "block" }}
       >
-        <div className="flex items-center gap-3 px-4 py-3" style={{ background: "#E5342A" }}>
-          {/* S logo */}
+        <div className="flex items-center gap-3 px-4 py-3.5 bg-white">
+          {/* S logo — red rounded square, white S */}
           <div
-            className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0"
-            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "#E5342A" }}
           >
             <span
-              className="text-[15px] font-black leading-none"
-              style={{ color: "#E5342A", fontFamily: "var(--font-en)" }}
+              className="text-[17px] font-black leading-none text-white"
+              style={{ fontFamily: "var(--font-en)" }}
             >
               S
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-[13px] font-bold leading-tight">
+            <p
+              className="text-[13px] font-bold leading-tight"
+              style={{ color: "#E5342A", fontFamily: "var(--font-en)" }}
+            >
               Step-Free Seoul Subway
             </p>
-            <p className="text-white/75 text-[11px] leading-tight mt-0.5">
+            <p className="text-[11px] leading-tight mt-0.5 text-[var(--color-text-muted)]">
               No More Stairs. Elevator-to-Elevator.
             </p>
           </div>
-          <ExternalLink size={16} className="shrink-0 text-white/80" />
+          <ExternalLink size={15} style={{ color: "#E5342A" }} className="shrink-0" />
         </div>
       </Link>
 
