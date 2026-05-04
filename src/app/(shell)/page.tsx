@@ -1,5 +1,5 @@
 "use client";
-import { TrainFront, Navigation, Sun, Map } from "lucide-react";
+import { TrainFront, Navigation, Sun, Map, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import MountainDiscovery from "@/components/ui/MountainDiscovery";
@@ -118,39 +118,6 @@ export default function HomePage() {
       {/* ── Interest Chips + Mountain Illustration (shared state) ── */}
       <MountainDiscovery />
 
-      {/* ── Step-Free Seoul Subway ──────────────────────────────── */}
-      <Link
-        href="https://subway.seoulroutes.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-[var(--radius-card)] overflow-hidden active:opacity-80 transition-opacity"
-        style={{ border: "1px solid rgba(229,52,42,0.18)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", display: "block" }}
-      >
-        {/* Brand header */}
-        <div className="flex items-center gap-3 px-4 py-3" style={{ background: "#E5342A" }}>
-          <div
-            className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0"
-            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}
-          >
-            <span
-              className="text-[15px] font-black leading-none"
-              style={{ color: "#E5342A", fontFamily: "var(--font-en)" }}
-            >
-              S
-            </span>
-          </div>
-          <div>
-            <p className="text-white text-[13px] font-bold leading-tight">
-              Step-Free Seoul Subway
-            </p>
-            <p className="text-white/75 text-[11px] leading-tight mt-0.5">
-              No More Stairs. Elevator-to-Elevator.
-            </p>
-          </div>
-        </div>
-
-      </Link>
-
       {/* ── Personal Note & Feedback ────────────────────────────── */}
       <section 
         className="mt-2 rounded-[16px] border border-[#4A5D4E]/20 bg-[#F9F9F9] p-6 flex flex-col gap-4 shadow-sm"
@@ -195,6 +162,42 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── Step-Free Seoul Subway ──────────────────────────────── */}
+      <Link
+        href="https://subway.seoulroutes.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-[var(--radius-card)] overflow-hidden active:opacity-80 transition-opacity"
+        style={{ border: "1px solid rgba(229,52,42,0.25)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", display: "block" }}
+      >
+        <div className="flex items-center gap-3 px-4 py-3.5 bg-white">
+          {/* S logo — matching site brand */}
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "#E5342A", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}
+          >
+            <span
+              className="text-[17px] font-black leading-none text-white"
+              style={{ fontFamily: "var(--font-en)" }}
+            >
+              S
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p
+              className="text-[13px] font-bold leading-tight"
+              style={{ color: "#E5342A", fontFamily: "var(--font-en)" }}
+            >
+              Step-Free Seoul Subway
+            </p>
+            <p className="text-[11px] leading-tight mt-0.5 text-[var(--color-text-muted)]">
+              No More Stairs. Elevator-to-Elevator.
+            </p>
+          </div>
+          <ExternalLink size={16} className="shrink-0 text-[var(--color-text-muted)]" />
+        </div>
+      </Link>
 
     </div>
   );
