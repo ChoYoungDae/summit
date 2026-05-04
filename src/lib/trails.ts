@@ -292,8 +292,12 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
       groups.set(row.mountain_id, { mountain, routes: [] });
     }
 
-    // Concatenate elevation coordinates in segment order
-    const elevationTrack: [number, number, number][] = (row.segment_ids ?? []).flatMap(
+    // Concatenate elevation coordinates in segment order, then subsample
+    // to ≤200 points. The route-list elevation chart is a small preview —
+    // it doesn't need full GPS resolution, and keeping it lean ensures the
+    // unstable_cache payload stays well under the 2 MB limit.
+    const MAX_ELEVATION_PTS = 200;
+    const rawElevation: [number, number, number][] = (row.segment_ids ?? []).flatMap(
       (sid) => {
         const geo = trackMap.get(sid);
         if (!geo) return [];
@@ -302,6 +306,10 @@ export const fetchRouteList = cache(async (): Promise<MountainGroup[]> => {
         );
       }
     );
+    const step = Math.max(1, Math.ceil(rawElevation.length / MAX_ELEVATION_PTS));
+    const elevationTrack = step === 1
+      ? rawElevation
+      : rawElevation.filter((_, i) => i % step === 0 || i === rawElevation.length - 1);
 
     // Build ordered unique waypoint list: start of first seg, then end of each seg
     const segIds = row.segment_ids ?? [];
@@ -458,12 +466,14 @@ export const fetchRoute = cache(async (id: number): Promise<ResolvedRoute | null
   };
 });
 
-export const getCachedRoute = (id: number) => 
-  unstable_cache(
-    async (rid: number) => fetchRoute(rid),
-    ["route-detail", String(id)],
-    { revalidate: 60 * 60, tags: ["route-detail", `route-detail-${id}`] }
-  )(id);
+export const getCachedRoute = (id: number) =>
+  process.env.NODE_ENV === "development"
+    ? fetchRoute(id)   // dev: 캐시 없이 항상 DB에서 직접 조회
+    : unstable_cache(
+        async (rid: number) => fetchRoute(rid),
+        ["route-detail", String(id)],
+        { revalidate: 60 * 60, tags: ["route-detail", `route-detail-${id}`] }
+      )(id);
 
 // ── Home map data ─────────────────────────────────────────────────────────────
 
