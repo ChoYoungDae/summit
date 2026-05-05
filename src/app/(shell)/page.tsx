@@ -1,5 +1,5 @@
 "use client";
-import { TrainFront, Navigation, Sun, Map, ExternalLink } from "lucide-react";
+import { TrainFront, Navigation, Sun, Map } from "lucide-react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import MountainDiscovery from "@/components/ui/MountainDiscovery";
@@ -163,31 +163,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Step-Free Seoul Subway ──────────────────────────────── */}
-      <Link
-        href="https://subway.seoulroutes.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-[var(--radius-card)] overflow-hidden active:opacity-80 transition-opacity"
-        style={{ border: "1px solid rgba(229,52,42,0.25)", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", display: "block" }}
-      >
-        <div className="flex items-center gap-3 px-4 py-3.5 bg-white" style={{ fontFamily: "var(--font-en)" }}>
-          <img
-            src="/images/stepfree-icon.png"
-            alt="Step-Free Seoul Subway"
-            className="w-11 h-11 rounded-xl shrink-0"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-base font-bold leading-tight" style={{ color: "#E5342A" }}>
-              Step-Free Seoul Subway
-            </p>
-            <p className="text-sm leading-tight mt-0.5 text-[var(--color-text-muted)]">
-              No More Stairs. Elevator-to-Elevator.
-            </p>
-          </div>
-          <ExternalLink size={16} style={{ color: "#E5342A" }} className="shrink-0 opacity-70" />
-        </div>
-      </Link>
 
     </div>
   );
