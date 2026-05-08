@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Plus, Pencil, Trash2, CheckCircle, AlertCircle, X, ChevronDown, RefreshCw } from "lucide-react";
+import { MapPin, Plus, Pencil, Trash2, CheckCircle, AlertCircle, X, ChevronDown } from "lucide-react";
 import { toSlug } from "@/lib/slug";
 
 const SUBWAY_LINE_COLORS: Record<number, string> = {
@@ -41,10 +41,12 @@ type FormState = {
   nameEn: string; nameKo: string; type: WaypointType;
   lat: string; lon: string; elevation_m: string;
   descEn: string; descKo: string;
-  slug: string;
+  // STATION: station name fields (nameEn/Ko auto-generated from these)
+  stationNameKo: string; // e.g. "독립문"
+  stationNameEn: string; // e.g. "Dongnimmun"
   exitNumber: string;
   subwayLine: string;
-  subwayStation: string;
+  subwayStation: string; // KO station name stored in DB
   arsId: string;
   busNumbers: string;
 };
@@ -53,7 +55,7 @@ const EMPTY_FORM: FormState = {
   nameEn: "", nameKo: "", type: "JUNCTION",
   lat: "", lon: "", elevation_m: "",
   descEn: "", descKo: "",
-  slug: "",
+  stationNameKo: "", stationNameEn: "",
   exitNumber: "",
   subwayLine: "",
   subwayStation: "",
@@ -102,6 +104,17 @@ function Alert({ type, message }: { type: "success" | "error" | "loading"; messa
   );
 }
 
+/** Build full display names from station fields */
+function buildStationNames(stationNameKo: string, stationNameEn: string, exitNumber: string) {
+  const nameKo = exitNumber
+    ? `${stationNameKo}역 ${exitNumber}번 출구`
+    : `${stationNameKo}역`;
+  const nameEn = exitNumber
+    ? `Exit ${exitNumber}, ${stationNameEn} Station`
+    : `${stationNameEn} Station`;
+  return { nameKo, nameEn };
+}
+
 function WaypointForm({
   initial,
   onSave, onCancel, saving, error,
@@ -113,65 +126,27 @@ function WaypointForm({
   error: string;
 }) {
   const [f, setF] = useState<FormState>(initial);
-  // Track whether the slug has been manually edited so we don't overwrite it
-  const [slugManual, setSlugManual] = useState(!!initial.slug);
 
   const set = (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setF(prev => ({ ...prev, [k]: e.target.value }));
 
-  function setNameEn(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value;
-    setF(prev => ({
-      ...prev,
-      nameEn: val,
-      // Auto-update slug only when it hasn't been manually edited
-      ...(slugManual ? {} : { slug: toSlug(val) }),
-    }));
-  }
+  const isUnnamed = ["JUNCTION", "PEAK", "VIEW", "LANDMARK", "SHELTER", "CAUTION"].includes(f.type);
+  const isStation = f.type === "STATION";
+
+  // Preview of auto-generated name for STATION
+  const stationPreview = isStation && f.stationNameEn
+    ? buildStationNames(f.stationNameKo, f.stationNameEn, f.exitNumber)
+    : null;
+
+  const canSave = isUnnamed
+    ? !!f.lat && !!f.lon
+    : isStation
+      ? !!f.stationNameKo && !!f.stationNameEn && !!f.lat && !!f.lon
+      : !!f.nameEn && !!f.lat && !!f.lon && (f.type !== "SUMMIT" || !!f.elevation_m);
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg-light)]">
-      {/* Name — hidden for unnamed trail points */}
-      {!["JUNCTION", "PEAK", "VIEW", "LANDMARK", "SHELTER", "CAUTION"].includes(f.type) && (
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--color-text-muted)]">Name (KO)</span>
-            <input type="text" placeholder="정상" value={f.nameKo} onChange={set("nameKo")}
-              className={INPUT} style={{ fontFamily: "var(--font-ko)" }} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
-            <input type="text" placeholder="Summit" value={f.nameEn} onChange={setNameEn} className={INPUT} />
-          </label>
-        </div>
-      )}
-
-      {/* Slug */}
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-[var(--color-text-muted)]">Slug *</span>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="sadang-station"
-            value={f.slug}
-            onChange={e => {
-              setSlugManual(true);
-              setF(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-") }));
-            }}
-            className={`${INPUT} flex-1 font-mono text-xs`}
-          />
-          <button
-            type="button"
-            title="Reset to auto-generated slug"
-            onClick={() => { setSlugManual(false); setF(prev => ({ ...prev, slug: toSlug(prev.nameEn) })); }}
-            disabled={!f.nameEn}
-            className="flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2.5 py-2 text-xs text-[var(--color-text-muted)] hover:text-primary hover:border-primary transition-colors disabled:opacity-30"
-          >
-            <RefreshCw className="w-3 h-3" /> Reset
-          </button>
-        </div>
-      </div>
 
       {/* Type */}
       <label className="flex flex-col gap-1">
@@ -190,25 +165,59 @@ function WaypointForm({
         </select>
       </label>
 
-      {/* Subway Info — only for Stations */}
-      {f.type === "STATION" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <label className="flex flex-col gap-1">
-             <span className="text-xs text-[var(--color-text-muted)]">Station Name (e.g. 사당 / Sadang)</span>
-             <input type="text" placeholder="사당 (Sadang)" value={f.subwayStation} onChange={set("subwayStation")} className={INPUT} />
-          </label>
-          <label className="flex flex-col gap-1">
-             <span className="text-xs text-[var(--color-text-muted)]">Subway Line (e.g. 2,4)</span>
-             <input type="text" placeholder="2, 4" value={f.subwayLine} onChange={set("subwayLine")} className={INPUT} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--color-text-muted)]">Exit (e.g. 4)</span>
-            <div className="flex items-center gap-2">
-              <div className="w-[36px] h-[36px] rounded-lg bg-[#2D2D2D] flex items-center justify-center text-[#FFCE00] font-black text-[16px] flex-shrink-0">
-                {f.exitNumber || "?"}
+      {/* STATION: station name + exit combined */}
+      {isStation && (
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-[var(--color-text-muted)]">역명 (KO) *</span>
+              <input type="text" placeholder="독립문" value={f.stationNameKo}
+                onChange={e => setF(prev => ({ ...prev, stationNameKo: e.target.value, subwayStation: e.target.value }))}
+                className={INPUT} style={{ fontFamily: "var(--font-ko)" }} />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-[var(--color-text-muted)]">Station Name (EN) *</span>
+              <input type="text" placeholder="Dongnimmun" value={f.stationNameEn}
+                onChange={set("stationNameEn")} className={INPUT} />
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-[var(--color-text-muted)]">Subway Line (e.g. 2,4)</span>
+              <input type="text" placeholder="3" value={f.subwayLine} onChange={set("subwayLine")} className={INPUT} />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-[var(--color-text-muted)]">Exit Number</span>
+              <div className="flex items-center gap-2">
+                <div className="w-[36px] h-[36px] rounded-lg bg-[#2D2D2D] flex items-center justify-center text-[#FFCE00] font-black text-[16px] flex-shrink-0">
+                  {f.exitNumber || "?"}
+                </div>
+                <input type="text" placeholder="4" value={f.exitNumber} onChange={set("exitNumber")}
+                  className={`${INPUT} flex-1 min-w-0`} />
               </div>
-              <input type="text" placeholder="4" value={f.exitNumber} onChange={set("exitNumber")} className={`${INPUT} flex-1 min-w-0`} />
+            </label>
+          </div>
+          {/* Auto-generated name preview */}
+          {stationPreview && (
+            <div className="rounded-lg bg-primary/5 border border-primary/15 px-3 py-2 text-xs text-[var(--color-text-muted)]">
+              <span className="font-semibold text-primary">자동 생성:</span>{" "}
+              {stationPreview.nameKo} · {stationPreview.nameEn}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Non-station named types */}
+      {!isStation && !isUnnamed && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">Name (KO)</span>
+            <input type="text" placeholder="정상" value={f.nameKo} onChange={set("nameKo")}
+              className={INPUT} style={{ fontFamily: "var(--font-ko)" }} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--color-text-muted)]">Name (EN) *</span>
+            <input type="text" placeholder="Summit" value={f.nameEn} onChange={set("nameEn")} className={INPUT} />
           </label>
         </div>
       )}
@@ -239,11 +248,9 @@ function WaypointForm({
 
       {/* Coordinates */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--color-text-muted)]">
-            Lat / Lon / Elevation (m){f.type === "SUMMIT" ? " *" : ""}
-          </span>
-        </div>
+        <span className="text-xs text-[var(--color-text-muted)]">
+          Lat / Lon / Elevation (m){f.type === "SUMMIT" ? " *" : ""}
+        </span>
         <div className="grid grid-cols-3 gap-2">
           <input type="text" inputMode="decimal" placeholder="37.123456" value={f.lat} onChange={set("lat")}
             className={`${INPUT} font-mono`} />
@@ -274,9 +281,7 @@ function WaypointForm({
         <button onClick={onCancel} className={BTN_SECONDARY} disabled={saving}>
           <X className="w-4 h-4" /> Cancel
         </button>
-        <button onClick={() => onSave(f)}
-          disabled={saving || (!["JUNCTION","VIEW","LANDMARK","CAUTION"].includes(f.type) && !f.nameEn) || !f.lat || !f.lon || !f.slug || (f.type === "SUMMIT" && !f.elevation_m)}
-          className={BTN_PRIMARY}>
+        <button onClick={() => onSave(f)} disabled={saving || !canSave} className={BTN_PRIMARY}>
           {saving
             ? <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
             : <CheckCircle className="w-4 h-4" />}
@@ -336,6 +341,17 @@ export default function WaypointManagerCard() {
     setFormErr("");
     const isEdit = typeof mode === "number";
 
+    // For STATION: auto-generate full nameEn/nameKo from station fields
+    let finalNameEn = f.nameEn;
+    let finalNameKo = f.nameKo;
+    if (f.type === "STATION") {
+      const names = buildStationNames(f.stationNameKo, f.stationNameEn, f.exitNumber);
+      finalNameEn = names.nameEn;
+      finalNameKo = names.nameKo;
+    }
+
+    const slug = toSlug(finalNameEn);
+
     const form = new FormData();
     if (isEdit) {
       form.append("id", String(mode));
@@ -343,20 +359,20 @@ export default function WaypointManagerCard() {
     } else {
       form.append("mountain_id", mountainId);
     }
-    form.append("nameEn", f.nameEn);
-    if (f.nameKo)       form.append("nameKo", f.nameKo);
+    form.append("nameEn", finalNameEn);
+    if (finalNameKo) form.append("nameKo", finalNameKo);
     form.append("type",  f.type);
-    if (f.slug)         form.append("slug",   f.slug);
+    form.append("slug",  slug);
     form.append("lat",   f.lat);
     form.append("lon",   f.lon);
-    if (f.elevation_m)  form.append("elevation_m", f.elevation_m);
-    if (f.descEn)       form.append("descEn", f.descEn);
-    if (f.descKo)       form.append("descKo", f.descKo);
-    if (f.exitNumber)   form.append("exit_number", f.exitNumber);
-    if (f.subwayLine)   form.append("subway_line", f.subwayLine);
+    if (f.elevation_m)   form.append("elevation_m", f.elevation_m);
+    if (f.descEn)        form.append("descEn", f.descEn);
+    if (f.descKo)        form.append("descKo", f.descKo);
+    if (f.exitNumber)    form.append("exit_number", f.exitNumber);
+    if (f.subwayLine)    form.append("subway_line", f.subwayLine);
     if (f.subwayStation) form.append("subway_station", f.subwayStation);
-    if (f.arsId)        form.append("ars_id", f.arsId);
-    if (f.busNumbers)   form.append("bus_numbers", f.busNumbers);
+    if (f.arsId)         form.append("ars_id", f.arsId);
+    if (f.busNumbers)    form.append("bus_numbers", f.busNumbers);
 
     try {
       const res = await fetch("/api/admin/waypoints", {
@@ -395,6 +411,17 @@ export default function WaypointManagerCard() {
   }
 
   function startEdit(w: Waypoint) {
+    // For STATION: parse station name back from full display name
+    let stationNameKo = w.subway_station ?? "";
+    let stationNameEn = "";
+    if (w.type === "STATION") {
+      // "Exit 4, Dongnimmun Station" → "Dongnimmun"
+      const match = w.name.en?.match(/^Exit\s+\d+,\s*(.+?)\s+Station$/i);
+      stationNameEn = match ? match[1] : w.name.en ?? "";
+      // "{역명}역 N번 출구" → "{역명}"
+      stationNameKo = w.subway_station ?? stationNameKo;
+    }
+
     setFormInit({
       nameEn: w.name.en,
       nameKo: w.name.ko ?? "",
@@ -404,7 +431,8 @@ export default function WaypointManagerCard() {
       elevation_m: w.elevation_m != null ? String(w.elevation_m) : "",
       descEn: w.description?.en ?? "",
       descKo: w.description?.ko ?? "",
-      slug:   w.slug ?? toSlug(w.name.en),
+      stationNameKo,
+      stationNameEn,
       exitNumber: w.exit_number ?? "",
       subwayLine: w.subway_line ?? "",
       subwayStation: w.subway_station ?? "",
@@ -543,9 +571,6 @@ export default function WaypointManagerCard() {
                           {w.lat.toFixed(5)}, {w.lon.toFixed(5)}
                           {w.elevation_m != null ? ` · ${w.elevation_m}m` : ""}
                         </div>
-                        {w.slug && (
-                          <div className="text-[10px] font-mono mt-0.5 text-primary/70">{w.slug}</div>
-                        )}
                       </div>
 
                       <div className="flex gap-1 flex-shrink-0">
