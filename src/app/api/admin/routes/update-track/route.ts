@@ -239,9 +239,9 @@ export async function POST(req: NextRequest) {
     // 6. Force Cache Revalidation
     try {
       const { revalidatePath, revalidateTag } = await import("next/cache");
-      revalidateTag("route-list");
-      revalidateTag("route-detail");
-      revalidateTag(`route-detail-${routeId}`);
+      revalidateTag("route-list", {});
+      revalidateTag("route-detail", {});
+      revalidateTag(`route-detail-${routeId}`, {});
       revalidatePath(`/route/${routeId}`);
       revalidatePath("/admin");
     } catch (e) {
