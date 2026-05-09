@@ -155,12 +155,6 @@ function WaypointForm({
           <option value="STATION">Station</option>
           <option value="TRAILHEAD">Trailhead</option>
           <option value="SUMMIT">Summit</option>
-          <option value="PEAK">Peak</option>
-          <option value="JUNCTION">Junction</option>
-          <option value="SHELTER">Shelter</option>
-          <option value="VIEW">View</option>
-          <option value="LANDMARK">Landmark</option>
-          <option value="CAUTION">Caution</option>
           <option value="BUS_STOP">Bus Stop</option>
         </select>
       </label>
