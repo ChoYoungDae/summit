@@ -39,12 +39,13 @@ export default function RouteEditCard() {
   const [descriptionEn, setDescriptionEn] = useState("");
   const [descriptionKo, setDescriptionKo] = useState("");
 
-  const [saving,  setSaving]  = useState(false);
-  const [fixing,  setFixing]  = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [fixing,    setFixing]    = useState(false);
+  const [forceAll,  setForceAll]  = useState(false);
+  const [success,   setSuccess]   = useState(false);
   const [fixSuccess, setFixSuccess] = useState(false);
   const [parsedPointCount, setParsedPointCount] = useState<number | null>(null);
-  const [error,   setError]   = useState("");
+  const [error,     setError]     = useState("");
 
   const gpxInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,6 +132,7 @@ export default function RouteEditCard() {
         body: JSON.stringify({
           routeId,
           trackPoints: parsed.points,
+          forceAll,
         }),
       });
       const data = await res.json();
@@ -244,6 +246,18 @@ export default function RouteEditCard() {
               }}
             />
             
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={forceAll}
+                onChange={e => setForceAll(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-xs text-[var(--color-text-muted)]">
+                기존 segment도 강제 업데이트 (shared segment 포함)
+              </span>
+            </label>
+
             <button
               onClick={() => gpxInputRef.current?.click()}
               disabled={fixing}

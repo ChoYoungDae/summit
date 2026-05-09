@@ -108,28 +108,51 @@ function toPhoto(row: any) {
   };
 }
 
-// ── GET /api/admin/route-photos?routeId=X ────────────────────────────────────
-// Photos are stored per-segment so two routes sharing a segment automatically
-// share the same photos. Trail photos always have GPS and are always within
-// 100 m of the track, so segment_id is always resolved on upload.
+// ── GET /api/admin/route-photos?routeId=X[&includeSiblings=true] ─────────────
+// Default (admin):  only photos directly tied to this route or its segments.
+// includeSiblings=true (public TrailSection): also includes photos from sibling
+//   routes that share a segment — client-side 30 m proximity filter then decides
+//   what actually appears on screen.
 export async function GET(req: NextRequest) {
   const routeId = req.nextUrl.searchParams.get("routeId");
   if (!routeId) return NextResponse.json({ error: "routeId required" }, { status: 400 });
 
-  // Resolve segment_ids for this route
+  const routeIdInt      = parseInt(routeId);
+  const includeSiblings = req.nextUrl.searchParams.get("includeSiblings") === "true";
+
+  // 1. Fetch segment_ids for this route
   const { data: routeRow } = await supabaseAdmin
     .from("routes")
     .select("segment_ids")
-    .eq("id", parseInt(routeId))
+    .eq("id", routeIdInt)
     .single();
 
   const segIds: number[] = routeRow?.segment_ids ?? [];
-  if (!segIds.length) return NextResponse.json([]);
+
+  // 2. Optionally find sibling routes (routes sharing ≥1 segment)
+  let siblingRouteIds: number[] = [];
+  if (includeSiblings && segIds.length) {
+    const { data: allRoutes } = await supabaseAdmin
+      .from("routes")
+      .select("id, segment_ids")
+      .neq("id", routeIdInt);
+
+    siblingRouteIds = (allRoutes ?? [])
+      .filter(r => (r.segment_ids as number[] ?? []).some(sid => segIds.includes(sid)))
+      .map(r => r.id as number);
+  }
+
+  // 3. Build OR filter
+  const candidateRouteIds  = [routeIdInt, ...siblingRouteIds];
+  const routeIdClauses     = candidateRouteIds.map(id => `route_id.eq.${id}`).join(",");
+  const orFilter           = segIds.length
+    ? `${routeIdClauses},segment_id.in.(${segIds.join(",")})`
+    : routeIdClauses;
 
   const { data, error } = await supabaseAdmin
     .from("route_photos")
     .select("*")
-    .in("segment_id", segIds)
+    .or(orFilter)
     .order("order_index", { ascending: true })
     .order("id", { ascending: true });
 
@@ -248,7 +271,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ photos: results });
     }
 
-    const { id, description, segment_id, order_index, recalculate, waypoint_type } = body;
+    const { id, description, segment_id, order_index, recalculate, target_route_id, waypoint_type } = body;
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     const patch: Record<string, unknown> = {};
@@ -258,10 +281,12 @@ export async function PATCH(req: NextRequest) {
     if (waypoint_type !== undefined) patch.waypoint_type = waypoint_type;
 
     // Handle recalculation request
+    // target_route_id overrides the photo's own route_id so we can re-map using a different route's GPS track
     if (recalculate) {
       const { data: photo } = await supabaseAdmin.from("route_photos").select("route_id, lat, lon").eq("id", id).single();
       if (photo?.lat && photo?.lon) {
-        const { segmentId: sid, orderIndex: oi } = await resolvePhotoMeta(photo.route_id, photo.lat, photo.lon);
+        const resolveRouteId = target_route_id ?? photo.route_id;
+        const { segmentId: sid, orderIndex: oi } = await resolvePhotoMeta(resolveRouteId, photo.lat, photo.lon);
         patch.segment_id = sid;
         patch.order_index = oi;
       }

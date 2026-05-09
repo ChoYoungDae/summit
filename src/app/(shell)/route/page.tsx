@@ -64,7 +64,7 @@ const TERRAIN_TAG_ICON: Record<string, LucideIcon> = {
 
 const getCachedRouteList = unstable_cache(
   async () => fetchRouteList(),
-  ["route-list-v3"],
+  ["route-list-v4"],
   {
     revalidate: 60 * 60, // 1 hour
     tags: ["route-list"],

@@ -507,15 +507,21 @@ export default function NewRoutePage() {
 
         // Save descriptions if any were entered
         const photoData = await photoRes.json() as { photos: { id: number }[] };
-        const withDesc  = photos.filter((p, i) => (photoData.photos[i]?.id) && (p.descEn || p.descKo));
-        for (let i = 0; i < withDesc.length; i++) {
-          const p   = withDesc[i];
-          const pid = photoData.photos[i]?.id;
-          if (!pid) continue;
+        const uploadedPhotos = photoData.photos;
+        const descPatches = photos
+          .map((p, i) => ({ p, pid: uploadedPhotos[i]?.id }))
+          .filter(({ p, pid }) => pid && (p.descEn || p.descKo));
+        for (const { p, pid } of descPatches) {
           await fetch("/api/admin/route-photos", {
             method:  "PATCH",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ id: pid, description_en: p.descEn || null, description_ko: p.descKo || null }),
+            body: JSON.stringify({
+              id:          pid,
+              description: {
+                ...(p.descEn ? { en: p.descEn } : {}),
+                ...(p.descKo ? { ko: p.descKo } : {}),
+              },
+            }),
           });
         }
       }

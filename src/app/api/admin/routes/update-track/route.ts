@@ -46,8 +46,8 @@ function findNearestIndex(track: TrackPoint[], lat: number, lon: number): number
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { routeId: number; trackPoints: TrackPoint[] };
-    const { routeId, trackPoints } = body;
+    const body = await req.json() as { routeId: number; trackPoints: TrackPoint[]; forceAll?: boolean };
+    const { routeId, trackPoints, forceAll = false } = body;
 
     if (!routeId || !trackPoints?.length) {
       return NextResponse.json({ error: "routeId and trackPoints are required" }, { status: 400 });
@@ -138,6 +138,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Re-slice and update each segment
+    // First, find which segments are shared with other routes — those must NOT be overwritten.
+    const allSegmentIds = segmentsInOrder.map((s: { id: number }) => s.id);
+    const { data: otherRoutes } = await supabaseAdmin
+      .from("routes")
+      .select("id, segment_ids")
+      .neq("id", routeId);
+
+    const sharedSegmentIds = new Set<number>();
+    for (const other of (otherRoutes ?? [])) {
+      for (const sid of (other.segment_ids ?? [])) {
+        if (allSegmentIds.includes(sid)) sharedSegmentIds.add(sid);
+      }
+    }
+
     let totalDurationMin = 0;
     let totalDistanceM   = 0;
 
@@ -180,33 +194,35 @@ export async function POST(req: NextRequest) {
       }
 
       const walkStats = computeStats(walkTrack);
-      
-      // Update segment in DB - ONLY update track and distance/elevation stats.
-      // Use walkTrack and walkStats for the main segment data.
-      const updates: any = {
-        track_data: { type: "LineString", coordinates: walkTrack },
-        ...walkStats,
-      };
 
-      // If it was a bus segment, update the bus_track_data inside bus_details
-      if (seg.is_bus_combined && busTrack) {
-        updates.bus_details = {
-          ...seg.bus_details,
-          bus_track_data: { type: "LineString", coordinates: busTrack },
+      // Shared segments (used by other routes) keep their original track — do not overwrite.
+      // Pass forceAll: true in the request body to override this and update everything.
+      if (forceAll || !sharedSegmentIds.has(seg.id)) {
+        const updates: any = {
+          track_data: { type: "LineString", coordinates: walkTrack },
+          ...walkStats,
         };
+
+        if (seg.is_bus_combined && busTrack) {
+          updates.bus_details = {
+            ...seg.bus_details,
+            bus_track_data: { type: "LineString", coordinates: busTrack },
+          };
+        }
+
+        const { error: segUpdErr } = await supabaseAdmin
+          .from("segments")
+          .update(updates)
+          .eq("id", seg.id);
+
+        if (segUpdErr) throw segUpdErr;
       }
 
-      const { error: segUpdErr } = await supabaseAdmin
-        .from("segments")
-        .update(updates)
-        .eq("id", seg.id);
-
-      if (segUpdErr) throw segUpdErr;
-
-      // For the route total, use the EXISTING estimated_time_min from the segment (which should be walk time)
-      // and EXCLUDE bus duration as per user request ("Exclude both time and distance for bus").
+      // For the route total: shared segments keep their existing stats; new segments use freshly computed stats.
       totalDurationMin += (seg.estimated_time_min || 0);
-      totalDistanceM   += walkStats.distance_m;
+      totalDistanceM   += sharedSegmentIds.has(seg.id)
+        ? (seg.distance_m || 0)
+        : walkStats.distance_m;
     }
 
     // 5. Update route totals (Hiking Only)
@@ -223,10 +239,11 @@ export async function POST(req: NextRequest) {
     // 6. Force Cache Revalidation
     try {
       const { revalidatePath, revalidateTag } = await import("next/cache");
-      revalidateTag("route-list", {});
-      revalidateTag(`route-detail-${routeId}`, {});
+      revalidateTag("route-list");
+      revalidateTag("route-detail");
+      revalidateTag(`route-detail-${routeId}`);
       revalidatePath(`/route/${routeId}`);
-      revalidatePath(`/admin`); // Ensure admin view is also fresh
+      revalidatePath("/admin");
     } catch (e) {
       console.error("Revalidation error:", e);
     }

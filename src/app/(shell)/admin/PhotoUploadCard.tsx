@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
+import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, RefreshCw, Minimize2 } from "lucide-react";
 import { Icon } from "@iconify/react";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
@@ -11,9 +11,8 @@ const INPUT       = "rounded-lg border border-[var(--color-border)] px-3 py-2 te
 const BTN_PRIMARY = "flex items-center justify-center gap-2 rounded-xl bg-primary text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Mountain = { id: number; name: { en?: string; ko?: string } };
-type RouteItem = { id: number; name: { en?: string; ko?: string } };
-type Segment   = { id: number; segment_type: string };
+type Mountain  = { id: number; name: { en?: string; ko?: string } };
+type RouteItem = { id: number; name: { en?: string; ko?: string }; segment_ids?: number[] };
 
 type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "PEAK" | "JUNCTION" | "SHELTER" | "VIEW" | "LANDMARK" | "CAUTION" | "BUS_STOP";
 
@@ -80,8 +79,8 @@ function sortPhotos(photos: PhotoEntry[]): PhotoEntry[] {
 
 // ── Client-side helpers ───────────────────────────────────────────────────────
 
-/** Resize image to maxPx and encode as WebP at quality 0.8 using Canvas API. */
-async function processImage(file: File, maxPx = 1200): Promise<Blob> {
+/** Resize image to maxPx and encode as WebP at quality 0.82 using Canvas API. */
+async function processImage(file: File, maxPx = 600): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -238,14 +237,17 @@ function Lightbox({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function PhotoUploadCard() {
-  const [mountains, setMountains]   = useState<Mountain[]>([]);
-  const [mountainId, setMountainId] = useState("");
-  const [routes, setRoutes]         = useState<RouteItem[]>([]);
-  const [routeId, setRouteId]       = useState("");
-  const [segments, setSegments]     = useState<Segment[]>([]);
-  const [photos, setPhotos]         = useState<PhotoEntry[]>([]);
+  const [mountains, setMountains]         = useState<Mountain[]>([]);
+  const [mountainId, setMountainId]       = useState("");
+  const [routes, setRoutes]               = useState<RouteItem[]>([]);
+  const [routeId, setRouteId]             = useState("");
+  const [photos, setPhotos]               = useState<PhotoEntry[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [recompressState, setRecompressState] = useState<
+    "idle" | "running" | "done"
+  >("idle");
+  const [recompressProgress, setRecompressProgress] = useState({ done: 0, total: 0, failed: 0 });
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const uploadingKeys = useRef(new Set<string>());
 
@@ -260,17 +262,12 @@ export default function PhotoUploadCard() {
     setMountainId(mid);
     setRouteId("");
     setRoutes([]);
-    setSegments([]);
     setPhotos([]);
     if (!mid) return;
     setLoadingRoutes(true);
     try {
-      const [routeRes, segRes] = await Promise.all([
-        fetch(`/api/admin/routes?mountainId=${mid}`).then(r => r.json()),
-        fetch(`/api/admin/segments?mountainId=${mid}`).then(r => r.json()),
-      ]);
+      const routeRes = await fetch(`/api/admin/routes?mountainId=${mid}`).then(r => r.json());
       if (Array.isArray(routeRes)) setRoutes(routeRes as RouteItem[]);
-      if (Array.isArray(segRes))   setSegments(segRes as Segment[]);
     } catch { /* ignore */ }
     finally { setLoadingRoutes(false); }
   }
@@ -279,7 +276,8 @@ export default function PhotoUploadCard() {
     setRouteId(rid);
     setPhotos([]);
     if (!rid) return;
-    // Load existing photos for this route
+
+    // Load existing photos for this route (admin: no sibling photos)
     try {
       const data = await fetch(`/api/admin/route-photos?routeId=${rid}`).then(r => r.json());
       if (Array.isArray(data)) {
@@ -404,12 +402,11 @@ export default function PhotoUploadCard() {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id:          entry.id,
-          description: (entry.descriptionEn || entry.descriptionKo) ? {
+          id:           entry.id,
+          description:  (entry.descriptionEn || entry.descriptionKo) ? {
             ...(entry.descriptionEn ? { en: entry.descriptionEn } : {}),
             ...(entry.descriptionKo ? { ko: entry.descriptionKo } : {}),
           } : null,
-          segment_id:   entry.segmentId,
           waypoint_type: entry.waypointType || null,
         }),
       });
@@ -449,7 +446,7 @@ export default function PhotoUploadCard() {
     }
   }
 
-  function updateField(key: string, field: "descriptionEn" | "descriptionKo" | "segmentId" | "waypointType", value: string | number | null) {
+  function updateField(key: string, field: "descriptionEn" | "descriptionKo" | "waypointType", value: string | number | null) {
     setPhotos(prev => prev.map(p =>
       p.key !== key ? p : { ...p, [field]: value, state: p.state === "saved" ? "uploaded" : p.state }
     ));
@@ -505,6 +502,43 @@ export default function PhotoUploadCard() {
     }
   }
 
+  async function bulkRecompress() {
+    if (!confirm("모든 사진을 600px WebP로 다운스케일합니다. 계속할까요?")) return;
+    setRecompressState("running");
+    setRecompressProgress({ done: 0, total: 0, failed: 0 });
+
+    // Fetch all photo IDs + URLs
+    const allPhotos: { id: number; url: string }[] = await fetch(
+      "/api/admin/route-photos/recompress"
+    ).then(r => r.json()).catch(() => []);
+
+    setRecompressProgress({ done: 0, total: allPhotos.length, failed: 0 });
+
+    let done = 0, failed = 0;
+    for (const p of allPhotos) {
+      try {
+        // Download existing image
+        const imgBlob = await fetch(p.url).then(r => r.blob());
+        const imgFile = new File([imgBlob], "photo.webp", { type: imgBlob.type });
+
+        // Resize to 600px via canvas
+        const webpBlob = await processImage(imgFile, 600);
+
+        // Upload back (overwrite)
+        const fd = new FormData();
+        fd.append("id",    String(p.id));
+        fd.append("photo", new File([webpBlob], "photo.webp", { type: "image/webp" }));
+        const res = await fetch("/api/admin/route-photos/recompress", { method: "POST", body: fd });
+        if (!res.ok) throw new Error("upload failed");
+        done++;
+      } catch {
+        failed++;
+      }
+      setRecompressProgress({ done: done + failed, total: allPhotos.length, failed });
+    }
+    setRecompressState("done");
+  }
+
   const SEG_TYPE_COLORS: Record<string, string> = {
     APPROACH: "text-blue-600", ASCENT: "text-emerald-600",
     DESCENT: "text-purple-600", RETURN: "text-gray-500",
@@ -527,6 +561,42 @@ export default function PhotoUploadCard() {
             Upload trail photos — WebP conversion &amp; GPS mapping happen automatically.
           </p>
         </div>
+      </div>
+
+      {/* ── Bulk recompress ──────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Minimize2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-800">Recompress All to 600px</p>
+            {recompressState === "idle" && (
+              <p className="text-[10px] text-amber-600">기존 사진 전체를 600px WebP로 다운스케일</p>
+            )}
+            {recompressState === "running" && (
+              <p className="text-[10px] text-amber-600 font-num">
+                {recompressProgress.done} / {recompressProgress.total}
+                {recompressProgress.failed > 0 && ` (실패 ${recompressProgress.failed})`}
+              </p>
+            )}
+            {recompressState === "done" && (
+              <p className="text-[10px] text-emerald-600 font-semibold">
+                완료 — {recompressProgress.total - recompressProgress.failed}개 성공
+                {recompressProgress.failed > 0 && `, ${recompressProgress.failed}개 실패`}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={bulkRecompress}
+          disabled={recompressState === "running"}
+          className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-amber-600 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50 hover:bg-amber-700 transition-colors"
+        >
+          {recompressState === "running" ? (
+            <><div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> 처리 중</>
+          ) : (
+            <><Minimize2 className="w-3 h-3" /> 시작</>
+          )}
+        </button>
       </div>
 
       {/* Mountain selector */}
@@ -593,7 +663,34 @@ export default function PhotoUploadCard() {
           {/* Photo list */}
           {photos.length > 0 && (
             <div className="flex flex-col gap-3">
-              <SectionLabel>{photos.length} photo{photos.length !== 1 ? "s" : ""}</SectionLabel>
+              <div className="flex items-center justify-between">
+                <SectionLabel>{photos.length} photo{photos.length !== 1 ? "s" : ""}</SectionLabel>
+                <div className="flex items-center gap-3">
+                  {photos.some(p => p.id && p.hasGps && p.segmentId == null) && (
+                    <button
+                      onClick={async () => {
+                        const unmapped = photos.filter(p => p.id && p.hasGps && p.segmentId == null);
+                        for (const entry of unmapped) await recalculateOrder(entry);
+                      }}
+                      className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:underline"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Remap {photos.filter(p => p.id && p.hasGps && p.segmentId == null).length} unmapped
+                    </button>
+                  )}
+                  {photos.some(p => p.id && p.state !== "saved") && (
+                    <button
+                      onClick={async () => {
+                        const unsaved = photos.filter(p => p.id && p.state !== "saved" && p.state !== "saving" && p.state !== "uploading");
+                        for (const entry of unsaved) await saveDescription(entry);
+                      }}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Save All
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {photos.map(entry => (
                 <div
@@ -696,29 +793,13 @@ export default function PhotoUploadCard() {
                         </div>
                       </div>
 
-                      {/* Segment selector */}
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-                          Segment
-                          {entry.autoMapped && (
-                            <span className="ml-1 text-emerald-600 normal-case tracking-normal">
-                              · auto-mapped
-                            </span>
-                          )}
-                        </span>
-                        <select
-                          value={entry.segmentId ?? ""}
-                          onChange={e => updateField(entry.key, "segmentId", e.target.value ? parseInt(e.target.value) : null)}
-                          className={INPUT + " text-xs py-1.5"}
-                        >
-                          <option value="">— None —</option>
-                          {segments.map(s => (
-                            <option key={s.id} value={s.id}>
-                              {s.segment_type} #{s.id}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* Segment: auto-assigned on upload, not user-editable */}
+                      {entry.segmentId != null && (
+                        <p className="text-[10px] text-[var(--color-text-muted)]">
+                          Segment #{entry.segmentId}
+                          {entry.autoMapped && <span className="ml-1 text-emerald-600">· auto-mapped</span>}
+                        </p>
+                      )}
 
                       {/* Description EN */}
                       <label className="flex flex-col gap-1">

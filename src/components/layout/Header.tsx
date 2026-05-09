@@ -5,18 +5,42 @@ import { Mountain, ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const KHAKI = "#C8362A";
-const currentMonth = new Date().toLocaleString("en-US", { month: "long" }).toUpperCase();
+const CHIP_BG = "#C8362A";
+
+// PTY code → weather emoji
+function ptyIcon(pty: number): string {
+  switch (pty) {
+    case 1: return "🌧";
+    case 2: return "🌨";
+    case 3: return "❄️";
+    case 4: return "🌦";
+    default: return "☀️";
+  }
+}
+
+interface WeatherData {
+  tempC: number;
+  tempF: number;
+  pty: number;
+}
 
 export function Header() {
   const pathname = usePathname();
   const isRouteContext = pathname.startsWith("/route/");
   const [scrolled, setScrolled] = useState(false);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/weather")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data && data.tempC != null) setWeather(data); })
+      .catch(() => {});
   }, []);
 
   if (isRouteContext) {
@@ -61,20 +85,32 @@ export function Header() {
           Seoul Subway to Summit
         </span>
       </Link>
+
       <span
-        className="ml-auto inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.05em] border"
+        className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border shrink-0"
         style={{
           color: "#fff",
-          borderColor: KHAKI,
-          backgroundColor: KHAKI,
-          fontFamily: "var(--font-en)",
+          borderColor: CHIP_BG,
+          backgroundColor: CHIP_BG,
+          fontFamily: "var(--font-num)",
         }}
       >
-        <span
-          className="w-1.5 h-1.5 rounded-full animate-pulse inline-block shrink-0"
-          style={{ backgroundColor: "#fff" }}
-        />
-        SEOUL, {currentMonth}
+        {weather ? (
+          <>
+            <span>{ptyIcon(weather.pty)}</span>
+            <span>{weather.tempC}°C ({weather.tempF}°F)</span>
+            <span className="opacity-50">·</span>
+            <span style={{ fontFamily: "var(--font-en)" }}>SEOUL</span>
+          </>
+        ) : (
+          <>
+            <span
+              className="w-1.5 h-1.5 rounded-full animate-pulse inline-block shrink-0"
+              style={{ backgroundColor: "#fff" }}
+            />
+            <span style={{ fontFamily: "var(--font-en)" }}>SEOUL</span>
+          </>
+        )}
       </span>
     </header>
   );
