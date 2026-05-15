@@ -205,10 +205,41 @@ export default function TrailSection({
   const hasEnteredActiveRef  = useRef(false);
   const photoTouchStartX     = useRef(0);
 
+  // ── ETA snapshot (triggered recalculation) ───────────────────────────────
+  const [etaSnapshot, setEtaSnapshot] = useState<{
+    peakMin: number | null;
+    trailheadMin: number | null;
+    finalMin: number | null;
+    updatedAt: number;
+  } | null>(null);
+  // Refs initialised after gps/returnTimeMin are declared below
+  const gpsRef = useRef<typeof gps | null>(null);
+  const returnTimeMinRef = useRef<number | null | undefined>(null);
+
   const { skill } = useHikingLevel();
   const skillMultiplier = skill.multiplier;
 
   const gps = useHikingGPS({ segments: route.segments, enabled: isHiking, fix: mapGpsFix });
+  gpsRef.current = gps;
+  returnTimeMinRef.current = returnTimeMin;
+
+  const recalculateETA = useCallback(() => {
+    const g = gpsRef.current;
+    if (!g?.currentPos) return;
+    const now = nowKSTMin();
+    let peakMin: number | null = null;
+    let trailheadMin: number | null = null;
+    if (g.phase === "ascent") {
+      const toSummitMins = naismithMinutes(g.remainingM, g.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
+      peakMin = now + Math.round(toSummitMins);
+      const descentMins = naismithMinutes(g.totalDescentM, 0, DESCENT_SPEED_M_PER_MIN);
+      trailheadMin = now + Math.round(toSummitMins) + SUMMIT_REST_MIN + Math.round(descentMins);
+    } else {
+      trailheadMin = now + Math.round(naismithMinutes(g.remainingM, 0, DESCENT_SPEED_M_PER_MIN));
+    }
+    const finalMin = trailheadMin != null ? trailheadMin + (returnTimeMinRef.current ?? 0) : null;
+    setEtaSnapshot({ peakMin, trailheadMin, finalMin, updatedAt: Date.now() });
+  }, []);
   const { threshold: offRouteThreshold, enabled: offRouteEnabled, setEnabled: setOffRouteEnabled } = useOffRouteSettings();
 
   // ── Auto-detect Active Mode once near the trailhead ──────────────────────
@@ -231,6 +262,24 @@ export default function TrailSection({
       setHikingMode("active");
     }
   }, [isHiking, gps.currentPos, track]);
+
+  // ── ETA triggers ─────────────────────────────────────────────────────────
+  const hasTriggeredInitialETA = useRef(false);
+  useEffect(() => {
+    if (!isHiking) { hasTriggeredInitialETA.current = false; setEtaSnapshot(null); return; }
+    if (gps.currentPos && !hasTriggeredInitialETA.current) {
+      hasTriggeredInitialETA.current = true;
+      recalculateETA();
+    }
+  }, [isHiking, gps.currentPos, recalculateETA]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && isHiking) recalculateETA();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [isHiking, recalculateETA]);
 
   // ── Off-route alert (Active Mode only, gated by user toggle) ─────────────
   const offRoute = useOffRouteAlert({
@@ -299,57 +348,25 @@ export default function TrailSection({
   const isPastLatestStart = latestStartMin != null && nowKSTMin() > latestStartMin;
 
   // ── ETA calculation ───────────────────────────────────────────────────────
-  // Active mode: Naismith-adjusted real-time ETA from GPS position.
-  //   Ascent  → 2.0 km/h + 10 min per 100 m vertical gain remaining
-  //   Descent → 3.2 km/h, no elevation penalty
-  //   Summit rest: +30 min added between peak and final ETA
-  // Preview mode: static offset from segment estimates.
+  // While hiking: snapshot-based (triggered on Start, screen wake, manual button).
+  // Pre-hike: static estimate from Last Safe Start.
   const peakETAMin = useMemo(() => {
-    // GPS real-time mode: only when actively hiking near the trailhead.
-    if (isHiking && hikingMode === "active" && gps.currentPos) {
-      if (gps.phase === "descent") return null;
-      const mins = naismithMinutes(gps.remainingM, gps.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
-      return nowKSTMin() + Math.round(mins);
-    }
-    // Pre-hike or started-but-far: show ETA relative to Last Safe Start.
-    if (latestStartMin == null) return null;
-    if (ascentMin != null) {
-      return latestStartMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier);
-    }
-    return null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, latestStartMin, ascentMin, approachTimeMin, skillMultiplier]);
+    if (isHiking) return etaSnapshot?.peakMin ?? null;
+    if (latestStartMin == null || ascentMin == null) return null;
+    return latestStartMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier);
+  }, [isHiking, etaSnapshot, latestStartMin, ascentMin, approachTimeMin, skillMultiplier]);
 
   const trailheadETAMin = useMemo(() => {
-    // GPS real-time mode: only when actively hiking near the trailhead.
-    if (isHiking && hikingMode === "active" && gps.currentPos) {
-      if (gps.phase === "ascent") {
-        const toSummitMins = naismithMinutes(gps.remainingM, gps.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
-        const descentMins  = naismithMinutes(gps.totalDescentM, 0, DESCENT_SPEED_M_PER_MIN);
-        return nowKSTMin() + Math.round(toSummitMins) + SUMMIT_REST_MIN + Math.round(descentMins);
-      }
-      return nowKSTMin() + Math.round(naismithMinutes(gps.remainingM, 0, DESCENT_SPEED_M_PER_MIN));
-    }
-    // Pre-hike or started-but-far: show ETA relative to Last Safe Start.
-    if (latestStartMin == null) return null;
-    if (ascentMin != null && descentMin != null) {
-      return (
-        latestStartMin +
-        (approachTimeMin ?? 0) +
-        Math.round(ascentMin * skillMultiplier) +
-        SUMMIT_REST_MIN +
-        Math.round(descentMin * skillMultiplier)
-      );
-    }
-    return null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHiking, hikingMode, gps.currentPos, gps.phase, gps.remainingM, gps.remainingAscentElevM, gps.totalDescentM, latestStartMin, ascentMin, descentMin, approachTimeMin, skillMultiplier]);
+    if (isHiking) return etaSnapshot?.trailheadMin ?? null;
+    if (latestStartMin == null || ascentMin == null || descentMin == null) return null;
+    return latestStartMin + (approachTimeMin ?? 0) + Math.round(ascentMin * skillMultiplier) + SUMMIT_REST_MIN + Math.round(descentMin * skillMultiplier);
+  }, [isHiking, etaSnapshot, latestStartMin, ascentMin, descentMin, approachTimeMin, skillMultiplier]);
 
   const finalETAMin = useMemo(() => {
-    const thETA = trailheadETAMin;
-    if (thETA == null) return null;
-    return thETA + (returnTimeMin ?? 0);
-  }, [trailheadETAMin, returnTimeMin]);
+    if (isHiking) return etaSnapshot?.finalMin ?? null;
+    if (trailheadETAMin == null) return null;
+    return trailheadETAMin + (returnTimeMin ?? 0);
+  }, [isHiking, etaSnapshot, trailheadETAMin, returnTimeMin]);
 
   // ── Elevation chart: GPS position dot during active hiking ───────────────
   const elevationHighlightIndex =
@@ -473,6 +490,8 @@ export default function TrailSection({
             nightView={!!route.hideSafeStart}
             isCollapsed={isHeaderCollapsed}
             onToggleCollapse={() => setIsHeaderCollapsed((v) => !v)}
+            onRecalcETA={isHiking ? recalculateETA : undefined}
+            etaUpdatedAt={etaSnapshot?.updatedAt ?? null}
           />
 
           {/* ── Off-route alert overlay ──────────────────────────────────── */}

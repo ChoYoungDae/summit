@@ -15,16 +15,18 @@ async function revalidate(...tags: string[]) {
   }
 }
 
-// GET /api/admin/routes?mountainId=X
+// GET /api/admin/routes?mountainId=X  (mountainId optional — omit to get all routes)
 export async function GET(req: NextRequest) {
   const mountainId = req.nextUrl.searchParams.get("mountainId");
-  if (!mountainId) return NextResponse.json({ error: "mountainId is required" }, { status: 400 });
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("routes")
-    .select("id, name, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, tags, highlights, description")
-    .eq("mountain_id", mountainId)
+    .select("id, name, mountain_id, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, tags, highlights, description")
     .order("id");
+
+  if (mountainId) query = query.eq("mountain_id", mountainId) as typeof query;
+
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

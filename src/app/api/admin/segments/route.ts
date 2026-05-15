@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DOMParser } from "@xmldom/xmldom";
 import { createClient } from "@supabase/supabase-js";
+import { haversineM, computeTrackStats } from "@/lib/geo";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,35 +67,13 @@ function parseGpx(xml: string): TrackPoint[] {
   });
 }
 
-function haversineM(lon1: number, lat1: number, lon2: number, lat2: number) {
-  const R  = 6_371_000;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a  = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
+// haversineM and computeTrackStats imported from @/lib/geo
 
-function computeStats(points: TrackPoint[]) {
-  let distM = 0, ascM = 0, descM = 0;
-  for (let i = 1; i < points.length; i++) {
-    distM += haversineM(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
-    const dEle = points[i][2] - points[i - 1][2];
-    if (dEle > 0) ascM  += dEle;
-    else          descM -= dEle;
-  }
-  return {
-    distance_m:      Math.round(distM),
-    total_ascent_m:  Math.round(ascM),
-    total_descent_m: Math.round(descM),
-  };
-}
-
-// GET /api/admin/segments?mountainId=X[&type=APPROACH]
+// GET /api/admin/segments?mountainId=X[&type=APPROACH][&ids=1,2,3]
 export async function GET(req: NextRequest) {
   const mountainId  = req.nextUrl.searchParams.get("mountainId");
   const segmentType = req.nextUrl.searchParams.get("type");
+  const idsParam    = req.nextUrl.searchParams.get("ids");
   if (!mountainId) return NextResponse.json({ error: "mountainId is required" }, { status: 400 });
 
   let query = supabaseAdmin
@@ -112,6 +91,10 @@ export async function GET(req: NextRequest) {
     .order("id");
 
   if (segmentType) query = query.eq("segment_type", segmentType.toUpperCase()) as typeof query;
+  if (idsParam) {
+    const ids = idsParam.split(",").map(Number).filter(Boolean);
+    if (ids.length) query = query.in("id", ids) as typeof query;
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -167,7 +150,7 @@ export async function PATCH(req: NextRequest) {
   if (gpxFile instanceof File && gpxFile.size > 0) {
     const text   = await gpxFile.text();
     const points = gpxFile.name.toLowerCase().endsWith(".geojson") ? parseGeoJson(text) : parseGpx(text);
-    const stats  = computeStats(points);
+    const stats  = computeTrackStats(points);
     updates.track_data      = { type: "LineString", coordinates: points };
     updates.distance_m      = stats.distance_m;
     updates.total_ascent_m  = stats.total_ascent_m;
@@ -277,7 +260,7 @@ export async function POST(req: NextRequest) {
       points = gpxFile.name.toLowerCase().endsWith(".geojson")
         ? parseGeoJson(text)
         : parseGpx(text);
-      stats = computeStats(points);
+      stats = computeTrackStats(points);
     } else {
       // Create a simple 2-point track from waypoints
       const { data: wps, error: wpErr } = await supabaseAdmin
@@ -302,7 +285,7 @@ export async function POST(req: NextRequest) {
           [ew.lon, ew.lat, ew.elevation_m || 0],
         ];
       }
-      stats = computeStats(points);
+      stats = computeTrackStats(points);
     }
 
     const isBusCombined      = form.get("isBusCombined") === "true";

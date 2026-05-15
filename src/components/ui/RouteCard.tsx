@@ -272,7 +272,7 @@ export default function RouteCard({
         {route.description && (
           <div className="relative px-1 group" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: "pointer" }}>
             <p 
-              className={`text-sm leading-relaxed text-[var(--color-text-muted)] italic transition-all duration-300 ${isExpanded ? "" : "line-clamp-3"}`}
+              className={`text-sm leading-relaxed text-[var(--color-text-muted)] italic transition-all duration-300 whitespace-pre-wrap ${isExpanded ? "" : "line-clamp-3"}`}
               style={{
                 display: isExpanded ? "block" : "-webkit-box",
                 WebkitLineClamp: isExpanded ? "none" : 3,

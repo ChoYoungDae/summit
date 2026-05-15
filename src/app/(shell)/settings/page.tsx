@@ -14,6 +14,10 @@ import {
   OFF_ROUTE_THRESHOLD_MIN,
   OFF_ROUTE_THRESHOLD_MAX,
   OFF_ROUTE_THRESHOLD_STEP,
+  GPS_INTERVAL_DEFAULT,
+  GPS_INTERVAL_MIN,
+  GPS_INTERVAL_MAX,
+  GPS_INTERVAL_STEP,
 } from "@/lib/useOffRouteSettings";
 
 // ── Multiplier pill colour per level ─────────────────────────────────────────
@@ -98,21 +102,32 @@ function StickyDoneButton({ hasChanges }: { hasChanges: boolean }) {
   );
 }
 
+// ── Recommended GPS interval based on off-route threshold ────────────────────
+
+function getRecommendedInterval(threshold: number): { min: number; max: number } {
+  if (threshold <= 20) return { min: 5,  max: 10 };
+  if (threshold <= 30) return { min: 10, max: 15 };
+  if (threshold <= 40) return { min: 15, max: 20 };
+  return                      { min: 20, max: 30 };
+}
+
 // ── Settings page ─────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const { index, setLevel } = useHikingLevel();
   const { locale, setLanguage } = useLanguage();
-  const { threshold, setThreshold } = useOffRouteSettings();
+  const { threshold, setThreshold, gpsInterval, setGpsInterval } = useOffRouteSettings();
 
   const initialIndex = useRef(index);
   const initialLocale = useRef(locale);
   const initialThreshold = useRef(threshold);
+  const initialGpsInterval = useRef(gpsInterval);
 
   const hasChanges =
     index !== initialIndex.current ||
     locale !== initialLocale.current ||
-    threshold !== initialThreshold.current;
+    threshold !== initialThreshold.current ||
+    gpsInterval !== initialGpsInterval.current;
 
   return (
     <div className="px-4 pt-5 pb-8">
@@ -141,7 +156,7 @@ export default function SettingsPage() {
               key={l}
               onClick={() => !disabled && setLanguage(l)}
               disabled={disabled}
-              className="w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors"
+              className="w-full flex items-center justify-between px-4 py-2 text-left transition-colors"
               style={{
                 background: active ? "rgba(46,94,74,0.06)" : "transparent",
                 borderBottom: i < LANGUAGES.length - 1 ? "1px solid rgba(0,0,0,0.05)" : "none",
@@ -303,16 +318,40 @@ export default function SettingsPage() {
             {threshold} m
           </span>
         </div>
-        <input
-          type="range"
-          min={OFF_ROUTE_THRESHOLD_MIN}
-          max={OFF_ROUTE_THRESHOLD_MAX}
-          step={OFF_ROUTE_THRESHOLD_STEP}
-          value={threshold}
-          onChange={(e) => setThreshold(Number(e.target.value))}
-          className="w-full"
-          style={{ accentColor: "var(--color-secondary)" }}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setThreshold(threshold - OFF_ROUTE_THRESHOLD_STEP)}
+            disabled={threshold <= OFF_ROUTE_THRESHOLD_MIN}
+            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-base font-bold transition-colors active:scale-95"
+            style={{
+              background: threshold <= OFF_ROUTE_THRESHOLD_MIN ? "rgba(0,0,0,0.04)" : "rgba(200,54,42,0.08)",
+              color: threshold <= OFF_ROUTE_THRESHOLD_MIN ? "var(--color-text-muted)" : "var(--color-secondary)",
+            }}
+          >
+            −
+          </button>
+          <input
+            type="range"
+            min={OFF_ROUTE_THRESHOLD_MIN}
+            max={OFF_ROUTE_THRESHOLD_MAX}
+            step={OFF_ROUTE_THRESHOLD_STEP}
+            value={threshold}
+            onChange={(e) => setThreshold(Number(e.target.value))}
+            className="flex-1"
+            style={{ accentColor: "var(--color-secondary)" }}
+          />
+          <button
+            onClick={() => setThreshold(threshold + OFF_ROUTE_THRESHOLD_STEP)}
+            disabled={threshold >= OFF_ROUTE_THRESHOLD_MAX}
+            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-base font-bold transition-colors active:scale-95"
+            style={{
+              background: threshold >= OFF_ROUTE_THRESHOLD_MAX ? "rgba(0,0,0,0.04)" : "rgba(200,54,42,0.08)",
+              color: threshold >= OFF_ROUTE_THRESHOLD_MAX ? "var(--color-text-muted)" : "var(--color-secondary)",
+            }}
+          >
+            +
+          </button>
+        </div>
         <div
           className="flex justify-between text-[11px] mt-1"
           style={{ color: "var(--color-text-muted)" }}
@@ -323,6 +362,34 @@ export default function SettingsPage() {
         <p className="text-[11px] mt-2" style={{ color: "var(--color-text-muted)" }}>
           {tUI("gpsAlertNote", locale)}
         </p>
+
+        {/* Divider */}
+        <div className="mt-4 mb-4" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }} />
+
+        {/* GPS Interval — app-only teaser */}
+        <div className="flex items-start gap-3 opacity-60">
+          <div
+            className="flex items-center justify-center rounded-xl shrink-0"
+            style={{ width: 36, height: 36, background: "rgba(46,94,74,0.08)" }}
+          >
+            <Icon icon="ph:device-mobile" width={18} height={18} style={{ color: "var(--color-primary)" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--color-text-body)" }}>
+              {tUI("gpsInterval", locale)}
+            </p>
+            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "var(--color-text-muted)" }}>
+              {tUI("gpsIntervalAppOnly", locale)}
+            </p>
+            <span
+              className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(46,94,74,0.08)", color: "var(--color-primary)" }}
+            >
+              <Icon icon="ph:google-play-logo" width={11} height={11} />
+              Google Play — Coming Soon
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* ── About section ────────────────────────────────────── */}
@@ -337,14 +404,27 @@ export default function SettingsPage() {
         style={{ background: "var(--color-card)" }}
       >
         {/* Version */}
-        <div className="px-4 py-3.5 flex items-center justify-between border-bottom border-black/[0.04]" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
+        <div className="px-4 py-3.5 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
           <span className="text-sm font-medium">{tUI("version", locale)}</span>
-          <span
-            className="text-sm font-bold tabular-nums"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            1.0.0
-          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span
+              className="text-sm font-bold tabular-nums"
+              style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-num)" }}
+            >
+              {process.env.NEXT_PUBLIC_APP_VERSION ?? "1.0.0"}
+            </span>
+            <span
+              className="text-[10px] tabular-nums"
+              style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-num)" }}
+            >
+              {process.env.NEXT_PUBLIC_BUILD_TIME
+                ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleDateString(
+                    locale === "ko" ? "ko-KR" : locale === "ja" ? "ja-JP" : locale === "zh" ? "zh-CN" : locale === "es" ? "es-ES" : "en-US",
+                    { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+                  )
+                : ""}
+            </span>
+          </div>
         </div>
 
         {/* Feedback */}

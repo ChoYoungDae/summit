@@ -494,13 +494,23 @@ export default function WaypointManagerCard() {
             />
           )}
 
-          {waypoints.length === 0 ? (
-            mode !== "add" && (
-              <p className="text-sm text-[var(--color-text-muted)] text-center py-4">No waypoints yet.</p>
-            )
-          ) : (
+          {(() => {
+            const HIDDEN_TYPES: WaypointType[] = ["LANDMARK", "VIEW"];
+            const visible = waypoints.filter(w => !HIDDEN_TYPES.includes(w.type));
+            const hiddenCount = waypoints.length - visible.length;
+            return visible.length === 0 ? (
+              mode !== "add" && (
+                <p className="text-sm text-[var(--color-text-muted)] text-center py-4">No waypoints yet.</p>
+              )
+            ) : (
+            <>
+            {hiddenCount > 0 && (
+              <p className="text-[11px] text-[var(--color-text-muted)] text-right">
+                {hiddenCount} Landmark/View waypoints hidden
+              </p>
+            )}
             <div className="flex flex-col gap-2">
-              {waypoints.map(w => (
+              {visible.map(w => (
                 <div key={w.id}>
                   {mode === w.id ? (
                     <WaypointForm
@@ -584,7 +594,9 @@ export default function WaypointManagerCard() {
                 </div>
               ))}
             </div>
-          )}
+            </>
+            );
+          })()}
         </>
       )}
 

@@ -1,6 +1,6 @@
 /**
  * uploadWaypointPhoto
- * 1. Canvas API로 이미지 압축 (최대 800px, WebP quality 0.80)
+ * 1. Canvas API로 이미지 압축 (최대 800px, WebP quality 0.85)
  * 2. Supabase Storage `waypoints` 버킷에 업로드
  * 3. Public URL 반환
  *
@@ -69,7 +69,7 @@ export async function uploadWaypointPhoto(
   file: File,
   options: UploadOptions = {},
 ): Promise<UploadResult> {
-  const { maxPx = 800, quality = 0.80, folder = "photos" } = options;
+  const { maxPx = 800, quality = 0.85, folder = "photos" } = options;
 
   if (!file.type.startsWith("image/")) {
     throw new Error(`이미지 파일만 업로드할 수 있습니다. (받은 타입: ${file.type})`);

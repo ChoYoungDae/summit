@@ -445,6 +445,7 @@ export default function NewRoutePage() {
       });
 
       const segmentSpecs = segments.map((s) => ({
+        segment_type:          s.segType,
         estimated_time_min:    s.durationMin,
         is_bus_combined:       s.isBusCombined ?? false,
         bus_duration_min:      s.busDurationMin,
@@ -456,7 +457,9 @@ export default function NewRoutePage() {
       const segmentOverrides = segments.map((s) =>
         s.source === "existing" && s.existingId ? s.existingId : null
       );
-      // Waypoint boundary overrides for GPS re-slicing
+      // Waypoint boundary overrides for GPS re-slicing.
+      // startWpIdx/endWpIdx are set either from preview inference or from the
+      // user explicitly editing boundaries in StepSegments.
       const segmentWpOverrides = segments.map((s) =>
         s.source === "new" && s.startWpIdx != null && s.endWpIdx != null
           ? { startWpIdx: s.startWpIdx, endWpIdx: s.endWpIdx }

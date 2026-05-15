@@ -217,6 +217,21 @@ export default function InfoPage() {
 
       {/* 2. Why Seoul */}
       <Section iconId="ph:mountains" title={tUI("infoSectionWhySeoulTitle", locale)}>
+        <figure className="flex flex-col gap-1.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://xtuqpqvjgxnclgkkxwgs.supabase.co/storage/v1/object/public/waypoints/photos/9/20260501_162717_1777821250825.webp"
+            alt={tUI("infoWhySeoulPhotoCaption", locale)}
+            className="w-full rounded-xl object-cover"
+            style={{ maxHeight: 220, objectPosition: "center 60%" }}
+          />
+          <figcaption
+            className="text-[11px] text-center leading-snug px-1"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            {tUI("infoWhySeoulPhotoCaption", locale)}
+          </figcaption>
+        </figure>
         <div className="flex flex-col gap-3">
           <Item
             icon={<Train size={14} style={{ color: "var(--color-primary)" }} />}

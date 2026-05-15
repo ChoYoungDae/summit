@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronDown, ChevronUp, AlertTriangle, Flag, Train, Moon } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, AlertTriangle, Flag, Train, Moon, RefreshCw } from "lucide-react";
 import { formatMinutesAsTime } from "@/lib/safetyEngine";
 import { tDB, tUI } from "@/lib/i18n";
 import type { StationInfo, HikingPhase } from "@/types/trail";
@@ -43,6 +43,9 @@ interface Props {
   isCollapsed?: boolean;
   /** Called when the user taps the collapse toggle button */
   onToggleCollapse?: () => void;
+  onRecalcETA?: () => void;
+  /** Date.now() timestamp of the last ETA calculation. null = never calculated. */
+  etaUpdatedAt?: number | null;
 }
 
 export default function FloatingTrailHeader({
@@ -61,7 +64,14 @@ export default function FloatingTrailHeader({
   nightView,
   isCollapsed = false,
   onToggleCollapse,
+  onRecalcETA,
+  etaUpdatedAt,
 }: Props) {
+  const STALE_MS = 10 * 60 * 1000; // 10 minutes
+  const isStale = etaUpdatedAt == null || (Date.now() - etaUpdatedAt) > STALE_MS;
+  const updatedAtLabel = etaUpdatedAt
+    ? new Date(etaUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
   const { locale: hookLocale } = useLanguage();
   const locale = propLocale || hookLocale;
 
@@ -230,18 +240,50 @@ export default function FloatingTrailHeader({
             )
           ) : hikingPhase === "ascent" ? (
             /* ASCENT MODE */
-            <>
-              <div className="h-4" />
-              {renderETALine(tUI("summitArrival", locale), peakETAMin, Flag)}
-              {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
-            </>
+            <div className="flex flex-col items-end gap-1">
+              <div style={{ opacity: isStale ? 0.45 : 1 }}>
+                {renderETALine(tUI("summitArrival", locale), peakETAMin, Flag)}
+                {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
+              </div>
+              <button
+                onClick={onRecalcETA}
+                className="flex items-center gap-1 active:scale-95 transition-transform"
+              >
+                <RefreshCw
+                  className="w-3 h-3"
+                  style={{ color: isStale ? "var(--color-primary)" : "var(--color-text-muted)" }}
+                />
+                <span
+                  className="text-[9px] tabular-nums"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {updatedAtLabel ?? "—"}
+                </span>
+              </button>
+            </div>
           ) : (
             /* DESCENT MODE */
-            <>
-              <div className="h-4" />
-              {renderETALine(tUI("trailheadArrival", locale), trailheadETAMin, Flag)}
-              {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
-            </>
+            <div className="flex flex-col items-end gap-1">
+              <div style={{ opacity: isStale ? 0.45 : 1 }}>
+                {renderETALine(tUI("trailheadArrival", locale), trailheadETAMin, Flag)}
+                {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
+              </div>
+              <button
+                onClick={onRecalcETA}
+                className="flex items-center gap-1 active:scale-95 transition-transform"
+              >
+                <RefreshCw
+                  className="w-3 h-3"
+                  style={{ color: isStale ? "var(--color-primary)" : "var(--color-text-muted)" }}
+                />
+                <span
+                  className="text-[9px] tabular-nums"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {updatedAtLabel ?? "—"}
+                </span>
+              </button>
+            </div>
           )}
         </div>
       </div>

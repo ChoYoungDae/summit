@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, RefreshCw, Minimize2 } from "lucide-react";
+import { Camera, CheckCircle, AlertCircle, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, RefreshCw, Upload, ImagePlus } from "lucide-react";
 import { Icon } from "@iconify/react";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
@@ -65,7 +65,21 @@ interface PhotoEntry {
   waypointType:  WaypointType | "";
   state: "pending" | "uploading" | "uploaded" | "saving" | "saved" | "error";
   errorMsg?: string;
+  /** True right after a new upload or a replace — shows "New" badge */
+  isNew?: boolean;
 }
+
+type ReplaceMatch = {
+  file: File;
+  filePreviewUrl: string;
+  matchedId: number;
+  matchedPreviewUrl: string;
+};
+type ReplaceUnmatched = {
+  file: File;
+  filePreviewUrl: string;
+  reason: string;
+};
 
 /** Keep saved photos sorted by trail position; in-progress ones stay at the end */
 function sortPhotos(photos: PhotoEntry[]): PhotoEntry[] {
@@ -79,8 +93,8 @@ function sortPhotos(photos: PhotoEntry[]): PhotoEntry[] {
 
 // ── Client-side helpers ───────────────────────────────────────────────────────
 
-/** Resize image to maxPx and encode as WebP at quality 0.82 using Canvas API. */
-async function processImage(file: File, maxPx = 600): Promise<Blob> {
+/** Resize image to maxPx (longest side) and encode as WebP at quality 0.85. */
+async function processImage(file: File, maxPx = 800): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -97,12 +111,21 @@ async function processImage(file: File, maxPx = 600): Promise<Blob> {
       canvas.toBlob(
         (blob) => blob ? resolve(blob) : reject(new Error("toBlob failed")),
         "image/webp",
-        0.8,
+        0.85,
       );
     };
     img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Image load failed")); };
     img.src = objectUrl;
   });
+}
+
+/** Haversine distance in metres between two lat/lon points. */
+function haversineMClient(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6_371_000;
+  const φ1 = (lat1 * Math.PI) / 180, φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180, Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 /** Extract GPS lat/lon from image EXIF using the exifr library (browser). */
@@ -244,12 +267,15 @@ export default function PhotoUploadCard() {
   const [photos, setPhotos]               = useState<PhotoEntry[]>([]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [recompressState, setRecompressState] = useState<
-    "idle" | "running" | "done"
-  >("idle");
-  const [recompressProgress, setRecompressProgress] = useState({ done: 0, total: 0, failed: 0 });
-  const fileInputRef  = useRef<HTMLInputElement>(null);
-  const uploadingKeys = useRef(new Set<string>());
+  const [replaceState,    setReplaceState]    = useState<"idle" | "matching" | "preview" | "running" | "done">("idle");
+  const [replaceMatches,  setReplaceMatches]  = useState<ReplaceMatch[]>([]);
+  const [replaceUnmatched,setReplaceUnmatched]= useState<ReplaceUnmatched[]>([]);
+  const [replaceProgress, setReplaceProgress] = useState({ done: 0, total: 0, failed: 0 });
+  const fileInputRef        = useRef<HTMLInputElement>(null);
+  const bulkReplaceInputRef = useRef<HTMLInputElement>(null);
+  const singleReplaceInputRef = useRef<HTMLInputElement>(null);
+  const replacingEntryRef   = useRef<PhotoEntry | null>(null);
+  const uploadingKeys       = useRef(new Set<string>());
 
   // Load mountains on mount
   useEffect(() => {
@@ -378,6 +404,7 @@ export default function PhotoUploadCard() {
             autoMapped: up.autoMapped,
             orderIndex: up.orderIndex ?? 999_999,
             state:      "uploaded",
+            isNew:      true,
           }
         )));
       } catch (err) {
@@ -502,41 +529,89 @@ export default function PhotoUploadCard() {
     }
   }
 
-  async function bulkRecompress() {
-    if (!confirm("모든 사진을 600px WebP로 다운스케일합니다. 계속할까요?")) return;
-    setRecompressState("running");
-    setRecompressProgress({ done: 0, total: 0, failed: 0 });
+  async function bulkReplaceFiles(files: FileList) {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith("image/"));
+    if (!imageFiles.length) return;
+    setReplaceState("matching");
 
-    // Fetch all photo IDs + URLs
-    const allPhotos: { id: number; url: string }[] = await fetch(
-      "/api/admin/route-photos/recompress"
-    ).then(r => r.json()).catch(() => []);
+    const existingWithGps = photos.filter(p => p.id && p.hasGps && p.lat != null && p.lon != null);
+    const usedIds = new Set<number>();
+    const matches: ReplaceMatch[] = [];
+    const unmatched: ReplaceUnmatched[] = [];
 
-    setRecompressProgress({ done: 0, total: allPhotos.length, failed: 0 });
+    for (const file of imageFiles) {
+      const gps = await extractGps(file);
+      const filePreviewUrl = URL.createObjectURL(file);
+      if (!gps) {
+        unmatched.push({ file, filePreviewUrl, reason: "GPS 없음" });
+        continue;
+      }
+      let bestMatch: PhotoEntry | null = null;
+      let bestDist = 5; // 5m threshold
+      for (const p of existingWithGps) {
+        if (usedIds.has(p.id!)) continue;
+        const dist = haversineMClient(gps.lat, gps.lon, p.lat!, p.lon!);
+        if (dist < bestDist) { bestDist = dist; bestMatch = p; }
+      }
+      if (bestMatch) {
+        usedIds.add(bestMatch.id!);
+        matches.push({ file, filePreviewUrl, matchedId: bestMatch.id!, matchedPreviewUrl: bestMatch.previewUrl });
+      } else {
+        unmatched.push({ file, filePreviewUrl, reason: `5m 이내 일치 없음 (${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)})` });
+      }
+    }
 
+    setReplaceMatches(matches);
+    setReplaceUnmatched(unmatched);
+    setReplaceState("preview");
+  }
+
+  async function confirmBulkReplace() {
+    setReplaceState("running");
+    setReplaceProgress({ done: 0, total: replaceMatches.length, failed: 0 });
     let done = 0, failed = 0;
-    for (const p of allPhotos) {
+    for (const match of replaceMatches) {
       try {
-        // Download existing image
-        const imgBlob = await fetch(p.url).then(r => r.blob());
-        const imgFile = new File([imgBlob], "photo.webp", { type: imgBlob.type });
-
-        // Resize to 600px via canvas
-        const webpBlob = await processImage(imgFile, 600);
-
-        // Upload back (overwrite)
+        const blob = await processImage(match.file);
         const fd = new FormData();
-        fd.append("id",    String(p.id));
-        fd.append("photo", new File([webpBlob], "photo.webp", { type: "image/webp" }));
+        fd.append("id",    String(match.matchedId));
+        fd.append("photo", new File([blob], "photo.webp", { type: "image/webp" }));
         const res = await fetch("/api/admin/route-photos/recompress", { method: "POST", body: fd });
         if (!res.ok) throw new Error("upload failed");
+        const newUrl = URL.createObjectURL(blob);
+        setPhotos(prev => prev.map(p => p.id === match.matchedId ? { ...p, previewUrl: newUrl, isNew: true } : p));
         done++;
-      } catch {
-        failed++;
-      }
-      setRecompressProgress({ done: done + failed, total: allPhotos.length, failed });
+      } catch { failed++; }
+      setReplaceProgress({ done: done + failed, total: replaceMatches.length, failed });
     }
-    setRecompressState("done");
+    replaceUnmatched.forEach(u => URL.revokeObjectURL(u.filePreviewUrl));
+    setReplaceState("done");
+  }
+
+  function cancelReplace() {
+    replaceMatches.forEach(m => URL.revokeObjectURL(m.filePreviewUrl));
+    replaceUnmatched.forEach(u => URL.revokeObjectURL(u.filePreviewUrl));
+    setReplaceMatches([]);
+    setReplaceUnmatched([]);
+    setReplaceState("idle");
+  }
+
+  async function replaceSinglePhoto(entry: PhotoEntry, file: File) {
+    if (!entry.id) return;
+    replacingEntryRef.current = null;
+    setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, state: "uploading" } : p));
+    try {
+      const blob = await processImage(file);
+      const fd = new FormData();
+      fd.append("id",    String(entry.id));
+      fd.append("photo", new File([blob], "photo.webp", { type: "image/webp" }));
+      const res = await fetch("/api/admin/route-photos/recompress", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("Replace failed");
+      const newUrl = URL.createObjectURL(blob);
+      setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, previewUrl: newUrl, state: "saved", isNew: true } : p));
+    } catch (err) {
+      setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, state: "error", errorMsg: err instanceof Error ? err.message : "Replace failed" } : p));
+    }
   }
 
   const SEG_TYPE_COLORS: Record<string, string> = {
@@ -563,41 +638,85 @@ export default function PhotoUploadCard() {
         </div>
       </div>
 
-      {/* ── Bulk recompress ──────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Minimize2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-amber-800">Recompress All to 600px</p>
-            {recompressState === "idle" && (
-              <p className="text-[10px] text-amber-600">기존 사진 전체를 600px WebP로 다운스케일</p>
-            )}
-            {recompressState === "running" && (
-              <p className="text-[10px] text-amber-600 font-num">
-                {recompressProgress.done} / {recompressProgress.total}
-                {recompressProgress.failed > 0 && ` (실패 ${recompressProgress.failed})`}
-              </p>
-            )}
-            {recompressState === "done" && (
-              <p className="text-[10px] text-emerald-600 font-semibold">
-                완료 — {recompressProgress.total - recompressProgress.failed}개 성공
-                {recompressProgress.failed > 0 && `, ${recompressProgress.failed}개 실패`}
-              </p>
-            )}
-          </div>
+      {/* ── Bulk replace (GPS match) ─────────────────────────────────────────── */}
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-blue-800">Replace Photos (GPS match)</p>
+          {replaceState === "idle" && <p className="text-[10px] text-blue-600">원본 사진 선택 → GPS 자동 매칭 → 800px WebP로 교체</p>}
+          {replaceState === "matching" && <p className="text-[10px] text-blue-600">GPS 매칭 중…</p>}
+          {replaceState === "running" && (
+            <p className="text-[10px] text-blue-600 font-num">
+              {replaceProgress.done} / {replaceProgress.total}
+              {replaceProgress.failed > 0 && ` (실패 ${replaceProgress.failed})`}
+            </p>
+          )}
+          {replaceState === "done" && (
+            <p className="text-[10px] text-emerald-600 font-semibold">
+              완료 — {replaceProgress.total - replaceProgress.failed}개 교체
+              {replaceProgress.failed > 0 && `, ${replaceProgress.failed}개 실패`}
+            </p>
+          )}
         </div>
         <button
-          onClick={bulkRecompress}
-          disabled={recompressState === "running"}
-          className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-amber-600 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50 hover:bg-amber-700 transition-colors"
+          onClick={() => { setReplaceState("idle"); bulkReplaceInputRef.current?.click(); }}
+          disabled={replaceState === "matching" || replaceState === "running"}
+          className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-blue-600 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors"
         >
-          {recompressState === "running" ? (
-            <><div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> 처리 중</>
-          ) : (
-            <><Minimize2 className="w-3 h-3" /> 시작</>
-          )}
+          {replaceState === "matching" || replaceState === "running"
+            ? <><div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> 처리 중</>
+            : <><Upload className="w-3 h-3" /> 선택</>
+          }
         </button>
+        <input ref={bulkReplaceInputRef} type="file" accept="image/*" multiple className="hidden"
+          onChange={e => { if (e.target.files?.length) bulkReplaceFiles(e.target.files); e.target.value = ""; }} />
       </div>
+
+      {/* ── Replace preview modal ─────────────────────────────────────────────── */}
+      {replaceState === "preview" && (
+        <div className="rounded-xl border border-blue-300 bg-white p-4 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-blue-800">
+            매칭 결과 확인 — {replaceMatches.length}개 교체 / {replaceUnmatched.length}개 미매칭
+          </p>
+          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+            {replaceMatches.map((m, i) => (
+              <div key={i} className="flex items-center gap-2 text-[10px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={m.matchedPreviewUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0 opacity-50" />
+                <span className="text-[var(--color-text-muted)]">→</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={m.filePreviewUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+                <span className="text-emerald-600 font-medium truncate">{m.file.name}</span>
+              </div>
+            ))}
+            {replaceUnmatched.map((u, i) => (
+              <div key={`u-${i}`} className="flex items-center gap-2 text-[10px] opacity-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={u.filePreviewUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+                <span className="text-red-500">{u.file.name} — {u.reason}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={cancelReplace} className="flex-1 rounded-lg border border-[var(--color-border)] text-xs font-medium py-1.5 hover:bg-gray-50">취소</button>
+            <button
+              onClick={confirmBulkReplace}
+              disabled={replaceMatches.length === 0}
+              className="flex-1 rounded-lg bg-blue-600 text-white text-xs font-semibold py-1.5 disabled:opacity-40 hover:bg-blue-700"
+            >
+              {replaceMatches.length}개 교체
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden input for single-photo replace */}
+      <input ref={singleReplaceInputRef} type="file" accept="image/*" className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          const entry = replacingEntryRef.current;
+          if (file && entry) replaceSinglePhoto(entry, file);
+          e.target.value = "";
+        }} />
 
       {/* Mountain selector */}
       <label className="flex flex-col gap-1">
@@ -647,7 +766,7 @@ export default function PhotoUploadCard() {
             <div className="text-center">
               <p className="text-sm font-medium">Tap to select photos</p>
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                Or drag &amp; drop — WebP · max 1200px · GPS auto-mapped
+                Or drag &amp; drop — WebP · max 800px · GPS auto-mapped
               </p>
             </div>
             <input
@@ -715,6 +834,9 @@ export default function PhotoUploadCard() {
                           <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                         </div>
                       )}
+                      {entry.isNew && entry.state !== "uploading" && (
+                        <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[8px] font-bold px-1 rounded">NEW</span>
+                      )}
                     </div>
 
                     {/* Info */}
@@ -740,6 +862,15 @@ export default function PhotoUploadCard() {
                               <ChevronDown className="w-3.5 h-3.5" />
                             </button>
                           </div>
+                          {entry.id && (
+                            <button
+                              onClick={() => { replacingEntryRef.current = entry; singleReplaceInputRef.current?.click(); }}
+                              className="flex-shrink-0 p-1 rounded-lg text-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                              title="Replace photo"
+                            >
+                              <ImagePlus className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => deletePhoto(entry)}
                             className="flex-shrink-0 p-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"

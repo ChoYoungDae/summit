@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { toSlug, buildSegmentSlug } from "@/lib/slug";
+import { haversineM, computeTrackStats, findNearestIndex, inferSegmentType as inferType } from "@/lib/geo";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +9,7 @@ const supabaseAdmin = createClient(
 );
 
 type TrackPoint = [number, number, number]; // [lon, lat, ele]
-type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "JUNCTION" | "SHELTER" | "BUS_STOP";
+type WaypointType = "STATION" | "TRAILHEAD" | "SUMMIT" | "PEAK" | "JUNCTION" | "SHELTER" | "BUS_STOP";
 type SegmentType  = "APPROACH" | "ASCENT" | "DESCENT" | "RETURN";
 
 // ── Waypoint spec from client ─────────────────────────────────────────────────
@@ -48,57 +49,7 @@ type ResolvedWaypoint = {
   nameKo?: string;
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function haversineM(lon1: number, lat1: number, lon2: number, lat2: number): number {
-  const R  = 6_371_000;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a  = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-function computeStats(points: TrackPoint[]) {
-  let distM = 0, ascM = 0, descM = 0;
-  for (let i = 1; i < points.length; i++) {
-    distM += haversineM(points[i-1][0], points[i-1][1], points[i][0], points[i][1]);
-    const dEle = points[i][2] - points[i-1][2];
-    if (dEle > 0) ascM  += dEle;
-    else          descM -= dEle;
-  }
-  return {
-    distance_m:      Math.round(distM),
-    total_ascent_m:  Math.round(ascM),
-    total_descent_m: Math.round(descM),
-  };
-}
-
-function findNearestIndex(track: TrackPoint[], lat: number, lon: number): number {
-  let bestIdx  = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < track.length; i++) {
-    const d = haversineM(track[i][0], track[i][1], lon, lat);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  return bestIdx;
-}
-
-function inferSegmentType(startType: WaypointType, endType: WaypointType): SegmentType {
-  const isStart = (t: WaypointType) => t === "STATION" || t === "BUS_STOP";
-  const isEnd   = (t: WaypointType) => t === "STATION" || t === "BUS_STOP";
-  const isMid   = (t: WaypointType) => t === "TRAILHEAD" || t === "JUNCTION" || t === "SHELTER";
-
-  if (isStart(startType) && isMid(endType))   return "APPROACH";
-  if (isMid(startType)   && endType === "SUMMIT") return "ASCENT";
-  if (startType === "SUMMIT" && isMid(endType))   return "DESCENT";
-  if (isMid(startType)   && isEnd(endType))   return "RETURN";
-  // same-side fallback
-  if (isStart(startType) && isEnd(endType))   return "APPROACH";
-  if (isMid(startType)   && isMid(endType))   return "ASCENT";
-  return "APPROACH";
-}
+// ── Helpers (haversineM, computeTrackStats, findNearestIndex, inferType) from @/lib/geo ──
 
 // ── POST /api/admin/create-route ──────────────────────────────────────────────
 
@@ -116,6 +67,7 @@ export async function POST(req: NextRequest) {
       description?: { en: string; ko: string };
       preview?:      boolean;
       segmentSpecs?: {
+        segment_type?:         string;
         estimated_time_min?: number;
         is_bus_combined?:      boolean;
         bus_duration_min?:     number;
@@ -339,7 +291,7 @@ export async function POST(req: NextRequest) {
 
       // Normal segment
       finalSegs.push({
-        segType:         inferSegmentType(startWp.type, endWp.type),
+        segType:         inferType(startWp.type, endWp.type),
         startWaypointId: startWp.id,
         startWpSlug:     startWp.slug,
         startWpIdx:      seg.startWpIdx,
@@ -380,7 +332,9 @@ export async function POST(req: NextRequest) {
           endWpSlug:       endWp.slug,
           endWpIdx:        ovEnd,
           track:           newTrack,
-          segType:         inferSegmentType(startWp.type, endWp.type),
+          // Prefer explicit segment_type from wizard; fall back to inference
+          segType:         (segmentSpecs?.[si]?.segment_type as SegmentType | undefined)
+                           ?? inferType(startWp.type as WaypointType, endWp.type as WaypointType),
         };
       }
     }
@@ -393,7 +347,7 @@ export async function POST(req: NextRequest) {
     const previewSegments: any[] = [];
 
     for (const [idx, seg] of finalSegs.entries()) {
-      const stats   = computeStats(seg.track);
+      const stats   = computeTrackStats(seg.track);
       // Naismith variant: ~2 km/h ascent pace + 10 m elevation per minute
       let estTime = Math.max(
         1,
@@ -418,11 +372,20 @@ export async function POST(req: NextRequest) {
           endWpNameKo:   ewp.nameKo,
           distanceM:     stats.distance_m,
           durationMin:   estTime,
+          startWpIdx:    seg.startWpIdx,
+          endWpIdx:      seg.endWpIdx,
         });
         totalDurationMin += estTime;
         totalDistanceM   += stats.distance_m;
         continue;
       }
+
+      // ── WIZARD FLOW: segmentOverrides drives segment count ──────────────────
+      // When the wizard provides segmentOverrides, it is the authoritative list.
+      // finalSegs may have more entries (one per waypoint pair) but only
+      // segmentOverrides.length logical segments should be created.
+      // Segments beyond this index are intermediate waypoints — not separate segments.
+      if (segmentOverrides && idx >= segmentOverrides.length) continue;
 
       // If an existing segment ID is provided for this slot, skip creation
       const existingOverrideId = segmentOverrides?.[idx];

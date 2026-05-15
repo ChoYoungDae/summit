@@ -87,26 +87,21 @@ export function Header() {
       </Link>
 
       <span
-        className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border shrink-0"
-        style={{
-          color: "#fff",
-          borderColor: CHIP_BG,
-          backgroundColor: CHIP_BG,
-          fontFamily: "var(--font-num)",
-        }}
+        className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold shrink-0"
+        style={{ color: "#374151", fontFamily: "var(--font-num)" }}
       >
         {weather ? (
           <>
             <span>{ptyIcon(weather.pty)}</span>
             <span>{weather.tempC}°C ({weather.tempF}°F)</span>
-            <span className="opacity-50">·</span>
+            <span className="opacity-40">·</span>
             <span style={{ fontFamily: "var(--font-en)" }}>SEOUL</span>
           </>
         ) : (
           <>
             <span
               className="w-1.5 h-1.5 rounded-full animate-pulse inline-block shrink-0"
-              style={{ backgroundColor: "#fff" }}
+              style={{ backgroundColor: "#9CA3AF" }}
             />
             <span style={{ fontFamily: "var(--font-en)" }}>SEOUL</span>
           </>

@@ -26,6 +26,12 @@ export default function AdminPage() {
       >
         + Create New Route (Guided Wizard)
       </Link>
+      <Link
+        href="/admin/resegment"
+        className="flex items-center justify-center gap-2 rounded-2xl border border-amber-400 text-amber-700 py-3 text-sm font-semibold hover:bg-amber-50 transition-colors"
+      >
+        🔧 Resegment Existing Route
+      </Link>
 
       {/* Step 1: Waypoints */}
       <WaypointManagerCard />
