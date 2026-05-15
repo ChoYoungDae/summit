@@ -145,7 +145,15 @@ body {
 }
 
 /* ─── Button press feedback ──────────────────────────────── */
+/* Release: spring easing (약간 튀어나오는 느낌) */
+button:not(:disabled) {
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.22s ease;
+}
+/* Press: 즉시 snap (70ms), 확실한 축소 + 어두워짐 */
 button:active:not(:disabled) {
-  transform: scale(0.96);
-  transition: transform 0.08s ease;
+  transform: scale(0.91);
+  filter: brightness(0.80);
+  transition: transform 0.07s ease,
+              filter 0.07s ease;
 }
