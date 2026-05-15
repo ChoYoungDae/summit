@@ -133,18 +133,30 @@ export default function TrailSection({
   const [photos,        setPhotos]        = useState<RoutePhoto[]>([]);
   const [activePhoto,   setActivePhoto]   = useState<RoutePhoto | null>(null);
 
-  // Fetch route photos once on mount, then preload all into browser cache
+  // Fetch route photos once on mount
   useEffect(() => {
     fetch(`/api/admin/route-photos?routeId=${route.id}&includeSiblings=true`)
       .then(r => r.ok ? r.json() : [])
       .then((data: RoutePhoto[]) => {
         if (!Array.isArray(data)) return;
         setPhotos(data);
-        // Preload all candidate photos (even filtered ones) for instant display
-        data.forEach(p => { const img = new window.Image(); img.src = renderUrl(p.url, 900); });
       })
       .catch(() => {});
   }, [route.id]);
+
+  // Smart preload: when activePhoto changes, preload current ± 2 neighbors.
+  // Avoids firing 30-40 simultaneous requests on route load.
+  useEffect(() => {
+    if (!activePhoto || visiblePhotos.length === 0) return;
+    const idx = visiblePhotos.findIndex(p => p.id === activePhoto.id);
+    if (idx === -1) return;
+    [idx - 1, idx, idx + 1, idx + 2]
+      .filter(i => i >= 0 && i < visiblePhotos.length)
+      .forEach(i => {
+        const photo = visiblePhotos[i];
+        if (photo) { const img = new window.Image(); img.src = renderUrl(photo.url, 900); }
+      });
+  }, [activePhoto, visiblePhotos]);
 
   // ── GPS proximity filter + route-relative sort ────────────────────────────
   // Build a flat [lon, lat] point list covering walk/hiking sub-tracks ONLY.

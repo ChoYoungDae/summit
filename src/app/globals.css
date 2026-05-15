@@ -143,3 +143,9 @@ body {
 .sketch-map .mapboxgl-ctrl-logo {
   display: none !important;
 }
+
+/* ─── Button press feedback ──────────────────────────────── */
+button:active:not(:disabled) {
+  transform: scale(0.96);
+  transition: transform 0.08s ease;
+}
