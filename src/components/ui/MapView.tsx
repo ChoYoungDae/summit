@@ -98,6 +98,10 @@ const UI_STRINGS: Record<string, { gpsHttps: string; alert: Record<string, strin
 // ── Constants ─────────────────────────────────────────────────────────────────
 const WAYPOINT_ALERT_M = 40;
 
+// Photo marker clustering — zoom below threshold → cluster badges, above → individual
+const CLUSTER_ZOOM_THRESHOLD = 14;   // zoom ≥ 14: individual markers
+const CLUSTER_DISTANCE_M     = 200;  // photos within 200 m are merged into one cluster
+
 // ── Geometry ──────────────────────────────────────────────────────────────────
 
 /**
@@ -347,6 +351,32 @@ function PhotoMarker({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** Cluster badge — amber pill with camera icon + count. Tap to zoom in. */
+function ClusterBadge({ count, onClick }: { count: number; onClick: () => void }) {
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        background: "#F59E0B",
+        borderRadius: 9999,
+        border: "2px solid #fff",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+        padding: "4px 9px",
+        cursor: "pointer",
+        userSelect: "none",
+      }}
+    >
+      <Icon icon="ph:camera" width={12} height={12} color="#fff" />
+      <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "var(--font-num)", lineHeight: 1 }}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
 function HoverDot({ ele }: { ele?: number }) {
   return (
     <div className="flex flex-col items-center group pointer-events-none">
@@ -542,6 +572,12 @@ export default function MapView({
   // Map / compass state
   const [isTracking,       setIsTracking]       = useState(false);
   const [mapBearing,       setMapBearing]       = useState(0);
+
+  // Photo clustering + viewport culling state
+  const [mapZoom,       setMapZoom]       = useState(13);
+  const [mapViewBounds, setMapViewBounds] = useState<{
+    north: number; south: number; east: number; west: number;
+  } | null>(null);
   const [mapError,         setMapError]         = useState<string | null>(null);
   const [gpsError,         setGpsError]         = useState<string | null>(null);
   const [accuracyTipOpen,  setAccuracyTipOpen]  = useState(false);
@@ -939,22 +975,34 @@ export default function MapView({
     setMapBearing(mapRef.current?.getBearing() ?? 0);
   }, []);
 
-  // ── Viewport → elevation chart sync ──────────────────────────────────────────
-  // Fires once after each pan/zoom ends (moveend). Finds which track points
-  // are inside the current map bounds and notifies the parent so the elevation
-  // chart can auto-scale its Y-axis to the visible elevation range.
+  // ── Viewport → elevation chart sync + zoom/bounds for photo clustering ───────
+  // Fires once after each pan/zoom ends (moveend).
   const handleMoveEnd = useCallback(() => {
-    const cb = onVisibleTrackRangeRef.current;
-    if (!cb || track.length === 0 || !mapRef.current) return;
+    const map = mapRef.current;
+    if (!map) return;
 
-    const bounds = mapRef.current.getBounds();
-    if (!bounds) return;
+    // Update zoom + viewport bounds — used for photo clustering / culling
+    const zoom      = map.getZoom();
+    const mapBounds = map.getBounds();
+    setMapZoom(zoom);
+    if (mapBounds) {
+      setMapViewBounds({
+        north: mapBounds.getNorth(),
+        south: mapBounds.getSouth(),
+        east:  mapBounds.getEast(),
+        west:  mapBounds.getWest(),
+      });
+    }
+
+    // Elevation chart sync
+    const cb = onVisibleTrackRangeRef.current;
+    if (!cb || track.length === 0 || !mapBounds) return;
 
     let startIdx = -1;
     let endIdx   = -1;
     for (let i = 0; i < track.length; i++) {
       const [lon, lat] = track[i];
-      if (bounds.contains([lon, lat])) {
+      if (mapBounds.contains([lon, lat])) {
         if (startIdx === -1) startIdx = i;
         endIdx = i;
       }
@@ -967,6 +1015,53 @@ export default function MapView({
       cb({ startIdx, endIdx });
     }
   }, [track]); // track changes only when route changes
+
+  // ── Photo markers: cluster when zoomed out, individual + culled when zoomed in ─
+  const photoMarkerData = useMemo(() => {
+    const geoPhotos = photos.filter(p => p.lat != null && p.lon != null);
+
+    if (mapZoom < CLUSTER_ZOOM_THRESHOLD) {
+      // Cluster mode — greedy nearest-cluster assignment
+      const clusters: Array<{ lat: number; lon: number; photos: RoutePhoto[] }> = [];
+      for (const photo of geoPhotos) {
+        let nearest: typeof clusters[0] | null = null;
+        let nearestDist = Infinity;
+        for (const cluster of clusters) {
+          const d = haversineM(photo.lat!, photo.lon!, cluster.lat, cluster.lon);
+          if (d < nearestDist) { nearestDist = d; nearest = cluster; }
+        }
+        if (nearest && nearestDist < CLUSTER_DISTANCE_M) {
+          nearest.photos.push(photo);
+          // Recalculate centroid
+          nearest.lat = nearest.photos.reduce((s, p) => s + p.lat!, 0) / nearest.photos.length;
+          nearest.lon = nearest.photos.reduce((s, p) => s + p.lon!, 0) / nearest.photos.length;
+        } else {
+          clusters.push({ lat: photo.lat!, lon: photo.lon!, photos: [photo] });
+        }
+      }
+      return { mode: "cluster" as const, clusters };
+    }
+
+    // Individual mode — viewport culling with small buffer
+    const buf = 0.005; // ~500 m buffer so markers near the edge don't pop
+    const visible = mapViewBounds
+      ? geoPhotos.filter(p =>
+          p.lat! >= mapViewBounds.south - buf &&
+          p.lat! <= mapViewBounds.north + buf &&
+          p.lon! >= mapViewBounds.west  - buf &&
+          p.lon! <= mapViewBounds.east  + buf
+        )
+      : geoPhotos;
+    return { mode: "individual" as const, photos: visible };
+  }, [photos, mapZoom, mapViewBounds]);
+
+  const handleClusterClick = useCallback((lat: number, lon: number) => {
+    mapRef.current?.easeTo({
+      center: [lon, lat],
+      zoom: CLUSTER_ZOOM_THRESHOLD + 0.5,
+      duration: 500,
+    });
+  }, []);
 
   // ── Compass toggle ──────────────────────────────────────────────────────────
   const centerOnGps = useCallback(() => {
@@ -1279,17 +1374,22 @@ export default function MapView({
           );
         })()}
 
-        {/* Photo markers — amber camera dots */}
-        {photos.filter(p => p.lat != null && p.lon != null).map(photo => (
-          <Marker
-            key={`photo-${photo.id}`}
-            longitude={photo.lon!}
-            latitude={photo.lat!}
-            anchor="center"
-          >
-            <PhotoMarker onClick={() => onPhotoClick?.(photo)} />
-          </Marker>
-        ))}
+        {/* Photo markers — clustered below zoom 14, individual + viewport-culled above */}
+        {photoMarkerData.mode === "cluster"
+          ? photoMarkerData.clusters.map((cluster, i) => (
+              <Marker key={`cluster-${i}`} longitude={cluster.lon} latitude={cluster.lat} anchor="center">
+                {cluster.photos.length === 1
+                  ? <PhotoMarker onClick={() => onPhotoClick?.(cluster.photos[0]!)} />
+                  : <ClusterBadge count={cluster.photos.length} onClick={() => handleClusterClick(cluster.lat, cluster.lon)} />
+                }
+              </Marker>
+            ))
+          : photoMarkerData.photos.map(photo => (
+              <Marker key={`photo-${photo.id}`} longitude={photo.lon!} latitude={photo.lat!} anchor="center">
+                <PhotoMarker onClick={() => onPhotoClick?.(photo)} />
+              </Marker>
+            ))
+        }
 
         {/* GPS accuracy circle — scales with zoom, shown behind the dot */}
         {gpsPos && gpsAccuracy !== null && (

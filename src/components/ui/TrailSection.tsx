@@ -144,20 +144,6 @@ export default function TrailSection({
       .catch(() => {});
   }, [route.id]);
 
-  // Smart preload: when activePhoto changes, preload current ± 2 neighbors.
-  // Avoids firing 30-40 simultaneous requests on route load.
-  useEffect(() => {
-    if (!activePhoto || visiblePhotos.length === 0) return;
-    const idx = visiblePhotos.findIndex(p => p.id === activePhoto.id);
-    if (idx === -1) return;
-    [idx - 1, idx, idx + 1, idx + 2]
-      .filter(i => i >= 0 && i < visiblePhotos.length)
-      .forEach(i => {
-        const photo = visiblePhotos[i];
-        if (photo) { const img = new window.Image(); img.src = renderUrl(photo.url, 900); }
-      });
-  }, [activePhoto, visiblePhotos]);
-
   // ── GPS proximity filter + route-relative sort ────────────────────────────
   // Build a flat [lon, lat] point list covering walk/hiking sub-tracks ONLY.
   // Bus tracks (city streets) are intentionally excluded — proximity to a bus
@@ -211,6 +197,20 @@ export default function TrailSection({
     // Sort by distance along this route's track (ignores stored order_index)
     return [...filtered].sort((a, b) => photoTrailDist(a) - photoTrailDist(b));
   }, [photos, routeTrackFlat, trackCumDist]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Smart preload: when activePhoto changes, preload current ± 2 neighbors.
+  // Placed after visiblePhotos declaration to satisfy TS block-scoping rules.
+  useEffect(() => {
+    if (!activePhoto || visiblePhotos.length === 0) return;
+    const idx = visiblePhotos.findIndex(p => p.id === activePhoto.id);
+    if (idx === -1) return;
+    [idx - 1, idx, idx + 1, idx + 2]
+      .filter(i => i >= 0 && i < visiblePhotos.length)
+      .forEach(i => {
+        const photo = visiblePhotos[i];
+        if (photo) { const img = new window.Image(); img.src = renderUrl(photo.url, 900); }
+      });
+  }, [activePhoto, visiblePhotos]);
 
   // ── Hiking mode: "preview" (far from trailhead) | "active" (within 500 m) ──
   const [hikingMode, setHikingMode] = useState<"preview" | "active">("preview");

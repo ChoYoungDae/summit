@@ -285,6 +285,28 @@ GPS 트랙이 각 웨이포인트 좌표 기준으로 **자동 분리**되며 Se
 
 `src/components/ui/TrailSection.tsx` — `activePhoto` state를 watch하는 `useEffect`
 
+### 사진 마커: 클러스터링 + 뷰포트 컬링
+
+지도에 표시되는 사진 마커를 줌 레벨에 따라 다르게 렌더링하여 DOM 부하를 최소화합니다.
+
+#### 줌 레벨별 동작
+
+| 줌 레벨 | 렌더 방식 |
+|---|---|
+| < 14 (전체 경로 보기) | **클러스터 모드**: 200m 이내 사진은 📷 N 뱃지로 묶음. 뱃지 탭 → zoom 14.5로 진입 |
+| ≥ 14 (구간 확대) | **개별 모드**: 현재 뷰포트 안 사진만 마커로 렌더 (뷰포트 컬링) |
+
+- 클러스터가 사진 1개짜리면 📷 뱃지 대신 카메라 아이콘 단독 표시
+- 뷰포트 컬링 버퍼: 500m (경계에 걸친 마커도 표시)
+
+#### 구현 위치
+
+`src/components/ui/MapView.tsx`
+- 상수: `CLUSTER_ZOOM_THRESHOLD = 14`, `CLUSTER_DISTANCE_M = 200`
+- `handleMoveEnd`: 이동·줌 완료 시 `mapZoom`, `mapViewBounds` state 갱신
+- `photoMarkerData` useMemo: 두 모드 계산
+- `ClusterBadge` 컴포넌트: 앰버색 pill 뱃지
+
 ### 마이그레이션 파일 위치
 
 `supabase/migrations/` 아래 날짜순 정렬. 주요 파일:
