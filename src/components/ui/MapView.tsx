@@ -253,21 +253,22 @@ function WaypointDot({
   const size = isSelected ? baseSize + 8 : baseSize;
   const iconSize = Math.round(size * 0.52);
   const LucideIcon = s.IconComponent;
+  const bg = wpt.busRouteColor ?? s.bg;
   return (
     <div
       title={tDB(wpt.name, locale)}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       style={{
-        background: s.bg,
+        background: bg,
         borderRadius: "50%",
         width: size,
         height: size,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        border: isSelected ? `3px solid ${s.bg === "#ffffff" ? COLOR_PRIMARY : "#fff"}` : s.border,
+        border: isSelected ? `3px solid ${bg === "#ffffff" ? COLOR_PRIMARY : "#fff"}` : s.border,
         boxShadow: isSelected
-          ? `0 0 0 3px ${s.bg === "#ffffff" ? COLOR_PRIMARY : s.bg}, 0 4px 12px rgba(0,0,0,0.5)`
+          ? `0 0 0 3px ${bg === "#ffffff" ? COLOR_PRIMARY : bg}, 0 4px 12px rgba(0,0,0,0.5)`
           : "0 2px 8px rgba(0,0,0,0.4)",
         cursor: "pointer",
         userSelect: "none",
@@ -508,6 +509,8 @@ export interface MapViewProps {
    * buttons float just above it.
    */
   controlsBottomOffset?: number;
+  /** Top offset for compass + location buttons — clears the FloatingTrailHeader. */
+  controlsTopOffset?: number;
   /** Active locale — drives waypoint labels and alert messages. Defaults to "en". */
   locale?: string;
   /** Whether off-route alerts are enabled. Defaults to true. */
@@ -550,6 +553,7 @@ export default function MapView({
   onPhotoClick,
   bottomPadding = 0,
   controlsBottomOffset = 88,
+  controlsTopOffset = 132,
   locale = "en",
   offRouteEnabled = true,
   onToggleOffRoute,
@@ -1319,9 +1323,8 @@ export default function MapView({
           />
         </Source>
 
-        {/* Waypoint markers — BUS_STOP excluded (shown via bus chip label instead) */}
+        {/* Waypoint markers */}
         {waypoints.map((wpt, idx) => {
-          if (wpt.type === "BUS_STOP") return null;
 
           // Calculate rotation for start/end points to point along the trail
           let rotation = 0;
@@ -1437,58 +1440,6 @@ export default function MapView({
         </div>
       )}
 
-      {/* GPS accuracy chip + tooltip — bottom-left, same row as compass */}
-      {gpsPos && gpsAccuracy !== null && (
-        <div
-          className="absolute left-3 z-10 flex flex-col items-start"
-          style={{ bottom: controlsBottomOffset + 8, transition: controlsTransition }}
-        >
-          {/* Tooltip — shown when chip is tapped */}
-          {accuracyTipOpen && (
-            <div
-              className="mb-2 rounded-xl text-white text-[12px] shadow-lg"
-              style={{
-                background: "rgba(17,17,22,0.92)",
-                backdropFilter: "blur(8px)",
-                width: 220,
-                padding: "10px 12px",
-              }}
-            >
-              <p className="font-semibold mb-1.5">GPS Accuracy</p>
-              {gpsApproxOnly ? (
-                <>
-                  <p className="opacity-75 mb-2 text-[11px]">Precise location is not enabled.</p>
-                  <ol className="flex flex-col gap-1 text-[11px] font-medium" style={{ paddingLeft: "1.1rem", listStyleType: "decimal" }}>
-                    <li>Tap the <strong>site settings icon</strong> before the URL in Chrome</li>
-                    <li><strong>Site settings → Location → Reset</strong></li>
-                    <li>Allow again → choose <strong>Precise</strong></li>
-                  </ol>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1 text-[11px] opacity-80">
-                  <span>🟢 &lt;20m · GPS chip active</span>
-                  <span>🟡 &lt;60m · WiFi + GPS mix</span>
-                  <span>🔴 ≥60m · WiFi / cell only</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Chip — tappable */}
-          <button
-            onClick={() => setAccuracyTipOpen((v) => !v)}
-            aria-label="GPS accuracy info"
-            className="flex items-center gap-1 px-2.5 py-1
-                       rounded-full text-white text-[11px] font-semibold font-num shadow-md"
-            style={{
-              background: gpsAccuracy <= 20 ? "#16a34a" : gpsAccuracy <= 60 ? "#d97706" : "#dc2626",
-            }}
-          >
-            <LocateFixed size={11} strokeWidth={2.5} />
-            <span>±{Math.round(gpsAccuracy)}m</span>
-          </button>
-        </div>
-      )}
 
       {/* GPS error pill — shown whenever GPS fails, not just while hiking */}
       {gpsError && (
@@ -1539,7 +1490,7 @@ export default function MapView({
         );
       })()}
 
-      {/* My Location button — visible once GPS is started (acquiring or has fix) */}
+      {/* My Location button — top-right, below header */}
       {(gpsPos || gpsAcquiring) && (
         <button
           onClick={gpsPos ? centerOnGps : undefined}
@@ -1547,7 +1498,7 @@ export default function MapView({
           disabled={!gpsPos}
           className="absolute right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
           style={{
-            bottom: controlsBottomOffset + 52,
+            top: controlsTopOffset + 44,
             transition: controlsTransition,
             background: "rgba(255,255,255,0.92)",
             border: "1px solid rgba(0,0,0,0.1)",
@@ -1580,7 +1531,7 @@ export default function MapView({
         </button>
       )}
 
-      {/* Compass / auto-rotate button — floats just above the bottom sheet */}
+      {/* Compass / auto-rotate button — top-right, below header */}
       <button
         onClick={toggleTracking}
         aria-label={
@@ -1593,7 +1544,7 @@ export default function MapView({
                    flex items-center justify-center
                    shadow-lg"
         style={{
-          bottom: controlsBottomOffset + 8,
+          top: controlsTopOffset,
           transition: controlsTransition,
           background: isTracking ? "#2E5E4A" : "rgba(255,255,255,0.92)",
           border: isTracking ? "none" : "1px solid rgba(0,0,0,0.1)",
