@@ -13,9 +13,9 @@ import { useOffRouteSettings } from "@/lib/useOffRouteSettings";
 import { useOffRouteAlert } from "@/lib/useOffRouteAlert";
 import { calcLatestStartMin, nowKSTMin } from "@/lib/safetyEngine";
 import { tUI, tDB } from "@/lib/i18n";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, RouteOff } from "lucide-react";
 import { Icon } from "@iconify/react";
-import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto } from "@/types/trail";
+import type { Waypoint, ResolvedRoute, StationInfo, RoutePhoto, HikingPhase } from "@/types/trail";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -57,9 +57,9 @@ function renderUrl(url: string, width: number): string {
 }
 
 // ── Photo visibility rules ────────────────────────────────────────────────────
-// All photos must be within 30 m of this route's walking track to be visible.
+// All photos must be within 20 m of this route's walking track to be visible.
 // Photos without GPS are shown only if they belong directly to this route.
-const PHOTO_PROXIMITY_KM = 0.03; // 30 metres
+const PHOTO_PROXIMITY_KM = 0.02; // 20 metres
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ interface Props {
   backHref?: string;
 }
 
-const MIN_SHEET_H = 88;
+// MIN_SHEET_H removed — sheet only renders during active hiking, starting height is 0
 
 export default function TrailSection({
   route,
@@ -124,7 +124,7 @@ export default function TrailSection({
   const [mapGpsFix,             setMapGpsFix]             = useState<ExternalGPSFix | null>(null);
   // Visible track range from MapView viewport — used to sync elevation chart Y-axis
   const [visibleTrackRange, setVisibleTrackRange] = useState<{ startIdx: number; endIdx: number } | null>(null);
-  const [sheetHeightPx,         setSheetHeightPx]         = useState(MIN_SHEET_H);
+  const [sheetHeightPx,         setSheetHeightPx]         = useState(0);
   const [showFarConfirm,        setShowFarConfirm]        = useState(false);
   // Header collapsed state — auto-collapses when bottom sheet expands to "mid"
   const [isHeaderCollapsed,     setIsHeaderCollapsed]     = useState(false);
@@ -135,7 +135,7 @@ export default function TrailSection({
 
   // Fetch route photos once on mount
   useEffect(() => {
-    fetch(`/api/admin/route-photos?routeId=${route.id}&includeSiblings=true`)
+    fetch(`/api/admin/route-photos?routeId=${route.id}`)
       .then(r => r.ok ? r.json() : [])
       .then((data: RoutePhoto[]) => {
         if (!Array.isArray(data)) return;
@@ -149,13 +149,13 @@ export default function TrailSection({
   // Bus tracks (city streets) are intentionally excluded — proximity to a bus
   // route should NOT pull in urban photos that aren't on the hiking trail.
   const routeTrackFlat = useMemo<Array<[number, number]>>(() => {
-    // track is [lon, lat, elev][]; approach/return sub-tracks are [lon, lat][]
+    // Sequential order: approach walk → main trail → return walk
+    // This ensures photoTrailDist gives correct route-order cumulative distances.
+    // Bus tracks excluded — city streets should not pull in urban photos.
     const pts: Array<[number, number]> = [];
-    for (const pt of track)             pts.push([pt[0], pt[1]]);
     for (const pt of approachWalkTrack) pts.push([pt[0], pt[1]]);
-    // approachBusTrack excluded — bus goes through city, not the trail
+    for (const pt of track)             pts.push([pt[0], pt[1]]);
     for (const pt of returnWalkTrack)   pts.push([pt[0], pt[1]]);
-    // returnBusTrack excluded — same reason
     return pts;
   }, [track, approachWalkTrack, returnWalkTrack]);
 
@@ -185,18 +185,24 @@ export default function TrailSection({
 
   // visiblePhotos: filtered AND sorted by position along THIS route's track.
   // Candidate pool is already scoped by the API (this route + sibling routes only).
-  // Client filter: infrastructure waypoints always show; everything else needs 30 m proximity.
+  // Client filter: photos must be within 20 m of the walking track OR within 50 m of any route waypoint.
   const visiblePhotos = useMemo<RoutePhoto[]>(() => {
     if (routeTrackFlat.length === 0) return photos;
     const filtered = photos.filter(p => {
       // No GPS: only show if it belongs directly to this route
       if (p.lat == null || p.lon == null) return p.routeId === route.id;
-      // Has GPS: must be within 30 m of this route's walking track — no exceptions by type
-      return routeTrackFlat.some(pt => haversineKm(p.lat!, p.lon!, pt[1], pt[0]) < PHOTO_PROXIMITY_KM);
+      
+      // Has GPS: must be within 20 m of this route's walking track...
+      const nearTrack = routeTrackFlat.some(pt => haversineKm(p.lat!, p.lon!, pt[1], pt[0]) < PHOTO_PROXIMITY_KM);
+      if (nearTrack) return true;
+
+      // ...OR within 50 m of any route waypoint (like starting station, bus stop, etc.)
+      const nearWaypoint = waypoints.some(wpt => haversineKm(p.lat!, p.lon!, wpt.lat, wpt.lon) < 0.05);
+      return nearWaypoint;
     });
     // Sort by distance along this route's track (ignores stored order_index)
     return [...filtered].sort((a, b) => photoTrailDist(a) - photoTrailDist(b));
-  }, [photos, routeTrackFlat, trackCumDist]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [photos, routeTrackFlat, trackCumDist, waypoints]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Smart preload: when activePhoto changes, preload current ± 2 neighbors.
   // Placed after visiblePhotos declaration to satisfy TS block-scoping rules.
@@ -227,6 +233,7 @@ export default function TrailSection({
   // Refs initialised after gps/returnTimeMin are declared below
   const gpsRef = useRef<typeof gps | null>(null);
   const returnTimeMinRef = useRef<number | null | undefined>(null);
+  const approachTimeMinRef = useRef<number | undefined>(undefined);
 
   const { skill } = useHikingLevel();
   const skillMultiplier = skill.multiplier;
@@ -234,18 +241,28 @@ export default function TrailSection({
   const gps = useHikingGPS({ segments: route.segments, enabled: isHiking, fix: mapGpsFix });
   gpsRef.current = gps;
   returnTimeMinRef.current = returnTimeMin;
+  approachTimeMinRef.current = approachTimeMin;
 
   const recalculateETA = useCallback(() => {
     const g = gpsRef.current;
     if (!g?.currentPos) return;
     const now = nowKSTMin();
+
+    // If the user is still before the ASCENT track (at the station / on the approach),
+    // add the full approach segment time so the ETA includes the walk-in.
+    // Detected when the nearest ASCENT track point is track[0] and GPS is >200 m away.
+    const pendingApproachMin =
+      g.phase === "ascent" && g.nearestTrackIndex === 0 && g.distanceToPathM > 200
+        ? (approachTimeMinRef.current ?? 0)
+        : 0;
+
     let peakMin: number | null = null;
     let trailheadMin: number | null = null;
     if (g.phase === "ascent") {
       const toSummitMins = naismithMinutes(g.remainingM, g.remainingAscentElevM, ASCENT_SPEED_M_PER_MIN);
-      peakMin = now + Math.round(toSummitMins);
+      peakMin = now + pendingApproachMin + Math.round(toSummitMins);
       const descentMins = naismithMinutes(g.totalDescentM, 0, DESCENT_SPEED_M_PER_MIN);
-      trailheadMin = now + Math.round(toSummitMins) + SUMMIT_REST_MIN + Math.round(descentMins);
+      trailheadMin = now + pendingApproachMin + Math.round(toSummitMins) + SUMMIT_REST_MIN + Math.round(descentMins);
     } else {
       trailheadMin = now + Math.round(naismithMinutes(g.remainingM, 0, DESCENT_SPEED_M_PER_MIN));
     }
@@ -262,20 +279,25 @@ export default function TrailSection({
       return;
     }
     if (hasEnteredActiveRef.current) return; // already active — stay active
-    if (!gps.currentPos || track.length === 0) return;
+    if (!gps.currentPos) return;
 
-    const trailhead = track[0]!;
-    const dist = getDistance(
-      { latitude: gps.currentPos.lat, longitude: gps.currentPos.lon },
-      { latitude: trailhead[1], longitude: trailhead[0] },
+    const near = routeTrackFlat.some((pt) =>
+      getDistance(
+        { latitude: gps.currentPos!.lat, longitude: gps.currentPos!.lon },
+        { latitude: pt[1], longitude: pt[0] },
+      ) <= TRAILHEAD_ACTIVE_M
     );
-    if (dist <= TRAILHEAD_ACTIVE_M) {
+    if (near) {
       hasEnteredActiveRef.current = true;
       setHikingMode("active");
     }
-  }, [isHiking, gps.currentPos, track]);
+  }, [isHiking, gps.currentPos, routeTrackFlat]);
 
   // ── ETA triggers ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isHiking) setSheetHeightPx(0);
+  }, [isHiking]);
+
   const hasTriggeredInitialETA = useRef(false);
   useEffect(() => {
     if (!isHiking) { hasTriggeredInitialETA.current = false; setEtaSnapshot(null); return; }
@@ -284,6 +306,16 @@ export default function TrailSection({
       recalculateETA();
     }
   }, [isHiking, gps.currentPos, recalculateETA]);
+
+  // Recalculate ETA automatically on ascent → descent phase transition.
+  const prevPhaseRef = useRef<HikingPhase>("ascent");
+  useEffect(() => {
+    if (!isHiking) { prevPhaseRef.current = "ascent"; return; }
+    if (gps.phase === "descent" && prevPhaseRef.current === "ascent") {
+      recalculateETA();
+    }
+    prevPhaseRef.current = gps.phase;
+  }, [isHiking, gps.phase, recalculateETA]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -407,7 +439,14 @@ export default function TrailSection({
   const handleWaypointClick = useCallback((wpt: Waypoint) => {
     const idx = waypoints.findIndex((w) => w.id === wpt.id);
     if (idx !== -1) handleWaypointSelect(idx);
-  }, [waypoints, handleWaypointSelect]);
+    // Search ALL photos (not just visible) — station/bus-stop photos may be outside
+    // the walk track proximity filter but are still relevant to the waypoint.
+    const nearby = photos.find(p =>
+      p.lat != null && p.lon != null &&
+      haversineKm(p.lat, p.lon, wpt.lat, wpt.lon) < 0.05
+    );
+    if (nearby) setActivePhoto(nearby);
+  }, [waypoints, photos, handleWaypointSelect]);
 
   function startHiking() {
     setIsHiking(true);
@@ -419,15 +458,16 @@ export default function TrailSection({
       setIsHiking(false);
       return;
     }
-    // If GPS fix is available, check distance to trailhead.
-    // If far → show confirmation popup. If near (or no fix) → start immediately.
-    if (mapGpsFix && track.length > 0) {
-      const trailhead = track[0]!;
-      const dist = getDistance(
-        { latitude: mapGpsFix.lat, longitude: mapGpsFix.lon },
-        { latitude: trailhead[1], longitude: trailhead[0] },
+    // If GPS fix is available, check distance to the nearest route entry point.
+    // "Near" means within 500 m of either the ASCENT start OR the APPROACH start (station).
+    if (mapGpsFix) {
+      const near = routeTrackFlat.some((pt) =>
+        getDistance(
+          { latitude: mapGpsFix.lat, longitude: mapGpsFix.lon },
+          { latitude: pt[1], longitude: pt[0] },
+        ) <= TRAILHEAD_ACTIVE_M
       );
-      if (dist > TRAILHEAD_ACTIVE_M) {
+      if (!near) {
         setShowFarConfirm(true);
         return;
       }
@@ -456,12 +496,17 @@ export default function TrailSection({
         returnBusInfos={returnBusInfos}
         bottomPadding={sheetHeightPx}
         controlsBottomOffset={sheetHeightPx}
+        controlsTopOffset={isHeaderCollapsed ? 72 : 132}
         locale={locale}
         // Unified Logic: Filter out photos that are already represented as Waypoints
         photos={visiblePhotos.filter(p => {
           if (p.lat == null || p.lon == null) return true;
-          // If a waypoint is within 20m of this photo, don't show it as a separate camera icon
-          const isAtWaypoint = waypoints.some(wpt => haversineKm(p.lat!, p.lon!, wpt.lat, wpt.lon) < 0.02);
+          // BUS_STOP has no map marker — photos near it show normally as camera icons.
+          // For other waypoint types, hide the camera icon (accessible via waypoint tap).
+          const isAtWaypoint = waypoints.some(wpt =>
+            wpt.type !== "BUS_STOP" &&
+            haversineKm(p.lat!, p.lon!, wpt.lat, wpt.lon) < 0.02
+          );
           return !isAtWaypoint;
         })}
         onPhotoClick={setActivePhoto}
@@ -492,7 +537,6 @@ export default function TrailSection({
             latestStartMin={latestStartMin}
             isPastLatestStart={isPastLatestStart}
             peakETAMin={peakETAMin}
-            trailheadETAMin={trailheadETAMin}
             finalETAMin={finalETAMin}
             routeName={routeName}
             backHref={backHref}
@@ -577,7 +621,7 @@ export default function TrailSection({
                     className="shrink-0 flex items-center justify-center rounded-full"
                     style={{ width: 36, height: 36, background: "rgba(200,54,42,0.10)" }}
                   >
-                    <Icon icon="ph:map-pin-simple-slash" width={20} height={20} style={{ color: "var(--color-secondary)" }} />
+                    <RouteOff size={20} style={{ color: "var(--color-secondary)" }} />
                   </div>
                   <p className="text-sm font-bold" style={{ color: "var(--color-secondary)" }}>
                     Not near the trail
@@ -606,28 +650,44 @@ export default function TrailSection({
             </div>
           )}
 
-          <HikingBottomSheet
-            isHiking={isHiking}
-            hikingMode={hikingMode}
-            isLocating={isLocating}
-            onToggleHiking={handleToggleHiking}
-            gps={gps}
-            track={track}
-            elevationSegments={elevationSegments}
-            summitElevationM={summitElevationM}
-            highlightIndex={elevationHighlightIndex}
-            visibleTrackRange={visibleTrackRange}
-            onSheetHeightChange={setSheetHeightPx}
-            onSnapChange={(snap) => setIsHeaderCollapsed(snap === "mid")}
-            offRouteEnabled={offRouteEnabled}
-            onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
-          />
+          {/* ── Start Hiking floating button (pre-hike only) ─────────────── */}
+          {!isHiking && (
+            <div className="absolute bottom-8 left-4 right-4 flex pointer-events-auto">
+              <button
+                onClick={handleToggleHiking}
+                className="flex-1 py-4 rounded-full text-base font-bold text-white shadow-xl active:scale-95 transition-transform"
+                style={{ background: "var(--color-primary)" }}
+              >
+                {tUI("startHiking", locale)}
+              </button>
+            </div>
+          )}
+
+          {/* ── Active hiking bottom sheet ────────────────────────────────── */}
+          {isHiking && (
+            <HikingBottomSheet
+              isHiking={isHiking}
+              hikingMode={hikingMode}
+              isLocating={isLocating}
+              onToggleHiking={handleToggleHiking}
+              gps={gps}
+              track={track}
+              elevationSegments={elevationSegments}
+              summitElevationM={summitElevationM}
+              highlightIndex={elevationHighlightIndex}
+              visibleTrackRange={visibleTrackRange}
+              onSheetHeightChange={setSheetHeightPx}
+              onSnapChange={(snap) => setIsHeaderCollapsed(snap === "mid")}
+              offRouteEnabled={offRouteEnabled}
+              onToggleOffRoute={() => setOffRouteEnabled(!offRouteEnabled)}
+            />
+          )}
 
           {/* ── Photo description popup (Unified for Photos & Waypoints) ── */}
           {activePhoto && (() => {
             const photoIndex = visiblePhotos.findIndex(p => p.id === activePhoto.id);
             const canPrev    = photoIndex > 0;
-            const canNext    = photoIndex < visiblePhotos.length - 1;
+            const canNext    = photoIndex !== -1 && photoIndex < visiblePhotos.length - 1;
 
             // Find if this photo represents a Waypoint (increased threshold to 100m)
             let linkedWpt: Waypoint | null = null;
@@ -741,7 +801,7 @@ export default function TrailSection({
                     )}
 
                     {/* Counter */}
-                    {visiblePhotos.length > 1 && (
+                    {visiblePhotos.length > 1 && photoIndex !== -1 && (
                       <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[12px] font-num text-white/90 bg-black/35 backdrop-blur-md px-3 py-1 rounded-full">
                         {photoIndex + 1} / {visiblePhotos.length}
                       </p>
@@ -751,12 +811,14 @@ export default function TrailSection({
                   {/* Caption Section */}
                   {displayCaption && (
                     <div className="px-6 py-5">
-                      <p
-                        className="text-[15px] leading-relaxed text-[var(--color-text-body)] text-center"
-                        style={locale === "ko" ? { fontFamily: "var(--font-ko)" } : undefined}
-                      >
-                        {displayCaption}
-                      </p>
+                      <div className="text-center">
+                        <p
+                          className="inline-block text-left text-[15px] leading-relaxed text-[var(--color-text-body)]"
+                          style={{ whiteSpace: "pre-wrap", ...(locale === "ko" ? { fontFamily: "var(--font-ko)" } : {}) }}
+                        >
+                          {displayCaption}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -146,6 +146,9 @@ export function useHikingGPS({ segments, enabled, fix }: Options): HikingGPSStat
   const [error] = useState<string | null>(null);
 
   const phaseRef = useRef<HikingPhase>("ascent");
+  // Prevents false descent detection at hiking start when GPS is near the descent track end.
+  // Only allows phase → descent after the user has actually traversed the ascent portion.
+  const hasBeenInAscentRef = useRef(false);
 
   // ── Derived constants ─────────────────────────────────────────────────────
 
@@ -164,6 +167,16 @@ export function useHikingGPS({ segments, enabled, fix }: Options): HikingGPSStat
 
   // All waypoints (for SW proximity registration)
   const allWaypoints = useMemo(() => collectWaypoints(segments), [segments]);
+
+  // ── Phase reset on hiking start ───────────────────────────────────────────
+  // Reset to ascent every time hiking is enabled so a session starting near the
+  // descent track end (e.g. at the trailhead station) doesn't false-advance.
+  useEffect(() => {
+    if (!enabled) return;
+    phaseRef.current = "ascent";
+    setPhase("ascent");
+    hasBeenInAscentRef.current = false;
+  }, [enabled]);
 
   // ── SW waypoint registration ───────────────────────────────────────────────
   // Runs once when hiking starts / stops; independent of GPS watcher.
@@ -194,10 +207,12 @@ export function useHikingGPS({ segments, enabled, fix }: Options): HikingGPSStat
     if (!enabled || !fix || track.length === 0) return;
     const { lat, lon } = fix;
 
-    // Phase auto-advance: once we pass the summit index, lock into descent
+    // Phase auto-advance: only switch to descent after user has actually traversed
+    // the ascent. Prevents false descent when GPS starts near the descent track end.
     if (phaseRef.current === "ascent") {
       const { idx } = findNearest(lat, lon, track);
-      if (idx >= summitTrackIdx) {
+      if (idx < summitTrackIdx) hasBeenInAscentRef.current = true;
+      if (idx >= summitTrackIdx && hasBeenInAscentRef.current) {
         phaseRef.current = "descent";
         setPhase("descent");
       }

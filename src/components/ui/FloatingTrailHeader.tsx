@@ -27,8 +27,6 @@ interface Props {
   isPastLatestStart: boolean;
   /** Peak ETA in minutes from midnight (KST) */
   peakETAMin?: number | null;
-  /** Trailhead ETA (end of mountain path) */
-  trailheadETAMin?: number | null;
   /** Final (subway station) ETA */
   finalETAMin?: number | null;
   /** Route display name */
@@ -54,7 +52,6 @@ export default function FloatingTrailHeader({
   latestStartMin,
   isPastLatestStart,
   peakETAMin,
-  trailheadETAMin,
   finalETAMin,
   routeName,
   backHref = "/route",
@@ -227,7 +224,7 @@ export default function FloatingTrailHeader({
             ) : (
               /* PRE-HIKE MODE */
               <>
-                {latestStartMin != null && renderETALine(
+                {!isHiking && latestStartMin != null && renderETALine(
                   tUI("lastSafeStart", locale),
                   latestStartMin,
                   AlertTriangle,
@@ -265,7 +262,6 @@ export default function FloatingTrailHeader({
             /* DESCENT MODE */
             <div className="flex flex-col items-end gap-1">
               <div style={{ opacity: isStale ? 0.45 : 1 }}>
-                {renderETALine(tUI("trailheadArrival", locale), trailheadETAMin, Flag)}
                 {renderETALine(tUI("stationArrival", locale), finalETAMin, Train)}
               </div>
               <button
