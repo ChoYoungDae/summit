@@ -19,6 +19,7 @@ type RouteRow  = {
   description?: { en?: string; ko?: string };
   total_distance_m?: number;
   total_duration_min?: number;
+  is_hidden?: boolean;
 };
 
 type TagItem       = { en: string; ko: string };
@@ -38,6 +39,7 @@ export default function RouteEditCard() {
   const [highlights, setHighlights] = useState<HighlightItem[]>([]);
   const [descriptionEn, setDescriptionEn] = useState("");
   const [descriptionKo, setDescriptionKo] = useState("");
+  const [isHidden, setIsHidden] = useState(false);
 
   const [saving,    setSaving]    = useState(false);
   const [fixing,    setFixing]    = useState(false);
@@ -82,6 +84,7 @@ export default function RouteEditCard() {
     );
     setDescriptionEn(route.description?.en || "");
     setDescriptionKo(route.description?.ko || "");
+    setIsHidden(route.is_hidden ?? false);
     setSuccess(false);
     setFixSuccess(false);
     setError("");
@@ -105,6 +108,7 @@ export default function RouteEditCard() {
         description: (descriptionEn || descriptionKo)
           ? { en: descriptionEn, ko: descriptionKo }
           : undefined,
+        isHidden,
       }),
     });
 
@@ -424,6 +428,20 @@ export default function RouteEditCard() {
               />
             </div>
           </div>
+
+          {/* Visibility toggle */}
+          <label className="flex items-center gap-3 cursor-pointer select-none rounded-xl border border-[var(--color-border)] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={isHidden}
+              onChange={(e) => setIsHidden(e.target.checked)}
+              className="rounded"
+            />
+            <div>
+              <p className="text-sm font-semibold text-[var(--color-text-body)]">Hide this route</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Hides from the public route list without deleting</p>
+            </div>
+          </label>
 
           {/* Feedback */}
           {error && (

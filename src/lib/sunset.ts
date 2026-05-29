@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { unstable_cache } from "next/cache";
 
 /**
  * Fetches today's sunset time for Seoul from the KASI (천문연구원) Open API.
@@ -21,16 +21,12 @@ function parseHHMM(hhmm: string): number | null {
   return h * 60 + m;
 }
 
-export const fetchSunsetMin = cache(async (): Promise<number | null> => {
+async function _fetchSunsetMin(locdate: string): Promise<number | null> {
   const apiKey = process.env.KASI_API_KEY;
   if (!apiKey) {
     console.warn("[sunset] KASI_API_KEY is not set — skipping sunset fetch");
     return null;
   }
-
-  // Today's date in KST (UTC+9), formatted as YYYYMMDD
-  const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const locdate = nowKST.toISOString().slice(0, 10).replace(/-/g, "");
 
   const url = new URL(KASI_API_BASE);
   url.searchParams.set("serviceKey", apiKey);
@@ -40,7 +36,7 @@ export const fetchSunsetMin = cache(async (): Promise<number | null> => {
 
   try {
     const res = await fetch(url.toString(), {
-      // Revalidate every 6 hours — sunset time is stable within a day
+      // fetch-level cache: 6 hours
       next: { revalidate: 6 * 60 * 60 },
     });
     if (!res.ok) {
@@ -65,4 +61,17 @@ export const fetchSunsetMin = cache(async (): Promise<number | null> => {
     console.error("[sunset] Fetch failed", err);
     return null;
   }
-});
+}
+
+// locdate is included as an arg so the cache key is date-scoped (new entry each KST day).
+const _getCachedSunsetMin = unstable_cache(
+  _fetchSunsetMin,
+  ["sunset-seoul"],
+  { revalidate: 6 * 60 * 60, tags: ["sunset"] },
+);
+
+export async function fetchSunsetMin(): Promise<number | null> {
+  const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const locdate = nowKST.toISOString().slice(0, 10).replace(/-/g, "");
+  return _getCachedSunsetMin(locdate);
+}

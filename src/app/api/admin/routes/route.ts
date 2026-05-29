@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from("routes")
-    .select("id, name, mountain_id, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, tags, highlights, description")
+    .select("id, name, mountain_id, segment_ids, total_duration_min, total_distance_m, total_difficulty, is_oneway, hide_safe_start, is_hidden, tags, highlights, description")
     .order("id");
 
   if (mountainId) query = query.eq("mountain_id", mountainId) as typeof query;
@@ -80,12 +80,13 @@ export async function PATCH(req: NextRequest) {
     totalDifficulty?: number | null;
     isOneway?: boolean;
     hideSafeStart?: boolean;
+    isHidden?: boolean;
     tags?: { en: string; ko: string }[];
     highlights?: { type: "highlight" | "pro_tip" | "warning"; text: { en: string; ko: string } }[];
     description?: { en: string; ko: string };
   };
 
-  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart, tags, highlights, description } = body;
+  const { id, nameEn, nameKo, segmentIds, totalDurationMin, totalDistanceM, totalDifficulty, isOneway, hideSafeStart, isHidden, tags, highlights, description } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const updates: Record<string, unknown> = {};
@@ -99,6 +100,7 @@ export async function PATCH(req: NextRequest) {
   if (description !== undefined) updates.description      = description;
   if (isOneway         != null) updates.is_oneway          = isOneway;
   if (hideSafeStart    != null) updates.hide_safe_start    = hideSafeStart;
+  if (isHidden         != null) updates.is_hidden          = isHidden;
 
   const { error } = await supabaseAdmin.from("routes").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

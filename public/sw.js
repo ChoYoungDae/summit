@@ -19,17 +19,20 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
+  const currentCaches = [TILE_CACHE];
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      // Only evict caches from older SW versions, not the current ones
+      .then((keys) =>
+        Promise.all(
+          keys.filter((k) => !currentCaches.includes(k)).map((k) => caches.delete(k)),
+        ),
+      )
       .then(() => self.clients.claim())
       .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }))
       .then((clients) => {
-        // Notify all tabs — they will force-reload to get fresh code
         clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }));
-        // Self-destruct: unregister so this SW can never serve stale content again
-        return self.registration.unregister();
       }),
   );
 });
@@ -152,7 +155,7 @@ self.addEventListener("message", (event) => {
         .showNotification(wpt.name?.en ?? "Waypoint ahead", {
           body: isDanger ? "⚠ Caution: difficult section ahead" : `Approaching ${wpt.name?.en ?? "waypoint"}`,
           tag: `wpt-${wpt.lat}-${wpt.lon}`,
-          icon: "/icons/icon-192.png",
+          icon: "/images/icon-192.png",
           silent: !isDanger,
         })
         .catch(() => {/* notification permission not granted — silently ignore */});

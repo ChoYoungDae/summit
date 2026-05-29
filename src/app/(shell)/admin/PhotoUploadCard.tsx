@@ -578,8 +578,9 @@ export default function PhotoUploadCard() {
         fd.append("photo", new File([blob], "photo.webp", { type: "image/webp" }));
         const res = await fetch("/api/admin/route-photos/recompress", { method: "POST", body: fd });
         if (!res.ok) throw new Error("upload failed");
-        const newUrl = URL.createObjectURL(blob);
-        setPhotos(prev => prev.map(p => p.id === match.matchedId ? { ...p, previewUrl: newUrl, isNew: true } : p));
+        const { url: newStorageUrl } = await res.json();
+        const newPreviewUrl = URL.createObjectURL(blob);
+        setPhotos(prev => prev.map(p => p.id === match.matchedId ? { ...p, previewUrl: newPreviewUrl, url: newStorageUrl, isNew: true } : p));
         done++;
       } catch { failed++; }
       setReplaceProgress({ done: done + failed, total: replaceMatches.length, failed });
@@ -607,17 +608,14 @@ export default function PhotoUploadCard() {
       fd.append("photo", new File([blob], "photo.webp", { type: "image/webp" }));
       const res = await fetch("/api/admin/route-photos/recompress", { method: "POST", body: fd });
       if (!res.ok) throw new Error("Replace failed");
-      const newUrl = URL.createObjectURL(blob);
-      setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, previewUrl: newUrl, state: "saved", isNew: true } : p));
+      const { url: newStorageUrl } = await res.json();
+      const newPreviewUrl = URL.createObjectURL(blob);
+      setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, previewUrl: newPreviewUrl, url: newStorageUrl, state: "saved", isNew: true } : p));
     } catch (err) {
       setPhotos(prev => prev.map(p => p.key === entry.key ? { ...p, state: "error", errorMsg: err instanceof Error ? err.message : "Replace failed" } : p));
     }
   }
 
-  const SEG_TYPE_COLORS: Record<string, string> = {
-    APPROACH: "text-blue-600", ASCENT: "text-emerald-600",
-    DESCENT: "text-purple-600", RETURN: "text-gray-500",
-  };
 
   const canUpload = !!routeId;
 

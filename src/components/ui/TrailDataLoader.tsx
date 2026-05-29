@@ -30,7 +30,9 @@ function buildWaypoints(route: ResolvedRoute): Waypoint[] {
     }
     if (seg.busStopWaypoint && !seen.has(seg.busStopWaypoint.id)) {
       seen.add(seg.busStopWaypoint.id);
-      result.push(seg.busStopWaypoint);
+      const busNums = seg.busDetails?.bus_numbers?.join(", ");
+      const busColor = seg.busDetails?.route_color ?? seoulBusStyle(busNums).color;
+      result.push({ ...seg.busStopWaypoint, busRouteColor: busColor });
     }
     if (!seen.has(seg.endWaypoint.id)) {
       seen.add(seg.endWaypoint.id);
@@ -116,15 +118,6 @@ export default async function TrailDataLoader({ routeId }: { routeId: number }) 
 
   const approachIsBus = approachSegs.some((s) => s.isBusCombined);
   const returnIsBus   = returnSegs.some((s) => s.isBusCombined);
-
-  // Collect all bus numbers from all relevant segments, unique and joined
-  const approachBusNumbers = Array.from(new Set(
-    approachSegs.flatMap(s => s.busDetails?.bus_numbers ?? [])
-  )).join(", ");
-  
-  const returnBusNumbers = Array.from(new Set(
-    returnSegs.flatMap(s => s.busDetails?.bus_numbers ?? [])
-  )).join(", ");
 
   // Sum all segments by type to handle multi-stage routes correctly
   const approachTimeMin = route.segments

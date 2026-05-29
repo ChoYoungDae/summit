@@ -64,15 +64,53 @@ Rules:
 4. Return ONLY a JSON object with keys ${needsEn ? '"en", ' : ''}"zh", "ja", "es". No markdown blocks.
 `;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text().trim().replace(/```json/g, '').replace(/```/g, '');
-    return JSON.parse(text);
-  } catch (err) {
-    console.error(`Translation failed for "${ko}":`, err);
-    return null;
+  const maxRetries = 5;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim().replace(/```json/g, '').replace(/```/g, '');
+      return JSON.parse(text);
+    } catch (err: any) {
+      attempt++;
+      console.error(`Translation failed for "${ko}" (Attempt ${attempt}/${maxRetries}):`, err);
+      
+      if (attempt >= maxRetries) {
+        return null;
+      }
+
+      // Check if it's a 429 rate limit error
+      const isRateLimit = err?.status === 429 || 
+                          err?.message?.includes('429') || 
+                          err?.toString()?.includes('429');
+      
+      let delayMs = 5000; // Default 5 seconds
+      if (isRateLimit) {
+        // Look for retryDelay in error details
+        const retryInfo = err?.errorDetails?.find((d: any) => d?.["@type"]?.includes("RetryInfo"));
+        const retryDelaySec = retryInfo?.retryDelay;
+        if (retryDelaySec) {
+          const sec = parseInt(retryDelaySec.replace('s', ''), 10);
+          if (!isNaN(sec)) {
+            delayMs = (sec + 2) * 1000; // Add 2s buffer
+          }
+        } else {
+          // Default to 30 seconds for 429 to be safe on free tier
+          delayMs = 30000;
+        }
+        console.log(`Rate limit hit. Waiting for ${delayMs / 1000}s before retrying...`);
+      } else {
+        // Exponential backoff for other errors
+        delayMs = Math.min(1000 * Math.pow(2, attempt), 30000);
+        console.log(`Temporary error. Waiting for ${delayMs / 1000}s before retrying...`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
   }
+  return null;
 }
 
 async function processTable(tableName: string, textColumn: string) {
@@ -135,11 +173,9 @@ async function syncUIStrings() {
   for (const item of data) {
     if (!(item as any).key) continue;
 
-    const sourceText = `${(item as any).ko}|${(item as any).en || ''}`;
-    const currentHash = calculateHash(sourceText);
     const meta = ((item as any).translation_meta || {}) as TranslationMeta;
 
-    if (meta.source_hash !== currentHash || !(item as any).en || !(item as any).zh || !(item as any).ja || !(item as any).es) {
+    if (!(item as any).en || !(item as any).zh || !(item as any).ja || !(item as any).es) {
         console.log(`Translating/Updating UI key: ${(item as any).key}...`);
         const translations = await translateText((item as any).ko, (item as any).en || '', glossary);
         if (translations) {

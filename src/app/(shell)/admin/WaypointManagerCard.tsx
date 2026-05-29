@@ -495,8 +495,8 @@ export default function WaypointManagerCard() {
           )}
 
           {(() => {
-            const HIDDEN_TYPES: WaypointType[] = ["LANDMARK", "VIEW"];
-            const visible = waypoints.filter(w => !HIDDEN_TYPES.includes(w.type));
+            const VISIBLE_TYPES: WaypointType[] = ["STATION", "TRAILHEAD", "SUMMIT", "BUS_STOP"];
+            const visible = waypoints.filter(w => VISIBLE_TYPES.includes(w.type));
             const hiddenCount = waypoints.length - visible.length;
             return visible.length === 0 ? (
               mode !== "add" && (

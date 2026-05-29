@@ -228,6 +228,19 @@ export default function SegmentUploadCard() {
     if (busFileRef.current) busFileRef.current.value = "";
   }
 
+  function closeEdit(segmentId?: number) {
+    const activeId = segmentId || editingId;
+    reset();
+    if (activeId) {
+      setTimeout(() => {
+        const el = document.getElementById(`seg-row-${activeId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
+    }
+  }
+
   async function handleFileChange(f: File | null, isBus: boolean = false) {
     if (isBus) {
       setBusFile(f);
@@ -347,27 +360,8 @@ export default function SegmentUploadCard() {
   })();
 
 
-  return (
-    <div className={CARD}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#EEF5F1] flex items-center justify-center flex-shrink-0">
-            <Route className="w-4 h-4 text-[#2E5E4A]" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-medium text-[1rem]" style={{ fontFamily: "var(--font-en)" }}>
-              {editingId ? `Edit Segment #${editingId}` : "Upload Segment"}
-            </span>
-            {editingId && <span className="text-[10px] text-[var(--color-text-muted)] mt-[-2px]">수정 모드</span>}
-          </div>
-        </div>
-        {(phase !== "input" || !!file || !!editingId) && (
-          <button onClick={reset} className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-primary">
-            <RotateCcw className="w-3.5 h-3.5" /> {editingId ? "Cancel Edit" : "Reset"}
-          </button>
-        )}
-      </div>
-
+  const renderFormContent = () => (
+    <>
       <Steps current={stepNum} labels={["Configure", "Preview", "Upload"]} />
 
       {/* ── Step 1 ── */}
@@ -376,7 +370,7 @@ export default function SegmentUploadCard() {
           {/* Mountain */}
           <label className="flex flex-col gap-1">
             <span className="text-xs text-[var(--color-text-muted)]">Mountain *</span>
-            <select value={mountainId} onChange={e => handleMountainChange(e.target.value)} className={INPUT}>
+            <select value={mountainId} onChange={e => handleMountainChange(e.target.value)} className={INPUT} disabled={!!editingId}>
               <option value="">— Select mountain —</option>
               {mountains.map(m => (
                 <option key={m.id} value={m.id}>
@@ -621,15 +615,54 @@ export default function SegmentUploadCard() {
             <button onClick={() => setPhase("preview")} className={`${BTN_SECONDARY} flex-none w-full`}>Back</button>
           )}
           {phase === "done" && (
-            <button onClick={reset}
+            <button onClick={() => closeEdit(editingId || undefined)}
               className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#2E5E4A] text-[#2E5E4A] py-2.5 text-sm font-semibold hover:bg-[#EEF5F1] transition-colors">
               <RotateCcw className="w-4 h-4" /> Add Another Segment
             </button>
           )}
         </div>
       )}
+    </>
+  );
+
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-[#EEF5F1] flex items-center justify-center flex-shrink-0">
+            <Route className="w-4 h-4 text-[#2E5E4A]" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-medium text-[1rem]" style={{ fontFamily: "var(--font-en)" }}>
+              {editingId ? `Edit Segment #${editingId}` : "Upload Segment"}
+            </span>
+            {editingId && <span className="text-[10px] text-[var(--color-text-muted)] mt-[-2px]">수정 모드 (아래 목록에서 수정 중)</span>}
+          </div>
+        </div>
+        {(phase !== "input" || !!file || !!editingId) && (
+          <button onClick={() => closeEdit()} className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-primary">
+            <RotateCcw className="w-3.5 h-3.5" /> {editingId ? "Cancel Edit" : "Reset"}
+          </button>
+        )}
+      </div>
+
+      {!editingId ? (
+        renderFormContent()
+      ) : (
+        <div className="rounded-xl bg-[#EEF5F1] border border-[#2E5E4A]/20 p-4 text-sm flex flex-col gap-2 items-center text-center animate-pulse">
+          <span className="font-bold text-[#2E5E4A]">Editing Segment #{editingId} inline below.</span>
+          <p className="text-xs text-[var(--color-text-muted)] max-w-md">
+            Please scroll down to the <b>Existing Segments</b> list to modify and save this segment in its original context.
+          </p>
+          <button onClick={() => closeEdit()} className="mt-1 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 bg-white hover:bg-red-50 text-xs font-semibold transition-colors shadow-sm">
+            Cancel Edit
+          </button>
+        </div>
+      )}
+
       {/* ── Management List ── */}
-      {mountainId && !loadingSeg && segments.length > 0 && phase === "input" && (() => {
+      {mountainId && !loadingSeg && segments.length > 0 && (phase === "input" || !!editingId) && (() => {
         const grouped = segments.reduce((acc, s) => {
           const wpId = s.start_waypoint_id;
           if (!acc[wpId]) acc[wpId] = [];
@@ -655,7 +688,7 @@ export default function SegmentUploadCard() {
             <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
               Existing Segments for {mountainLabel()}
             </div>
-            <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-1 text-sm">
+            <div className={`flex flex-col gap-4 pr-1 text-sm ${editingId ? "max-h-none" : "max-h-[400px] overflow-y-auto"}`}>
               {sortedWpIds.map(wpId => (
                 <div key={wpId} className="flex flex-col gap-2">
                   <div className="text-[10px] text-primary font-bold bg-primary/5 px-2 py-1 rounded-md border border-primary/10">
@@ -665,50 +698,65 @@ export default function SegmentUploadCard() {
                     {grouped[wpId]
                       .sort((a, b) => (SEG_TYPE_PRIORITY[a.segment_type] ?? 5) - (SEG_TYPE_PRIORITY[b.segment_type] ?? 5))
                       .map((s, idx) => (
-                      <div key={s.id} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition-colors ${
-                        editingId === s.id ? "border-primary bg-primary/5" : "border-[var(--color-border)] bg-[var(--color-bg-light)]"
+                      <div id={`seg-row-${s.id}`} key={s.id} className={`flex flex-col rounded-xl border transition-colors ${
+                        editingId === s.id ? "border-primary bg-white shadow-md p-4" : "border-[var(--color-border)] bg-[var(--color-bg-light)] px-3 py-2"
                       }`}>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{s.segment_type}</span>
-                            <span className="text-[10px] font-bold text-[var(--color-text-muted)]">#{idx+1}</span>
-                            <span className={`font-medium truncate ${editingId === s.id ? "text-primary" : ""}`}>
-                              {s.name?.en || s.name?.ko ? `${s.name.en ?? ""}${s.name.ko ? ` (${s.name.ko})` : ""}` : `Segment ${s.id}`}
-                            </span>
-                            <span className="text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg-light)] px-1.5 py-0.5 rounded border border-[var(--color-border)] font-mono">
-                              {s.is_bus_combined ? (
-                                <>
-                                  <span className="text-[#2E5E4A] font-bold">Bus {s.bus_details?.bus_duration_min || 0}m</span>
-                                  <span className="mx-1">+</span>
-                                  <span>Walk {s.estimated_time_min || 0}m</span>
-                                </>
-                              ) : (
-                                `${s.estimated_time_min}m`
-                              )}
-                            </span>
+                        {editingId === s.id ? (
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-primary">Editing Segment #{s.id}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{s.segment_type}</span>
+                              </div>
+                              <button onClick={() => closeEdit(s.id)} className="text-xs text-red-500 hover:underline">Cancel</button>
+                            </div>
+                            {renderFormContent()}
                           </div>
-                          <div className="text-[10px] text-[var(--color-text-muted)] truncate mt-0.5">
-                            → {waypointLabel(String(s.end_waypoint_id))}
+                        ) : (
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{s.segment_type}</span>
+                                <span className="text-[10px] font-bold text-[var(--color-text-muted)]">#{idx+1}</span>
+                                <span className="font-medium truncate">
+                                  {s.name?.en || s.name?.ko ? `${s.name.en ?? ""}${s.name.ko ? ` (${s.name.ko})` : ""}` : `Segment ${s.id}`}
+                                </span>
+                                <span className="text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg-light)] px-1.5 py-0.5 rounded border border-[var(--color-border)] font-mono">
+                                  {s.is_bus_combined ? (
+                                    <>
+                                      <span className="text-[#2E5E4A] font-bold">Bus {s.bus_details?.bus_duration_min || 0}m</span>
+                                      <span className="mx-1">+</span>
+                                      <span>Walk {s.estimated_time_min || 0}m</span>
+                                    </>
+                                  ) : (
+                                    `${s.estimated_time_min}m`
+                                  )}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-[var(--color-text-muted)] truncate mt-0.5">
+                                → {waypointLabel(String(s.end_waypoint_id))}
+                              </div>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <button
+                                onClick={() => startEdit(s)}
+                                disabled={isPending}
+                                className="flex items-center justify-center p-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-primary hover:border-primary transition-colors disabled:opacity-30"
+                                title="Edit segment metadata"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSegment(s.id)}
+                                disabled={isPending}
+                                className="flex items-center justify-center p-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
+                                title="Delete permanently"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => startEdit(s)}
-                            disabled={isPending}
-                            className="flex items-center justify-center p-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-primary hover:border-primary transition-colors disabled:opacity-30"
-                            title="Edit segment metadata"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSegment(s.id)}
-                            disabled={isPending}
-                            className="flex items-center justify-center p-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
-                            title="Delete permanently"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>

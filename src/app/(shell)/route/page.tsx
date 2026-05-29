@@ -64,7 +64,7 @@ const TERRAIN_TAG_ICON: Record<string, LucideIcon> = {
 
 const getCachedRouteList = unstable_cache(
   async () => fetchRouteList(),
-  ["route-list-v4"],
+  ["route-list-v5"],
   {
     revalidate: 60 * 60, // 1 hour
     tags: ["route-list"],
@@ -111,7 +111,7 @@ export default async function RouteListPage({
 
   return (
     <div className="flex flex-col gap-8 pb-8">
-      {groups.map(({ mountain, routes }) => {
+      {groups.map(({ mountain, routes }, groupIndex) => {
         const mountainName = tDB(mountain.name, locale);
         const nameKo = mountain.name.ko;
         const terrainTags = mountain.terrainTags ?? [];
@@ -127,6 +127,8 @@ export default async function RouteListPage({
                     src={mountain.imageUrl}
                     alt={mountainName}
                     className="absolute inset-0 w-full h-full object-cover"
+                    loading={groupIndex === 0 ? "eager" : "lazy"}
+                    fetchPriority={groupIndex === 0 ? "high" : "auto"}
                   />
                 ) : (
                   <div

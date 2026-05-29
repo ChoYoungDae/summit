@@ -32,13 +32,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Photo not found" }, { status: 404 });
     }
 
-    // Extract storage path from public URL
+    // Strip any existing cache-bust param before extracting storage path
+    const cleanUrl    = photo.url.split("?")[0];
     const bucketMarker = `/storage/v1/object/public/${BUCKET}/`;
-    const pathStart    = photo.url.indexOf(bucketMarker);
+    const pathStart    = cleanUrl.indexOf(bucketMarker);
     if (pathStart === -1) {
       return NextResponse.json({ error: "Cannot resolve storage path" }, { status: 400 });
     }
-    const storagePath = photo.url.slice(pathStart + bucketMarker.length);
+    const storagePath = cleanUrl.slice(pathStart + bucketMarker.length);
 
     // Overwrite with the new (smaller) blob
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -48,7 +49,13 @@ export async function POST(req: NextRequest) {
 
     if (uploadErr) throw new Error(`Storage upload failed: ${uploadErr.message}`);
 
-    return NextResponse.json({ ok: true, id, storagePath });
+    // Append cache-buster so CDN serves the new file instead of the cached one
+    const newUrl = `${cleanUrl}?v=${Date.now()}`;
+    const { error: updateErr } = await supabaseAdmin
+      .from("route_photos").update({ url: newUrl }).eq("id", id);
+    if (updateErr) throw new Error(`DB update failed: ${updateErr.message}`);
+
+    return NextResponse.json({ ok: true, id, url: newUrl });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Recompress failed" },

@@ -46,7 +46,7 @@ function Section({
           )}
         </div>
         <h2
-          className="font-bold text-base"
+          className="m-0 font-bold text-base leading-snug"
           style={{ color: accent ? "#C8362A" : "var(--color-primary)" }}
         >
           {title}

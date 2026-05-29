@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.seoulsubwaytosummit.app",
+    "sha256_cert_fingerprints": ["27:CA:D8:B5:23:99:DC:2B:95:C7:38:27:E9:C5:B4:85:52:6C:93:60:CE:F9:3B:99:45:A6:3E:53:A5:DB:5F:23"]
+  }
+}]

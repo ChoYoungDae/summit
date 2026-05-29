@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 190">
+  <!-- Mountain silhouette: two peaks, left taller -->
+  <path d="M 0 186 L 70 10 L 108 60 L 148 22 L 200 186 Z" fill="#2E5E4A"/>
+
+  <!-- Trail: start dot -->
+  <circle cx="46" cy="158" r="7" fill="white"/>
+
+  <!-- S-curve trail path -->
+  <path d="M 46 158 C 46 122, 148 138, 148 102 C 148 66, 58 70, 82 42"
+        fill="none" stroke="white" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Arrowhead at trail end, pointing upper-right -->
+  <polyline points="66,38 82,42 78,56"
+            fill="none" stroke="white" stroke-width="9"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+```

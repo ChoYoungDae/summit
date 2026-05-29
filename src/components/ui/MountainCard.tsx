@@ -25,6 +25,7 @@ export default function MountainCard({ mountain, locale, priority = false }: Pro
   return (
     <Link
       href={`/route?mountain=${mountain.id}`}
+      prefetch={true}
       className="group relative flex flex-col h-[180px] rounded-2xl overflow-hidden shadow-sm active:scale-[0.98] transition-all duration-200"
     >
       {/* Background Image */}

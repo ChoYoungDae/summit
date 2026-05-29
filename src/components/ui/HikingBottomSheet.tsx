@@ -1,13 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
-import ElevationChart from "./ElevationChart";
+// import ElevationChart from "./ElevationChart"; // hidden — restore with chart
 import type { SegmentElevationInfo } from "./ElevationChart";
 import type { HikingPhase } from "@/types/trail";
-import { useHikingLevel } from "@/lib/useHikingLevel";
 import type { HikingGPSState } from "@/lib/useHikingGPS";
 import { useLanguage } from "@/lib/useLanguage";
 import { tUI } from "@/lib/i18n";
@@ -20,15 +16,11 @@ export type { SkillIndex } from "@/lib/hikingLevel";
 
 type Snap = "min" | "mid";
 
-export const MIN_H = 88; // px — visible height at min snap
+export const MIN_H = 72; // px — visible height at min snap
 
 // mid snap: show at most MID_MAX_H px — prevents large blank space on tall screens
 const MID_MAX_H = 280;
 
-function snapVisibleH(snap: Snap, vh: number): number {
-  if (snap === "min") return MIN_H;
-  return Math.min(Math.round(vh * 0.45), MID_MAX_H);
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,26 +63,24 @@ interface Props {
 export default function HikingBottomSheet({
   isHiking,
   hikingMode = "preview",
-  isLocating = false,
+  isLocating: _isLocating = false,
   onToggleHiking,
   gps,
-  track,
-  elevationSegments,
-  summitElevationM,
-  highlightIndex,
+  track: _track,
+  elevationSegments: _elevationSegments,
+  summitElevationM: _summitElevationM,
+  highlightIndex: _highlightIndex,
   onSheetHeightChange,
   showOffRoutePrompt = false,
   offRouteEnabled = true,
   onToggleOffRoute,
   onConfirmStart,
   onCancelPrompt,
-  visibleTrackRange,
+  visibleTrackRange: _visibleTrackRange,
   onSnapChange,
 }: Props) {
   const [snap, setSnap] = useState<Snap>("min");
 
-  const pathname = usePathname();
-  const { skill } = useHikingLevel();
   const { locale } = useLanguage();
 
   const progressPct = Math.round(gps.progressRatio * 100);
@@ -109,16 +99,6 @@ export default function HikingBottomSheet({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHiking]);
-
-  // Sheet only moves via user tap on the handle — no auto-expand.
-
-  function handleHandleTap() {
-    const vh = window.innerHeight;
-    const nextSnap: Snap = snap === "min" ? "mid" : "min";
-    setSnap(nextSnap);
-    onSheetHeightChange?.(snapVisibleH(nextSnap, vh));
-    onSnapChange?.(nextSnap);
-  }
 
   // ── Transform ─────────────────────────────────────────────────────────────
 
@@ -147,22 +127,10 @@ export default function HikingBottomSheet({
         }}
       >
 
-        {/* ── Tap handle ── */}
-        <div
-          className="flex flex-col items-center pt-2 pb-1 select-none cursor-pointer"
-          onClick={handleHandleTap}
-        >
-          <div className="w-9 h-1 rounded-full bg-gray-300 mb-0.5" />
-          {snap === "min"
-            ? <ChevronUp size={14} className="text-gray-400 animate-bounce-hint" />
-            : <ChevronDown size={14} className="text-gray-400 animate-bounce-hint" />
-          }
-        </div>
-
         {/* ══════════════════════════════════════════════════════
             MIN band — always visible
         ══════════════════════════════════════════════════════ */}
-        <div className="px-5">
+        <div className="px-5 pt-4">
           {isHiking ? (
             hikingMode === "active" ? (
               /* On-trail: progress bar + End Hike */
@@ -255,53 +223,7 @@ export default function HikingBottomSheet({
                 </button>
               </div>
             </div>
-          ) : (
-            /* Pre-hike: Start button + level badge */
-            <div className="flex items-center justify-between gap-4">
-              {/* Current level chip — taps through to Settings */}
-              <Link
-                href={`/settings?returnUrl=${encodeURIComponent(pathname)}`}
-                className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 active:opacity-70 transition-opacity"
-                style={{ background: "var(--color-bg-light)" }}
-              >
-                <div className="flex flex-col gap-0">
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wide leading-none"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    {tUI("myHikingLevel", locale)}
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <span
-                      className="text-[12px] font-bold leading-none"
-                      style={{ color: "var(--color-primary)" }}
-                    >
-                      {skill.label}
-                    </span>
-                    <span
-                      className="text-[11px] leading-none"
-                      style={{ color: "var(--color-text-muted)" }}
-                    >
-                      {skill.multiplier}×
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: "var(--color-text-muted)" }}
-                />
-              </Link>
-
-              <button
-                onClick={onToggleHiking}
-                disabled={isLocating}
-                className="shrink-0 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm active:scale-95 transition-transform disabled:opacity-60"
-                style={{ background: "var(--color-primary)" }}
-              >
-                {isLocating ? "…" : tUI("startHiking", locale)}
-              </button>
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* ══════════════════════════════════════════════════════
@@ -309,7 +231,7 @@ export default function HikingBottomSheet({
         ══════════════════════════════════════════════════════ */}
         <div className="px-5 pt-4 overflow-y-auto" style={{ maxHeight: "80vh" }}>
 
-          {/* Elevation chart */}
+          {/* ElevationChart — temporarily hidden; restore when needed
           {(elevationSegments?.some((s) => s.points.length > 0) ?? track.length > 0) && (
             <div className="mb-4">
               <ElevationChart
@@ -324,6 +246,7 @@ export default function HikingBottomSheet({
               />
             </div>
           )}
+          */}
 
         </div>
       </div>
